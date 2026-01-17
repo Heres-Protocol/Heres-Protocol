@@ -32,34 +32,33 @@ Lucid is built with a modern, decentralized architecture that combines frontend 
 ### Architecture Diagram
 
 ```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        A[Next.js App] --> B[Wallet Adapter]
-        A --> C[Helius API Client]
-        A --> D[Anchor Client]
-    end
-    
-    subgraph "Blockchain Layer"
-        D --> E[Solana Program]
-        E --> F[Intent Capsule PDA]
-        E --> G[System Program]
-    end
-    
-    subgraph "External Services"
-        C --> H[Helius RPC]
-        C --> I[Transaction History]
-        B --> J[Wallet Providers]
-    end
-    
-    subgraph "ZK Layer (Future)"
-        E --> K[Noir Verifier]
-        K --> L[Inactivity Proof]
-    end
-    
-    style A fill:#3b82f6
-    style E fill:#14f195
-    style F fill:#9945ff
-    style K fill:#ff6b6b
+sequenceDiagram
+    autonumber
+    participant User as User Wallet
+    participant UI as Lucid UI
+    participant Capsule as Intent Capsule (Solana Program)
+    participant Indexer as Activity Indexer
+    participant ZK as Noir ZK Prover
+    participant Chain as Solana Runtime
+
+    User->>UI: Define intent (conditions + actions)
+    UI->>Capsule: Create capsule (idle state)
+
+    Note over Capsule: Capsule does nothing while user is active
+
+    Indexer-->>Capsule: Observe wallet activity
+    Capsule-->>Capsule: Reset inactivity timer on activity
+
+    Note over Capsule: Silence begins (no activity)
+
+    Indexer-->>Capsule: Inactivity threshold reached
+    Capsule->>ZK: Request proof (no activity + conditions met)
+
+    ZK-->>Capsule: ZK proof (intent hidden)
+    Capsule->>Chain: Verify proof on-chain
+    Chain-->>Capsule: Proof valid
+
+    Capsule->>Chain: Execute intent
 ```
 
 ## 🔄 User Flow
