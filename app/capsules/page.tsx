@@ -941,19 +941,52 @@ export default function CapsulesPage() {
         }
         
         if (transactions && transactions.length > 0) {
+          // Extract and normalize timestamps from various possible locations
+          const transactionsWithTimestamps = transactions.map((tx: any) => {
+            // Try multiple locations for timestamp/blockTime
+            let timestamp = 0
+            if (tx.timestamp) {
+              timestamp = typeof tx.timestamp === 'number' ? tx.timestamp : parseInt(String(tx.timestamp))
+            } else if (tx.blockTime) {
+              timestamp = typeof tx.blockTime === 'number' ? tx.blockTime : parseInt(String(tx.blockTime))
+            } else if (tx.tx?.blockTime) {
+              timestamp = typeof tx.tx.blockTime === 'number' ? tx.tx.blockTime : parseInt(String(tx.tx.blockTime))
+            } else if (tx.transaction?.blockTime) {
+              timestamp = typeof tx.transaction.blockTime === 'number' ? tx.transaction.blockTime : parseInt(String(tx.transaction.blockTime))
+            } else if (tx.meta?.blockTime) {
+              timestamp = typeof tx.meta.blockTime === 'number' ? tx.meta.blockTime : parseInt(String(tx.meta.blockTime))
+            }
+            
+            // Convert to seconds if in milliseconds
+            if (timestamp > 1000000000000) {
+              timestamp = Math.floor(timestamp / 1000)
+            }
+            
+            return {
+              ...tx,
+              _extractedTimestamp: timestamp,
+              signature: tx.signature || tx.transactionSignature || tx.transaction?.signatures?.[0] || tx.tx?.signature || '',
+            }
+          })
+          
           // Sort transactions by timestamp (newest first)
-          transactions.sort((a, b) => {
-            const timeA = a.timestamp || a.blockTime || a.tx?.blockTime || 0
-            const timeB = b.timestamp || b.blockTime || b.tx?.blockTime || 0
+          transactionsWithTimestamps.sort((a, b) => {
+            const timeA = a._extractedTimestamp || 0
+            const timeB = b._extractedTimestamp || 0
             return timeB - timeA
           })
           
+          console.log('Enhanced Transactions API - sorted transactions:', transactionsWithTimestamps.slice(0, 5).map(tx => ({
+            signature: tx.signature?.substring(0, 8) + '...',
+            timestamp: tx._extractedTimestamp,
+            timestampDate: tx._extractedTimestamp ? new Date(tx._extractedTimestamp * 1000).toLocaleString() : 'N/A'
+          })))
+          
           // Convert Enhanced Transactions API format to match getTransactionsForAddress format
           heliusResult = {
-            data: transactions.map((tx: any) => ({
+            data: transactionsWithTimestamps.map((tx: any) => ({
               ...tx,
-              signature: tx.signature || tx.transactionSignature || tx.transaction?.signatures?.[0] || '',
-              blockTime: tx.timestamp || tx.blockTime || tx.tx?.blockTime,
+              blockTime: tx._extractedTimestamp || tx.timestamp || tx.blockTime || tx.tx?.blockTime,
             })),
           }
         }
@@ -1028,14 +1061,21 @@ export default function CapsulesPage() {
             })
             
             // Check for execution transaction - expand search terms
+            // Look for "Instruction: ExecuteIntent" (exact match) or variations
+            // Also check for "Transferred" messages which indicate asset distribution
             const hasExecuteLog = logMessages.some((log: string) => {
               if (typeof log !== 'string') return false
               const logLower = log.toLowerCase()
-              return logLower.includes('execute_intent') || 
+              const logOriginal = log // Keep original for exact match
+              return logOriginal.includes('Instruction: ExecuteIntent') ||
+                     logOriginal.includes('ExecuteIntent') ||
+                     logOriginal.includes('Transferred') && logOriginal.includes('lamports') && logOriginal.includes('beneficiary') ||
+                     logLower.includes('execute_intent') || 
                      logLower.includes('instruction: execute_intent') ||
                      logLower.includes('intent executed') ||
                      logLower.includes('intentexecuted') ||
                      logLower.includes('executeintent') ||
+                     logLower.includes('transferred') && logLower.includes('beneficiary') ||
                      logLower.includes('execute') ||
                      logLower.includes('execution') ||
                      logLower.includes('executed')
@@ -1523,6 +1563,25 @@ export default function CapsulesPage() {
           // Force state update with a new array reference
           setTransactions([...uniqueTxs])
           console.log('Transactions state updated with merged data, count:', uniqueTxs.length)
+          
+          // Find and set the most recent execution transaction
+          const executionTxs = uniqueTxs.filter(tx => tx.type === 'execution')
+          if (executionTxs.length > 0) {
+            // Sort by timestamp (newest first)
+            executionTxs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+            const mostRecentExecution = executionTxs[0]
+            if (mostRecentExecution.signature) {
+              // Update execution transaction signature if different
+              if (executionTxSignature !== mostRecentExecution.signature) {
+                setExecutionTxSignature(mostRecentExecution.signature)
+                console.log(`Updated execution transaction signature to most recent: ${mostRecentExecution.signature.substring(0, 8)}...`)
+                
+                // Also update localStorage main key
+                const executionTxKey = STORAGE_KEYS.CAPSULE_EXECUTION_TX(walletAddress)
+                localStorage.setItem(executionTxKey, mostRecentExecution.signature)
+              }
+            }
+          }
           
           // After all transactions are processed, find and update the most recent creation transaction
           if (publicKey && uniqueTxs.length > 0) {
