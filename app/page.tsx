@@ -387,19 +387,12 @@ export default function Home() {
       {/* Architecture Section */}
       <section className="relative py-24 px-6 z-20 bg-slate-950/50">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <header className="mb-12 text-center">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4">
-              <Zap size={10} className="fill-current" />
-              <span>How It Works</span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-2 bg-gradient-to-b from-white to-slate-500 bg-clip-text text-transparent">
-              LUCID FLOW
-            </h2>
-            <p className="text-slate-400 max-w-lg mx-auto text-base font-light leading-relaxed">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-4">Architecture</h2>
+            <p className="text-xl md:text-2xl text-slate-400 max-w-3xl mx-auto">
               The architecture of verifiable silence. Nothing happens on-chain until inactivity is proven via Noir ZK.
             </p>
-          </header>
+          </div>
 
           {/* Side-by-Side Content Area */}
           <div className="flex flex-col lg:flex-row gap-8 items-start mb-16">
