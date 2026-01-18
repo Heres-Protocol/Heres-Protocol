@@ -811,20 +811,9 @@ export default function CapsulesPage() {
       // Store transactions from localStorage for later merging
       localStorageTxs = [...transactionsList]
       
-      // Immediately set transactions from localStorage so they're visible
-      if (localStorageTxs.length > 0) {
-        console.log('Setting transactions from localStorage:', localStorageTxs.length, localStorageTxs)
-        const sortedTxs = [...localStorageTxs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-        setTransactions(sortedTxs)
-        console.log('Transactions state updated with localStorage data:', sortedTxs.length)
-      } else {
-        console.log('No transactions found in localStorage')
-        // Ensure empty array is set
-        if (transactions.length > 0) {
-          console.log('Clearing existing transactions state')
-          setTransactions([])
-        }
-      }
+      // Don't set transactions from localStorage immediately - wait for Helius API results
+      // This ensures we get the most recent transactions from the API first
+      console.log('Loaded transactions from localStorage:', localStorageTxs.length)
       
       // Try to find capsule creation transaction
       // First, get capsule PDA to search for transactions involving it
@@ -1314,13 +1303,32 @@ export default function CapsulesPage() {
             
             // Always save program-related transactions to localStorage, even if type is unclear
             if (involvesProgram) {
-              const timestamp = tx.timestamp || tx.blockTime || Math.floor(Date.now() / 1000)
+              // Extract timestamp from various possible locations in Helius API response
+              let timestamp = 0
+              
+              // Try different locations for timestamp/blockTime
+              if (tx.timestamp) {
+                timestamp = typeof tx.timestamp === 'number' ? tx.timestamp : parseInt(String(tx.timestamp))
+              } else if (tx.blockTime) {
+                timestamp = typeof tx.blockTime === 'number' ? tx.blockTime : parseInt(String(tx.blockTime))
+              } else if (tx.transaction?.blockTime) {
+                timestamp = typeof tx.transaction.blockTime === 'number' ? tx.transaction.blockTime : parseInt(String(tx.transaction.blockTime))
+              } else if (tx.meta?.blockTime) {
+                timestamp = typeof tx.meta.blockTime === 'number' ? tx.meta.blockTime : parseInt(String(tx.meta.blockTime))
+              } else if (tx.tx?.blockTime) {
+                timestamp = typeof tx.tx.blockTime === 'number' ? tx.tx.blockTime : parseInt(String(tx.tx.blockTime))
+              } else {
+                // Fallback to current time if no timestamp found
+                timestamp = Math.floor(Date.now() / 1000)
+                console.warn(`No timestamp found for transaction ${signature.substring(0, 8)}..., using current time`)
+              }
+              
               const txData = {
                 signature,
-                timestamp: typeof timestamp === 'number' ? timestamp : parseInt(String(timestamp)),
-                slot: tx.slot,
-                fee: tx.fee || tx.meta?.fee,
-                err: tx.err || tx.meta?.err,
+                timestamp,
+                slot: tx.slot || tx.transaction?.slot || tx.tx?.slot,
+                fee: tx.fee || tx.meta?.fee || tx.transaction?.meta?.fee || tx.tx?.meta?.fee,
+                err: tx.err || tx.meta?.err || tx.transaction?.meta?.err || tx.tx?.meta?.err,
                 type: txType || 'creation', // Default to creation if type unclear
               }
               
@@ -1429,12 +1437,15 @@ export default function CapsulesPage() {
           }
           
           // Merge with localStorage transactions
-          const allTxs = [...localStorageTxs, ...allCapsuleTxs]
-          console.log('Merging transactions - localStorage:', localStorageTxs.length, 'Helius:', allCapsuleTxs.length, 'Total:', allTxs.length)
-          console.log('Helius capsule transactions:', allCapsuleTxs.map(tx => ({
+          // Prioritize Helius API transactions (they are more recent and accurate)
+          // Then merge with localStorage transactions, ensuring no duplicates
+          const allTxs = [...allCapsuleTxs, ...localStorageTxs]
+          console.log('Merging transactions - Helius (priority):', allCapsuleTxs.length, 'localStorage:', localStorageTxs.length, 'Total:', allTxs.length)
+          console.log('Helius capsule transactions (sorted by timestamp):', allCapsuleTxs.map(tx => ({
             signature: tx.signature?.substring(0, 8) + '...',
             type: tx.type,
-            timestamp: tx.timestamp
+            timestamp: tx.timestamp,
+            timestampDate: tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : 'N/A'
           })))
           
           // Debug: If no Helius transactions found, log why
@@ -1444,11 +1455,14 @@ export default function CapsulesPage() {
             console.warn('Program ID:', programId)
           }
           
-          // Remove duplicates, prioritizing execution type over creation
-          // If same signature appears with different types, keep the execution type
+          // Remove duplicates, prioritizing:
+          // 1. Execution type over creation
+          // 2. Helius API data over localStorage (more recent and accurate)
+          // 3. Most recent timestamp
           const uniqueTxs: any[] = []
           const seenSignatures = new Map<string, any>()
           
+          // First pass: Add all transactions, prioritizing Helius API data
           for (const tx of allTxs) {
             if (!tx.signature) continue
             
@@ -1458,27 +1472,46 @@ export default function CapsulesPage() {
               seenSignatures.set(tx.signature, tx)
               uniqueTxs.push(tx)
             } else {
-              // Duplicate signature - prioritize execution type
-              if (tx.type === 'execution' && existing.type === 'creation') {
-                // Replace creation with execution
+              // Duplicate signature - decide which one to keep
+              const keepExisting = 
+                // Keep existing if it's execution and new is creation
+                (existing.type === 'execution' && tx.type === 'creation') ||
+                // Keep existing if it has a more recent timestamp
+                ((existing.timestamp || 0) > (tx.timestamp || 0)) ||
+                // Keep existing if types are same and timestamps are equal
+                (existing.type === tx.type && (existing.timestamp || 0) >= (tx.timestamp || 0))
+              
+              if (!keepExisting) {
+                // Replace with new transaction
                 const index = uniqueTxs.findIndex(t => t.signature === tx.signature)
                 if (index !== -1) {
                   uniqueTxs[index] = tx
                   seenSignatures.set(tx.signature, tx)
-                  console.log(`Upgraded transaction ${tx.signature.substring(0, 8)}... from creation to execution`)
+                  console.log(`Replaced transaction ${tx.signature.substring(0, 8)}... with newer/execution version`)
                 }
-              } else if (tx.type === 'execution' && existing.type !== 'execution') {
-                // Ensure execution type is preserved
+              } else if (tx.type === 'execution' && existing.type === 'creation') {
+                // Upgrade creation to execution
                 const index = uniqueTxs.findIndex(t => t.signature === tx.signature)
                 if (index !== -1) {
                   uniqueTxs[index] = { ...uniqueTxs[index], type: 'execution' }
                   seenSignatures.set(tx.signature, uniqueTxs[index])
+                  console.log(`Upgraded transaction ${tx.signature.substring(0, 8)}... from creation to execution`)
                 }
               }
             }
           }
           
-          uniqueTxs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+          // Sort by timestamp (newest first) - this ensures the most recent transaction is first
+          uniqueTxs.sort((a, b) => {
+            const timeA = a.timestamp || 0
+            const timeB = b.timestamp || 0
+            // If timestamps are equal, prioritize execution type
+            if (timeA === timeB) {
+              if (a.type === 'execution' && b.type === 'creation') return -1
+              if (a.type === 'creation' && b.type === 'execution') return 1
+            }
+            return timeB - timeA
+          })
           
           console.log('Final merged transactions:', uniqueTxs.length)
           if (uniqueTxs.length > 0) {
