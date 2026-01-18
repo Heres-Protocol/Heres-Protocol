@@ -150,55 +150,8 @@ export async function getTransactionsForAddress(
  */
 export async function getWalletActivity(walletAddress: string): Promise<WalletActivity | null> {
   try {
-    // Try new getTransactionsForAddress RPC method first (requires paid plan)
-    const result = await getTransactionsForAddress(walletAddress, {
-      transactionDetails: 'signatures', // Use signatures for faster response
-      sortOrder: 'desc', // Newest first
-      limit: 100,
-      filters: {
-        status: 'succeeded', // Only successful transactions
-        tokenAccounts: 'balanceChanged', // Include token account balance changes
-      },
-    })
-
-    // If result is available, use it
-    if (result && result.data && result.data.length > 0) {
-      const transactions = result.data
-      const latestTx = transactions[0]
-
-      const signature = latestTx.signature || 
-                       latestTx.transaction?.signatures?.[0] ||
-                       ''
-
-      let timestamp = 0
-      if (latestTx.blockTime) {
-        timestamp = typeof latestTx.blockTime === 'number'
-          ? latestTx.blockTime
-          : parseInt(String(latestTx.blockTime))
-      } else if (latestTx.transaction?.blockTime) {
-        timestamp = typeof latestTx.transaction.blockTime === 'number'
-          ? latestTx.transaction.blockTime
-          : parseInt(String(latestTx.transaction.blockTime))
-      }
-
-      const timestampMs = timestamp > 1000000000000 ? timestamp : timestamp * 1000
-
-      console.log('Helius RPC (getTransactionsForAddress) response for wallet:', walletAddress, {
-        transactionCount: transactions.length,
-        latestSignature: signature,
-        latestTimestamp: timestampMs,
-      })
-
-      return {
-        wallet: walletAddress,
-        lastSignature: signature,
-        lastActivityTimestamp: timestampMs,
-        transactionCount: transactions.length,
-      }
-    }
-
-    // Fallback to Enhanced Transactions API (free tier)
-    console.log('Falling back to Enhanced Transactions API for wallet:', walletAddress)
+    // Use Enhanced Transactions API (free tier)
+    console.log('Fetching wallet activity from Enhanced Transactions API for wallet:', walletAddress)
     const response = await fetch(
       `${HELIUS_CONFIG.BASE_URL}/addresses/${walletAddress}/transactions?api-key=${SOLANA_CONFIG.HELIUS_API_KEY}&limit=100`
     )

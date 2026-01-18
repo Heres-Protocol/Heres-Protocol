@@ -7,7 +7,8 @@ import { ArrowLeft, Shield, Clock, CheckCircle, XCircle, ExternalLink, Lock, Act
 import Link from 'next/link'
 import Image from 'next/image'
 import { getCapsule, executeIntent } from '@/lib/solana'
-import { getWalletActivity, getTransactionsForAddress } from '@/lib/helius'
+import { getWalletActivity } from '@/lib/helius'
+import type { GetTransactionsForAddressResponse } from '@/lib/helius'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
 import { getCapsulePDA } from '@/lib/program'
 import { decodeIntentData, secondsToDays } from '@/utils/intent'
@@ -910,57 +911,54 @@ export default function CapsulesPage() {
         // Fall through to Helius RPC
       }
       
-      // Method 2: Try getTransactionsForAddress RPC method first (requires paid plan)
-      // If not available, fallback to Enhanced Transactions API
-      let heliusResult = await getTransactionsForAddress(walletAddress, {
-        transactionDetails: 'full', // Get full transaction data in one call
-        sortOrder: 'desc', // Newest first
-        limit: 100,
-        filters: {
-          status: 'succeeded', // Only successful transactions
-          tokenAccounts: 'balanceChanged', // Include token account balance changes
-        },
-      })
+      // Method 2: Use Enhanced Transactions API (free tier)
+      console.log('Fetching transactions from Enhanced Transactions API')
+      let heliusResult: GetTransactionsForAddressResponse | null = null
       
-      // If getTransactionsForAddress is not available (403 error), fallback to Enhanced Transactions API
-      if (!heliusResult || !heliusResult.data || heliusResult.data.length === 0) {
-        console.log('getTransactionsForAddress not available, falling back to Enhanced Transactions API')
-        const response = await fetch(
-          `${HELIUS_CONFIG.BASE_URL}/addresses/${walletAddress}/transactions?api-key=${SOLANA_CONFIG.HELIUS_API_KEY}&limit=100`
-        )
+      const response = await fetch(
+        `${HELIUS_CONFIG.BASE_URL}/addresses/${walletAddress}/transactions?api-key=${SOLANA_CONFIG.HELIUS_API_KEY}&limit=100`
+      )
+      
+      if (response.ok) {
+        let data: any
+        try {
+          data = await response.json()
+        } catch (parseError) {
+          console.error('Error parsing Enhanced Transactions API response:', parseError)
+          return
+        }
         
-        if (response.ok) {
-          let data: any
-          try {
-            data = await response.json()
-          } catch (parseError) {
-            console.error('Error parsing Enhanced Transactions API response:', parseError)
-            return
-          }
+        // Handle different response formats
+        let transactions: any[] = []
+        if (Array.isArray(data)) {
+          transactions = data
+        } else if (data && Array.isArray(data.transactions)) {
+          transactions = data.transactions
+        } else if (data && data.result && Array.isArray(data.result)) {
+          transactions = data.result
+        } else if (data && data.data && Array.isArray(data.data)) {
+          transactions = data.data
+        }
+        
+        if (transactions && transactions.length > 0) {
+          // Sort transactions by timestamp (newest first)
+          transactions.sort((a, b) => {
+            const timeA = a.timestamp || a.blockTime || a.tx?.blockTime || 0
+            const timeB = b.timestamp || b.blockTime || b.tx?.blockTime || 0
+            return timeB - timeA
+          })
           
-          // Handle different response formats
-          let transactions: any[] = []
-          if (Array.isArray(data)) {
-            transactions = data
-          } else if (data && Array.isArray(data.transactions)) {
-            transactions = data.transactions
-          } else if (data && data.result && Array.isArray(data.result)) {
-            transactions = data.result
-          } else if (data && data.data && Array.isArray(data.data)) {
-            transactions = data.data
-          }
-          
-          if (transactions && transactions.length > 0) {
-            // Convert Enhanced Transactions API format to match getTransactionsForAddress format
-            heliusResult = {
-              data: transactions.map((tx: any) => ({
-                ...tx,
-                signature: tx.signature || tx.transactionSignature || tx.transaction?.signatures?.[0] || '',
-                blockTime: tx.timestamp || tx.blockTime || tx.tx?.blockTime,
-              })),
-            }
+          // Convert Enhanced Transactions API format to match getTransactionsForAddress format
+          heliusResult = {
+            data: transactions.map((tx: any) => ({
+              ...tx,
+              signature: tx.signature || tx.transactionSignature || tx.transaction?.signatures?.[0] || '',
+              blockTime: tx.timestamp || tx.blockTime || tx.tx?.blockTime,
+            })),
           }
         }
+      } else {
+        console.warn(`Enhanced Transactions API error: ${response.status} ${response.statusText}`)
       }
       
       if (heliusResult && heliusResult.data && heliusResult.data.length > 0) {
