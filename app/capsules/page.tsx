@@ -281,9 +281,83 @@ export default function CapsulesPage() {
         }
       }
 
+      // Load executed capsules from localStorage first (needed to find most recent execution tx)
+      const executedCapsulesKey = STORAGE_KEYS.EXECUTED_CAPSULES(publicKey.toString())
+      const savedExecutedCapsules = localStorage.getItem(executedCapsulesKey)
+      let loadedExecutedCapsules: Array<{ capsule: IntentCapsule; intentData: any; executedAt: number; executionTx: string | null }> = []
+      
+      if (savedExecutedCapsules) {
+        try {
+          const parsed = JSON.parse(savedExecutedCapsules)
+          loadedExecutedCapsules = Array.isArray(parsed) ? parsed : []
+          console.log('Loaded executed capsules from localStorage:', loadedExecutedCapsules.length)
+        } catch (e) {
+          console.error('Error parsing executed capsules:', e)
+          loadedExecutedCapsules = []
+        }
+      }
+
       // Load capsule execution transaction signature from localStorage
-      const executionTxKey = STORAGE_KEYS.CAPSULE_EXECUTION_TX(publicKey.toString())
-      let savedExecutionTx = localStorage.getItem(executionTxKey)
+      // First, try to get the most recent execution transaction from executed capsules
+      let savedExecutionTx: string | null = null
+      
+      // Check executed capsules first - they have the most accurate execution transaction
+      if (loadedExecutedCapsules.length > 0) {
+        // Sort by executedAt (most recent first) and get the latest executionTx
+        const sortedCapsules = loadedExecutedCapsules
+          .filter(ec => ec.executionTx)
+          .sort((a, b) => (b.executedAt || 0) - (a.executedAt || 0))
+        
+        if (sortedCapsules.length > 0 && sortedCapsules[0].executionTx) {
+          savedExecutionTx = sortedCapsules[0].executionTx
+          console.log('Using execution transaction from executed capsules:', savedExecutionTx.substring(0, 8) + '...')
+        }
+      }
+      
+      // Fallback to main execution tx key if not found in executed capsules
+      if (!savedExecutionTx) {
+        const executionTxKey = STORAGE_KEYS.CAPSULE_EXECUTION_TX(publicKey.toString())
+        savedExecutionTx = localStorage.getItem(executionTxKey)
+      }
+      
+      // Also check all execution transactions with signature keys to find the most recent one
+      if (!savedExecutionTx) {
+        const allExecutionTxs: Array<{ signature: string; timestamp: number }> = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.startsWith(`capsule_execution_tx_${publicKey.toString()}_`)) {
+            const sig = localStorage.getItem(key)
+            if (sig) {
+              allExecutionTxs.push({ signature: sig, timestamp: 0 })
+            }
+          }
+        }
+        
+        // Try to get timestamps for all execution transactions
+        if (allExecutionTxs.length > 0) {
+          const connection = getSolanaConnection()
+          for (const txInfo of allExecutionTxs) {
+            try {
+              const tx = await connection.getTransaction(txInfo.signature, {
+                commitment: 'confirmed',
+                maxSupportedTransactionVersion: 0,
+              })
+              if (tx && tx.blockTime) {
+                txInfo.timestamp = tx.blockTime
+              }
+            } catch (error) {
+              console.warn('Error fetching transaction timestamp:', error)
+            }
+          }
+          
+          // Sort by timestamp and get the most recent
+          allExecutionTxs.sort((a, b) => b.timestamp - a.timestamp)
+          if (allExecutionTxs.length > 0 && allExecutionTxs[0].timestamp > 0) {
+            savedExecutionTx = allExecutionTxs[0].signature
+            console.log('Using most recent execution transaction from localStorage:', savedExecutionTx.substring(0, 8) + '...')
+          }
+        }
+      }
       
       // Validate the execution signature if it exists
       if (savedExecutionTx) {
@@ -296,8 +370,9 @@ export default function CapsulesPage() {
           // If transaction doesn't exist or is invalid, clear it
           if (!tx || !tx.blockTime) {
             console.warn('Invalid execution transaction signature in localStorage, clearing it')
+            const executionTxKey = STORAGE_KEYS.CAPSULE_EXECUTION_TX(publicKey.toString())
             localStorage.removeItem(executionTxKey)
-            // Note: savedExecutionTx is already cleared from localStorage, no need to reassign
+            savedExecutionTx = null
           } else {
             setExecutionTxSignature(savedExecutionTx)
             // If execution was successful, set verification status
@@ -319,30 +394,15 @@ export default function CapsulesPage() {
           }
         } catch (error) {
           console.warn('Error validating execution transaction signature, clearing it:', error)
+          const executionTxKey = STORAGE_KEYS.CAPSULE_EXECUTION_TX(publicKey.toString())
           localStorage.removeItem(executionTxKey)
-          // Note: savedExecutionTx is already cleared from localStorage, no need to reassign
+          savedExecutionTx = null
         }
       }
 
-      // Load executed capsules from localStorage
-      const executedCapsulesKey = STORAGE_KEYS.EXECUTED_CAPSULES(publicKey.toString())
-      const savedExecutedCapsules = localStorage.getItem(executedCapsulesKey)
-      let loadedExecutedCapsules: Array<{ capsule: IntentCapsule; intentData: any; executedAt: number; executionTx: string | null }> = []
-      
-      if (savedExecutedCapsules) {
-        try {
-          const parsed = JSON.parse(savedExecutedCapsules)
-          loadedExecutedCapsules = Array.isArray(parsed) ? parsed : []
-          console.log('Loaded executed capsules from localStorage:', loadedExecutedCapsules.length)
-        } catch (e) {
-          console.error('Error parsing executed capsules:', e)
-          loadedExecutedCapsules = []
-        }
-      }
-      
       // Also try to reconstruct executed capsules from execution transactions and intent data
-      // Use the already loaded savedExecutionTx from above, or reload if it was cleared
-      const currentExecutionTx = savedExecutionTx || localStorage.getItem(executionTxKey)
+      // Use the already loaded savedExecutionTx from above
+      const currentExecutionTx = savedExecutionTx
       
       // Find ALL intent data from localStorage for this wallet
       const allIntentData: Array<{ key: string; intent: string; timestamp: number }> = []
