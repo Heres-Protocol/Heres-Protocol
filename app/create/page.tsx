@@ -196,6 +196,18 @@ export default function CreatePage() {
 
       const inactivityPeriodSeconds = daysToSeconds(inactivityDaysNum)
 
+      // Final check before submitting transaction - re-fetch to ensure state hasn't changed
+      if (publicKey) {
+        const finalCheck = await getCapsule(publicKey)
+        if (finalCheck && finalCheck.isActive && !finalCheck.executedAt) {
+          const errorMsg = 'You already have an active capsule. Please deactivate it first or update the existing one.'
+          setError(errorMsg)
+          alert(errorMsg + '\n\nYou can view your existing capsule at /capsules')
+          setIsPending(false)
+          return
+        }
+      }
+
       // Check if there's an executed capsule - if so, recreate it instead of creating new
       let hash: string
       if (publicKey) {
@@ -264,12 +276,49 @@ export default function CreatePage() {
       console.error('Error creating capsule:', err)
       let errorMessage = err.message || 'Failed to create capsule'
       
-      // Check for specific error messages
-      if (errorMessage.includes('already in use') || errorMessage.includes('custom program error: 0x0')) {
+      // Check if error is "already processed" - this might mean the transaction succeeded
+      // but we got an error response. Verify if capsule was actually created.
+      if (errorMessage.includes('already processed') || errorMessage.includes('This transaction has already been processed')) {
+        console.log('Transaction may have been processed. Checking if capsule was created...')
+        try {
+          // Wait a bit for the transaction to be confirmed
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          
+          // Check if capsule was actually created
+          if (publicKey) {
+            const createdCapsule = await getCapsule(publicKey)
+            if (createdCapsule && createdCapsule.isActive) {
+              // Capsule was successfully created despite the error
+              console.log('Capsule was successfully created despite error message')
+              alert('Capsule created successfully!')
+              window.location.href = '/capsules'
+              setIsPending(false)
+              return
+            }
+          }
+        } catch (checkError) {
+          console.error('Error checking capsule after "already processed" error:', checkError)
+        }
+        
+        // If capsule wasn't created, show appropriate error
+        errorMessage = 'Transaction was already processed or duplicate submission. Please try again in a moment.'
+      } else if (errorMessage.includes('already in use') || errorMessage.includes('custom program error: 0x0')) {
         errorMessage = 'A capsule already exists for this wallet. Please visit /capsules to view or update your existing capsule.'
       } else if (errorMessage.includes('Simulation failed')) {
-        if (errorMessage.includes('already in use')) {
+        if (errorMessage.includes('already in use') || errorMessage.includes('already processed')) {
           errorMessage = 'A capsule already exists for this wallet. Please visit /capsules to view or update your existing capsule.'
+        } else {
+          // For other simulation failures, check if it's because capsule already exists
+          try {
+            if (publicKey) {
+              const existingCapsule = await getCapsule(publicKey)
+              if (existingCapsule && existingCapsule.isActive && !existingCapsule.executedAt) {
+                errorMessage = 'You already have an active capsule. Please deactivate it first or update the existing one.'
+              }
+            }
+          } catch (checkError) {
+            console.error('Error checking capsule after simulation failure:', checkError)
+          }
         }
       }
       
