@@ -217,16 +217,53 @@ export default function CapsulesPage() {
         }
       }
       
+      // First, find execution transaction to exclude it from creation transaction search
+      // Load executed capsules to get execution transaction first
+      const executedCapsulesKey = STORAGE_KEYS.EXECUTED_CAPSULES(publicKey.toString())
+      const savedExecutedCapsules = localStorage.getItem(executedCapsulesKey)
+      let loadedExecutedCapsules: Array<{ capsule: IntentCapsule; intentData: any; executedAt: number; executionTx: string | null }> = []
+      
+      if (savedExecutedCapsules) {
+        try {
+          const parsed = JSON.parse(savedExecutedCapsules)
+          loadedExecutedCapsules = Array.isArray(parsed) ? parsed : []
+          console.log('Loaded executed capsules from localStorage:', loadedExecutedCapsules.length)
+        } catch (e) {
+          console.error('Error parsing executed capsules:', e)
+          loadedExecutedCapsules = []
+        }
+      }
+
+      // Get execution transaction signature first (to exclude it from creation transaction search)
+      let executionTxToExclude: string | null = null
+      if (capsuleData && capsuleData.executedAt && !capsuleData.isActive) {
+        const currentExecutedAt = capsuleData.executedAt
+        const matchingExecutedCapsule = loadedExecutedCapsules.find(
+          ec => ec.executedAt === currentExecutedAt || 
+                (ec.executionTx && ec.executedAt && Math.abs(ec.executedAt - currentExecutedAt) < 60)
+        )
+        if (matchingExecutedCapsule && matchingExecutedCapsule.executionTx) {
+          executionTxToExclude = matchingExecutedCapsule.executionTx
+        }
+      }
+
       // If current capsule is executed, find the creation transaction that matches this capsule
-      // by checking which creation transaction happened before the execution
+      // by checking which creation transaction happened before the execution AND is not the execution transaction
       let matchedCreationTx: { key: string; signature: string; timestamp: number } | null = null
       
       if (capsuleData && capsuleData.executedAt && !capsuleData.isActive) {
         // For executed capsules, find the creation transaction that was used to create this capsule
         // It should be the most recent creation transaction before the execution time
+        // AND it should NOT be the execution transaction
         const executionTimestamp = capsuleData.executedAt
         
         for (const { key, signature } of allCreationTxsWithKeys) {
+          // Skip if this is the execution transaction
+          if (executionTxToExclude && signature === executionTxToExclude) {
+            console.log('Skipping execution transaction from creation transaction search:', signature.substring(0, 8) + '...')
+            continue
+          }
+
           try {
             const connection = getSolanaConnection()
             const tx = await connection.getTransaction(signature, {
@@ -236,6 +273,24 @@ export default function CapsulesPage() {
             
             if (tx && tx.blockTime) {
               const timestamp = tx.blockTime
+              
+              // Verify this is actually a creation transaction by checking logs
+              const logMessages = tx.meta?.logMessages || []
+              const isCreationTx = logMessages.some((log: string) => {
+                if (typeof log !== 'string') return false
+                const logLower = log.toLowerCase()
+                return logLower.includes('createcapsule') || 
+                       logLower.includes('instruction: createcapsule') ||
+                       logLower.includes('recreatecapsule') ||
+                       logLower.includes('instruction: recreatecapsule')
+              })
+
+              // Skip if this is not a creation transaction (might be execution transaction)
+              if (!isCreationTx) {
+                console.log('Skipping non-creation transaction:', signature.substring(0, 8) + '...')
+                continue
+              }
+
               // Creation transaction should be before execution
               // Find the most recent creation transaction before execution
               if (timestamp < executionTimestamp) {
@@ -327,29 +382,12 @@ export default function CapsulesPage() {
         }
       }
 
-      // Load executed capsules from localStorage first (needed to find most recent execution tx)
-      const executedCapsulesKey = STORAGE_KEYS.EXECUTED_CAPSULES(publicKey.toString())
-      const savedExecutedCapsules = localStorage.getItem(executedCapsulesKey)
-      let loadedExecutedCapsules: Array<{ capsule: IntentCapsule; intentData: any; executedAt: number; executionTx: string | null }> = []
-      
-      if (savedExecutedCapsules) {
-        try {
-          const parsed = JSON.parse(savedExecutedCapsules)
-          loadedExecutedCapsules = Array.isArray(parsed) ? parsed : []
-          console.log('Loaded executed capsules from localStorage:', loadedExecutedCapsules.length)
-        } catch (e) {
-          console.error('Error parsing executed capsules:', e)
-          loadedExecutedCapsules = []
-        }
-      }
-
       // Load capsule execution transaction signature from localStorage
-      // If current capsule is executed, use its specific execution transaction
-      let savedExecutionTx: string | null = null
+      // Use the execution transaction we found earlier (executionTxToExclude)
+      let savedExecutionTx: string | null = executionTxToExclude
       
-      // If current capsule is executed, find the matching executed capsule entry
-      if (capsuleData && capsuleData.executedAt && !capsuleData.isActive) {
-        // Find executed capsule entry that matches current capsule's executedAt
+      // If we didn't find it earlier, try to find it from loadedExecutedCapsules
+      if (!savedExecutionTx && capsuleData && capsuleData.executedAt && !capsuleData.isActive) {
         const currentExecutedAt = capsuleData.executedAt
         const matchingExecutedCapsule = loadedExecutedCapsules.find(
           ec => ec.executedAt === currentExecutedAt || 
