@@ -217,8 +217,53 @@ export default function CapsulesPage() {
         }
       }
       
-      // Find the most recent transaction by fetching and comparing timestamps
-      if (allCreationTxsWithKeys.length > 0) {
+      // If current capsule is executed, find the creation transaction that matches this capsule
+      // by checking which creation transaction happened before the execution
+      let matchedCreationTx: { key: string; signature: string; timestamp: number } | null = null
+      
+      if (capsuleData && capsuleData.executedAt && !capsuleData.isActive) {
+        // For executed capsules, find the creation transaction that was used to create this capsule
+        // It should be the most recent creation transaction before the execution time
+        const executionTimestamp = capsuleData.executedAt
+        
+        for (const { key, signature } of allCreationTxsWithKeys) {
+          try {
+            const connection = getSolanaConnection()
+            const tx = await connection.getTransaction(signature, {
+              commitment: 'confirmed',
+              maxSupportedTransactionVersion: 0,
+            })
+            
+            if (tx && tx.blockTime) {
+              const timestamp = tx.blockTime
+              // Creation transaction should be before execution
+              // Find the most recent creation transaction before execution
+              if (timestamp < executionTimestamp) {
+                if (!matchedCreationTx || timestamp > matchedCreationTx.timestamp) {
+                  matchedCreationTx = { key, signature, timestamp }
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(`Could not fetch transaction ${signature.substring(0, 8)}... for timestamp comparison:`, error)
+          }
+        }
+        
+        if (matchedCreationTx) {
+          savedTx = matchedCreationTx.signature
+          localStorage.setItem(txKey, matchedCreationTx.signature)
+          setCreationTxSignature(matchedCreationTx.signature)
+          console.log('Found creation transaction for executed capsule:', matchedCreationTx.signature.substring(0, 8) + '...', {
+            creationTimestamp: matchedCreationTx.timestamp,
+            executionTimestamp: executionTimestamp,
+            creationTime: new Date(matchedCreationTx.timestamp * 1000).toLocaleString(),
+            executionTime: new Date(executionTimestamp * 1000).toLocaleString()
+          })
+        }
+      }
+      
+      // If no matched creation transaction found (or capsule is not executed), find the most recent one
+      if (!savedTx && allCreationTxsWithKeys.length > 0) {
         let mostRecentTx: { key: string; signature: string; timestamp: number } | null = null
         
         for (const { key, signature } of allCreationTxsWithKeys) {
@@ -299,11 +344,28 @@ export default function CapsulesPage() {
       }
 
       // Load capsule execution transaction signature from localStorage
-      // First, try to get the most recent execution transaction from executed capsules
+      // If current capsule is executed, use its specific execution transaction
       let savedExecutionTx: string | null = null
       
-      // Check executed capsules first - they have the most accurate execution transaction
-      if (loadedExecutedCapsules.length > 0) {
+      // If current capsule is executed, find the matching executed capsule entry
+      if (capsuleData && capsuleData.executedAt && !capsuleData.isActive) {
+        // Find executed capsule entry that matches current capsule's executedAt
+        const matchingExecutedCapsule = loadedExecutedCapsules.find(
+          ec => ec.executedAt === capsuleData.executedAt || 
+                (ec.executionTx && Math.abs((ec.executedAt || 0) - capsuleData.executedAt) < 60) // Within 60 seconds
+        )
+        
+        if (matchingExecutedCapsule && matchingExecutedCapsule.executionTx) {
+          savedExecutionTx = matchingExecutedCapsule.executionTx
+          console.log('Using execution transaction from matching executed capsule:', savedExecutionTx.substring(0, 8) + '...', {
+            executedAt: capsuleData.executedAt,
+            matchedExecutedAt: matchingExecutedCapsule.executedAt
+          })
+        }
+      }
+      
+      // Fallback: Check executed capsules for most recent execution transaction
+      if (!savedExecutionTx && loadedExecutedCapsules.length > 0) {
         // Sort by executedAt (most recent first) and get the latest executionTx
         const sortedCapsules = loadedExecutedCapsules
           .filter(ec => ec.executionTx)
@@ -311,7 +373,7 @@ export default function CapsulesPage() {
         
         if (sortedCapsules.length > 0 && sortedCapsules[0].executionTx) {
           savedExecutionTx = sortedCapsules[0].executionTx
-          console.log('Using execution transaction from executed capsules:', savedExecutionTx.substring(0, 8) + '...')
+          console.log('Using most recent execution transaction from executed capsules:', savedExecutionTx.substring(0, 8) + '...')
         }
       }
       
@@ -361,43 +423,69 @@ export default function CapsulesPage() {
       }
       
       // Validate the execution signature if it exists
+      // Only show execution transaction if current capsule is executed
       if (savedExecutionTx) {
-        try {
-          const connection = getSolanaConnection()
-          const tx = await connection.getTransaction(savedExecutionTx, {
-            commitment: 'confirmed',
-            maxSupportedTransactionVersion: 0,
-          })
-          // If transaction doesn't exist or is invalid, clear it
-          if (!tx || !tx.blockTime) {
-            console.warn('Invalid execution transaction signature in localStorage, clearing it')
+        // If current capsule is not executed, don't show execution transaction
+        if (capsuleData && (!capsuleData.executedAt || capsuleData.isActive)) {
+          console.log('Current capsule is not executed, clearing execution transaction display')
+          savedExecutionTx = null
+          setExecutionTxSignature(null)
+        } else {
+          try {
+            const connection = getSolanaConnection()
+            const tx = await connection.getTransaction(savedExecutionTx, {
+              commitment: 'confirmed',
+              maxSupportedTransactionVersion: 0,
+            })
+            // If transaction doesn't exist or is invalid, clear it
+            if (!tx || !tx.blockTime) {
+              console.warn('Invalid execution transaction signature in localStorage, clearing it')
+              const executionTxKey = STORAGE_KEYS.CAPSULE_EXECUTION_TX(publicKey.toString())
+              localStorage.removeItem(executionTxKey)
+              savedExecutionTx = null
+              setExecutionTxSignature(null)
+            } else {
+              // Verify that execution transaction timestamp matches capsule's executedAt (within reasonable range)
+              if (capsuleData && capsuleData.executedAt) {
+                const txTimestamp = tx.blockTime
+                const executedAtTimestamp = capsuleData.executedAt
+                // Allow 5 minute tolerance for timestamp matching
+                const timeDiff = Math.abs(txTimestamp - executedAtTimestamp)
+                if (timeDiff > 300) {
+                  console.warn('Execution transaction timestamp does not match capsule executedAt, clearing it', {
+                    txTimestamp,
+                    executedAtTimestamp,
+                    timeDiff
+                  })
+                  savedExecutionTx = null
+                  setExecutionTxSignature(null)
+                } else {
+                  setExecutionTxSignature(savedExecutionTx)
+                  setZkVerificationStatus('verified')
+                  // Try to extract proof hash from localStorage if available
+                  const proofHashKey = `zk_proof_hash_${publicKey.toString()}`
+                  const savedProofHash = localStorage.getItem(proofHashKey)
+                  if (savedProofHash) {
+                    setZkProofHash(savedProofHash)
+                  }
+                  const inputsHashKey = `zk_inputs_hash_${publicKey.toString()}`
+                  const savedInputsHash = localStorage.getItem(inputsHashKey)
+                  if (savedInputsHash) {
+                    setZkPublicInputsHash(savedInputsHash)
+                  }
+                }
+              } else {
+                setExecutionTxSignature(savedExecutionTx)
+              }
+              // Don't add to transactions here - let fetchTransactionHistory handle it
+            }
+          } catch (error) {
+            console.warn('Error validating execution transaction signature, clearing it:', error)
             const executionTxKey = STORAGE_KEYS.CAPSULE_EXECUTION_TX(publicKey.toString())
             localStorage.removeItem(executionTxKey)
             savedExecutionTx = null
-          } else {
-            setExecutionTxSignature(savedExecutionTx)
-            // If execution was successful, set verification status
-            if (capsuleData && capsuleData.executedAt) {
-              setZkVerificationStatus('verified')
-              // Try to extract proof hash from localStorage if available
-              const proofHashKey = `zk_proof_hash_${publicKey.toString()}`
-              const savedProofHash = localStorage.getItem(proofHashKey)
-              if (savedProofHash) {
-                setZkProofHash(savedProofHash)
-              }
-              const inputsHashKey = `zk_inputs_hash_${publicKey.toString()}`
-              const savedInputsHash = localStorage.getItem(inputsHashKey)
-              if (savedInputsHash) {
-                setZkPublicInputsHash(savedInputsHash)
-              }
-            }
-            // Don't add to transactions here - let fetchTransactionHistory handle it
+            setExecutionTxSignature(null)
           }
-        } catch (error) {
-          console.warn('Error validating execution transaction signature, clearing it:', error)
-          const executionTxKey = STORAGE_KEYS.CAPSULE_EXECUTION_TX(publicKey.toString())
-          localStorage.removeItem(executionTxKey)
-          savedExecutionTx = null
         }
       }
 
