@@ -350,15 +350,16 @@ export default function CapsulesPage() {
       // If current capsule is executed, find the matching executed capsule entry
       if (capsuleData && capsuleData.executedAt && !capsuleData.isActive) {
         // Find executed capsule entry that matches current capsule's executedAt
+        const currentExecutedAt = capsuleData.executedAt
         const matchingExecutedCapsule = loadedExecutedCapsules.find(
-          ec => ec.executedAt === capsuleData.executedAt || 
-                (ec.executionTx && Math.abs((ec.executedAt || 0) - capsuleData.executedAt) < 60) // Within 60 seconds
+          ec => ec.executedAt === currentExecutedAt || 
+                (ec.executionTx && ec.executedAt && Math.abs(ec.executedAt - currentExecutedAt) < 60) // Within 60 seconds
         )
         
         if (matchingExecutedCapsule && matchingExecutedCapsule.executionTx) {
           savedExecutionTx = matchingExecutedCapsule.executionTx
           console.log('Using execution transaction from matching executed capsule:', savedExecutionTx.substring(0, 8) + '...', {
-            executedAt: capsuleData.executedAt,
+            executedAt: currentExecutedAt,
             matchedExecutedAt: matchingExecutedCapsule.executedAt
           })
         }
@@ -561,11 +562,12 @@ export default function CapsulesPage() {
 
       // If current capsule is executed, save it to executed capsules list
       if (capsuleData && capsuleData.executedAt && !capsuleData.isActive) {
+        const currentExecutedAt = capsuleData.executedAt
         const currentIntentData = intentData || (capsuleData.intentData.length > 0 ? decodeIntentData(capsuleData.intentData) : null)
         const executedCapsuleData = {
           capsule: capsuleData,
           intentData: currentIntentData,
-          executedAt: capsuleData.executedAt,
+          executedAt: currentExecutedAt,
           executionTx: savedExecutionTx,
         }
         
@@ -574,7 +576,7 @@ export default function CapsulesPage() {
         
         // Check if this capsule is already in the list
         const existingIndex = currentExecutedCapsules.findIndex(
-          (ec) => ec.executedAt === capsuleData.executedAt || ec.executionTx === savedExecutionTx
+          (ec) => ec.executedAt === currentExecutedAt || ec.executionTx === savedExecutionTx
         )
         
         if (existingIndex === -1) {
