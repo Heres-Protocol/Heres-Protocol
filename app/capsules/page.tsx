@@ -80,9 +80,16 @@ export default function CapsulesPage() {
   // Auto-execute capsule when inactivity period is met
   useEffect(() => {
     if (!capsule || !publicKey || !wallet || !capsule.isActive) return
+    // Don't auto-execute if already executing or if capsule is already executed
+    if (isExecuting || capsule.executedAt || !capsule.isActive) return
 
     // Check if capsule can be executed
     const checkAndExecute = async () => {
+      // Double-check capsule is still active before executing
+      if (!capsule.isActive || capsule.executedAt || isExecuting) {
+        return
+      }
+
       if (!canExecute(capsule.lastActivity, capsule.inactivityPeriod)) {
         return
       }
@@ -103,7 +110,8 @@ export default function CapsulesPage() {
         }
 
         // If no recent activity and inactivity period is met, execute automatically
-        if (!isExecuting) {
+        // Only execute once - check if already executing or capsule is executed
+        if (!isExecuting && capsule.isActive && !capsule.executedAt) {
           console.log('Auto-executing capsule: inactivity period met')
           await handleExecute()
         }
@@ -117,6 +125,11 @@ export default function CapsulesPage() {
 
     // Set up interval to check every 5 minutes
     const interval = setInterval(() => {
+      // Re-check capsule state before executing
+      if (!capsule.isActive || capsule.executedAt || isExecuting) {
+        clearInterval(interval)
+        return
+      }
       checkAndExecute()
     }, 5 * 60 * 1000) // 5 minutes
 
@@ -1358,7 +1371,44 @@ export default function CapsulesPage() {
             
             // Prioritize execution detection - check for execution first
             // Execution is identified by: execute logs/events OR asset distribution to multiple accounts
-            if (((hasExecuteLog || hasExecuteEvent || hasExecuteInstruction) || hasAssetDistribution) && involvesProgram) {
+            // Also check against known execution signatures before defaulting
+            const allExecutionSigsCheck = new Set<string>()
+            if (executionTxSignature) {
+              allExecutionSigsCheck.add(executionTxSignature)
+            }
+            // Check localStorage for all execution signatures
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i)
+              if (key && key.startsWith(`capsule_execution_tx_${walletAddress}`)) {
+                const sig = localStorage.getItem(key)
+                if (sig) {
+                  allExecutionSigsCheck.add(sig)
+                }
+              }
+            }
+            // Check executed capsules
+            try {
+              const executedCapsulesKey = `executed_capsules_${walletAddress}`
+              const savedExecutedCapsules = localStorage.getItem(executedCapsulesKey)
+              if (savedExecutedCapsules) {
+                const parsed = JSON.parse(savedExecutedCapsules)
+                if (Array.isArray(parsed)) {
+                  parsed.forEach((ec: any) => {
+                    if (ec.executionTx) {
+                      allExecutionSigsCheck.add(ec.executionTx)
+                    }
+                  })
+                }
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+
+            // If signature matches known execution transaction, prioritize it
+            if (allExecutionSigsCheck.has(signature)) {
+              txType = 'execution'
+              console.log(`✓ Found execution transaction by signature match: ${signature.substring(0, 8)}...`)
+            } else if (((hasExecuteLog || hasExecuteEvent || hasExecuteInstruction) || hasAssetDistribution) && involvesProgram) {
               txType = 'execution'
               console.log(`✓ Found execution transaction: ${signature.substring(0, 8)}... (hasAssetDistribution: ${hasAssetDistribution})`)
             }
@@ -1386,6 +1436,24 @@ export default function CapsulesPage() {
                     allExecutionSigs.add(sig)
                   }
                 }
+              }
+              
+              // Also check executed capsules for execution transactions
+              try {
+                const executedCapsulesKey = `executed_capsules_${walletAddress}`
+                const savedExecutedCapsules = localStorage.getItem(executedCapsulesKey)
+                if (savedExecutedCapsules) {
+                  const parsed = JSON.parse(savedExecutedCapsules)
+                  if (Array.isArray(parsed)) {
+                    parsed.forEach((ec: any) => {
+                      if (ec.executionTx) {
+                        allExecutionSigs.add(ec.executionTx)
+                      }
+                    })
+                  }
+                }
+              } catch (e) {
+                // Ignore parse errors
               }
               
               if (signature === creationTxSignature) {
