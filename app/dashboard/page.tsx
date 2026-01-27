@@ -348,7 +348,7 @@ export default function DashboardPage() {
   const [capsules, setCapsules] = useState<CapsuleRow[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [filterMode, setFilterMode] = useState<'all' | 'capsules' | 'events'>('all')
+  const [filterMode, setFilterMode] = useState<'all' | 'capsules' | 'events'>('events')
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
@@ -608,7 +608,7 @@ export default function DashboardPage() {
           } as CapsuleRow
         })
 
-        const combinedRows = [...eventRows, ...capsuleRows]
+        const combinedRows = [...eventRows]
         const totalEventSignatures = eventRows.length
         const executedEventSignatures = eventRows.filter((row) => row.status === 'Executed').length
 
