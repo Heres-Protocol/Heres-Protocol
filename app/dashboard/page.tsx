@@ -509,7 +509,7 @@ export default function DashboardPage() {
 
             let solDelta: number | null = null
             if (record.meta?.preBalances && record.meta?.postBalances && ownerKey) {
-              const ownerIndex = accountKeys.findIndex((key) => key === ownerKey)
+              const ownerIndex = accountKeys.findIndex((key: string) => key === ownerKey)
               if (ownerIndex >= 0) {
                 const pre = record.meta.preBalances[ownerIndex] || 0
                 const post = record.meta.postBalances[ownerIndex] || 0
