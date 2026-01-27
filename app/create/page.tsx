@@ -360,7 +360,7 @@ export default function CreatePage() {
             <div className="material-elevation-2 rounded-lg overflow-hidden">
               <WalletMultiButton />
             </div>
-            <Link href="/">
+            <Link href="/dashboard">
               <button className="material-button material-elevation-2 hover:material-elevation-4 flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/60 backdrop-blur-xl text-white rounded-lg border border-slate-700/50 hover:border-blue-500/50 transition-all">
                 <ArrowLeft className="w-4 h-4" />
                 Back
