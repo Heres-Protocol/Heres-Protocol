@@ -558,7 +558,7 @@ export default function DashboardPage() {
           })
         })
 
-        const capsuleRows = decodedCapsules.map((capsule) => {
+        const capsuleRows: CapsuleRow[] = decodedCapsules.map((capsule) => {
           const executedAtMs = capsule.executedAt ? capsule.executedAt * 1000 : null
           const lastActivityMs = capsule.lastActivity * 1000
           const isExpired = capsule.executedAt === null && capsule.lastActivity + capsule.inactivityPeriod < nowSeconds
@@ -576,7 +576,7 @@ export default function DashboardPage() {
 
           return {
             id: capsule.capsuleAddress,
-            kind: 'capsule',
+            kind: 'capsule' as const,
             capsuleAddress: capsule.capsuleAddress,
             owner: capsule.owner,
             status,
@@ -590,7 +590,7 @@ export default function DashboardPage() {
             tokenDelta: null,
             solDelta: null,
             proofBytes: null,
-          }
+          } as CapsuleRow
         })
 
         const combinedRows = [...eventRows, ...capsuleRows]
