@@ -348,12 +348,13 @@ export default function DashboardPage() {
   const [capsules, setCapsules] = useState<CapsuleRow[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [filterMode, setFilterMode] = useState<'all' | 'capsules' | 'events'>('events')
+  const [filterMode, setFilterMode] = useState<'all' | 'created' | 'executed' | 'waiting'>('created')
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   const [zkProofHash, setZkProofHash] = useState<string | null>(null)
   const [zkPublicInputsHash, setZkPublicInputsHash] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
   const [summary, setSummary] = useState({
     total: 0,
     active: 0,
@@ -650,8 +651,9 @@ export default function DashboardPage() {
   const filteredCapsules = useMemo(() => {
     const value = query.trim().toLowerCase()
     const scoped = capsules.filter((capsule) => {
-      if (filterMode === 'capsules' && capsule.kind !== 'capsule') return false
-      if (filterMode === 'events' && capsule.kind !== 'event') return false
+      if (filterMode === 'created' && capsule.status !== 'Created') return false
+      if (filterMode === 'executed' && capsule.status !== 'Executed') return false
+      if (filterMode === 'waiting' && capsule.status !== 'Waiting') return false
       if (!value) return true
       return (
         capsule.capsuleAddress.toLowerCase().includes(value) ||
@@ -666,6 +668,15 @@ export default function DashboardPage() {
     })
     return sorted
   }, [capsules, filterMode, query, sortOrder])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterMode, query, sortOrder])
+
+  const pageSize = 10
+  const totalPages = Math.max(1, Math.ceil(filteredCapsules.length / pageSize))
+  const pageStart = (currentPage - 1) * pageSize
+  const pagedCapsules = filteredCapsules.slice(pageStart, pageStart + pageSize)
 
   const statCards = [
     { label: 'Total Capsules', value: formatNumber(summary.total), tone: 'text-cyan-300' },
@@ -836,8 +847,9 @@ export default function DashboardPage() {
               <div className="flex flex-wrap gap-2 text-xs">
                 {[
                   { key: 'all', label: 'All' },
-                  { key: 'capsules', label: 'Capsules' },
-                  { key: 'events', label: 'Events' },
+                  { key: 'created', label: 'Created' },
+                  { key: 'executed', label: 'Executed' },
+                  { key: 'waiting', label: 'Waiting' },
                 ].map((option) => (
                   <button
                     key={option.key}
@@ -869,7 +881,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {filteredCapsules.map((capsule) => (
+              {pagedCapsules.map((capsule) => (
                 <div
                   key={capsule.id}
                   className={`rounded-2xl border px-4 py-4 ${
@@ -910,9 +922,13 @@ export default function DashboardPage() {
                           </p>
                         </div>
                         <div>
-                          <p className="uppercase tracking-[0.2em] text-slate-500 text-[10px]">Inactivity</p>
+                          <p className="uppercase tracking-[0.2em] text-slate-500 text-[10px]">
+                            {capsule.kind === 'event' ? 'Created' : 'Inactivity'}
+                          </p>
                           <p className="text-slate-300">
-                            {formatDuration(capsule.inactivitySeconds)}
+                            {capsule.kind === 'event'
+                              ? timeAgo(capsule.lastActivityMs)
+                              : formatDuration(capsule.inactivitySeconds)}
                           </p>
                         </div>
                       </div>
@@ -1037,6 +1053,46 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+
+            {filteredCapsules.length > pageSize && (
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-300">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-1 disabled:opacity-40"
+                >
+                  First
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-1 disabled:opacity-40"
+                >
+                  ‹
+                </button>
+                <span className="rounded-lg border border-slate-800/70 bg-slate-950/40 px-3 py-1">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-1 disabled:opacity-40"
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                  className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-1 disabled:opacity-40"
+                >
+                  Last
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </main>
