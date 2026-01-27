@@ -352,6 +352,8 @@ export default function DashboardPage() {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
+  const [zkProofHash, setZkProofHash] = useState<string | null>(null)
+  const [zkPublicInputsHash, setZkPublicInputsHash] = useState<string | null>(null)
   const [summary, setSummary] = useState({
     total: 0,
     active: 0,
@@ -382,6 +384,19 @@ export default function DashboardPage() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showWalletMenu])
+
+  useEffect(() => {
+    if (!connected || !publicKey) {
+      setZkProofHash(null)
+      setZkPublicInputsHash(null)
+      return
+    }
+
+    const proofHashKey = `zk_proof_hash_${publicKey.toString()}`
+    const inputsHashKey = `zk_inputs_hash_${publicKey.toString()}`
+    setZkProofHash(localStorage.getItem(proofHashKey))
+    setZkPublicInputsHash(localStorage.getItem(inputsHashKey))
+  }, [connected, publicKey])
 
   useEffect(() => {
     let isMounted = true
@@ -963,6 +978,14 @@ export default function DashboardPage() {
                             <div>
                               <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Noir Proof Bytes</p>
                               <p>{capsule.proofBytes ? `${capsule.proofBytes} bytes` : '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Proof Hash</p>
+                              <p className="font-mono text-slate-200 break-all">{zkProofHash || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Public Inputs Hash</p>
+                              <p className="font-mono text-slate-200 break-all">{zkPublicInputsHash || '—'}</p>
                             </div>
                           </>
                         )}
