@@ -92,7 +92,8 @@ export default function Home() {
               Lucid
             </span>
           </Link>
-          <div className="relative z-[9999] wallet-menu-container">
+          <div className="flex items-center gap-4">
+            <div className="relative z-[9999] wallet-menu-container">
             {connected && publicKey ? (
               <div className="relative">
                 <button
@@ -153,6 +154,7 @@ export default function Home() {
             <WalletMultiButton />
               </div>
             )}
+            </div>
           </div>
         </div>
       </nav>
@@ -170,16 +172,11 @@ export default function Home() {
             <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-3xl mx-auto leading-relaxed">
               Lucid allows you to securely record, simulate, and automatically execute your intentions on-chain when you are no longer able to act.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/create">
-                <button className="material-button material-elevation-4 hover:material-elevation-8 px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl font-semibold text-base flex items-center gap-2 mx-auto transition-all shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 group">
-                  Create Memory Capsule
+            <div className="flex justify-center">
+              <Link href="/dashboard">
+                <button className="material-button material-elevation-4 hover:material-elevation-8 px-10 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl font-semibold text-base flex items-center gap-2 mx-auto transition-all shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 group">
+                  Get Started
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </Link>
-              <Link href="/capsules">
-                <button className="material-button material-elevation-2 hover:material-elevation-4 px-8 py-4 bg-slate-800/60 hover:bg-slate-700/60 backdrop-blur-xl text-white rounded-xl font-semibold text-base border border-slate-700/50 hover:border-blue-500/50 transition-all">
-                  View My Capsules
                 </button>
               </Link>
             </div>
@@ -532,7 +529,7 @@ export default function Home() {
               <p className="text-xl md:text-2xl text-slate-200 mb-10 max-w-3xl mx-auto leading-relaxed">
                 Create your first Memory Capsule and ensure your decisions live on, even when you can&apos;t.
               </p>
-              <Link href="/create">
+              <Link href="/dashboard">
                 <button className="material-button material-elevation-4 hover:material-elevation-8 px-10 py-5 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl font-bold text-lg flex items-center gap-3 mx-auto transition-all shadow-xl shadow-blue-500/40 hover:shadow-blue-500/60 group">
                   Get Started
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

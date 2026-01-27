@@ -242,6 +242,19 @@ button:hover::before {
   }
 }
 
+@keyframes grid-drift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 6rem 6rem;
+  }
+}
+
+.grid-drift {
+  animation: grid-drift 40s linear infinite;
+}
+
 /* Scroll reveal animations */
 @keyframes fadeInUp {
   from {
