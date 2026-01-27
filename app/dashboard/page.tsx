@@ -492,7 +492,7 @@ export default function DashboardPage() {
             } else if (Array.isArray(ix.accounts)) {
               accountIndexes = ix.accounts.map((key: any) => {
                 const keyStr = typeof key === 'string' ? key : key?.toBase58?.()
-                return accountKeys.findIndex((k) => k === keyStr)
+                return accountKeys.findIndex((k: string) => k === keyStr)
               })
             }
 
