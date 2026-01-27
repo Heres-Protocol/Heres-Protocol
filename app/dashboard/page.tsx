@@ -539,7 +539,7 @@ export default function DashboardPage() {
             if (['create_capsule', 'recreate_capsule', 'execute_intent'].includes(instruction)) {
               eventRows.push({
                 id: `event:${record.signature}`,
-                kind: 'event',
+                kind: 'event' as const,
                 capsuleAddress: capsuleKey,
                 owner: ownerKey,
                 status: statusFromInstruction(instruction),
@@ -553,7 +553,7 @@ export default function DashboardPage() {
                 tokenDelta,
                 solDelta,
                 proofBytes,
-              })
+              } as CapsuleRow)
             }
           })
         })
