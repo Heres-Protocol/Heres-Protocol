@@ -78,7 +78,7 @@ export async function GET() {
   try {
     const connection = getSolanaConnection()
     const programId = getProgramId()
-    let accounts: { account: { data: Uint8Array } }[] = []
+    let accounts: readonly { account: { data: Uint8Array } }[]
     try {
       accounts = await connection.getProgramAccounts(programId, {
         commitment: 'confirmed',
