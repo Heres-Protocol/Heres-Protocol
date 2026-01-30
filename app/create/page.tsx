@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import dynamic from 'next/dynamic'
-import { ArrowLeft, Clock, User, Shield, Eye, Plus, X, ArrowRight, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Clock, User, Shield, Eye, Plus, X, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react'
 
 // Dynamic import to prevent hydration errors
 const WalletMultiButton = dynamic(
@@ -22,11 +22,10 @@ import {
   validatePercentageTotals,
 } from '@/utils/validation'
 import { isValidSolanaAddress } from '@/config/solana'
-import Hero3D from '@/components/Hero3D'
-
 export default function CreatePage() {
   const wallet = useWallet()
-  const { publicKey, connected } = wallet
+  const { publicKey, connected, disconnect, select, wallets } = wallet
+  const [showWalletMenu, setShowWalletMenu] = useState(false)
   const [intent, setIntent] = useState('')
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([
     { address: '', amount: '', amountType: 'fixed' }
@@ -40,6 +39,17 @@ export default function CreatePage() {
   const [txHash, setTxHash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [existingCapsule, setExistingCapsule] = useState<boolean>(false)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (showWalletMenu && !target.closest('.wallet-menu-container')) {
+        setShowWalletMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showWalletMenu])
 
   // Check for existing capsule on mount
   useEffect(() => {
@@ -219,10 +229,6 @@ export default function CreatePage() {
         // 2. (executedAt is set OR isActive is false)
         // This handles both executed capsules and deactivated capsules
         if (existingCapsule && (existingCapsule.executedAt || !existingCapsule.isActive)) {
-          console.log('Recreating capsule:', {
-            executedAt: existingCapsule.executedAt,
-            isActive: existingCapsule.isActive
-          })
           // Use recreateCapsule for executed or deactivated capsules
           const { recreateCapsule } = await import('@/lib/solana')
           hash = await recreateCapsule(
@@ -231,8 +237,6 @@ export default function CreatePage() {
             intentData
           )
         } else {
-          // Use createCapsule for new capsules (capsule doesn't exist)
-          console.log('Creating new capsule')
           hash = await createCapsule(
             wallet as any,
             inactivityPeriodSeconds,
@@ -264,8 +268,6 @@ export default function CreatePage() {
         // Also save to the main key (for backward compatibility)
         const txKey = STORAGE_KEYS.CAPSULE_CREATION_TX(publicKey.toString())
         localStorage.setItem(txKey, hash)
-        
-        console.log('Saved creation transaction to localStorage:', hash)
       }
 
       alert(`Capsule created successfully! Transaction: ${hash}`)
@@ -279,7 +281,6 @@ export default function CreatePage() {
       // Check if error is "already processed" - this might mean the transaction succeeded
       // but we got an error response. Verify if capsule was actually created.
       if (errorMessage.includes('already processed') || errorMessage.includes('This transaction has already been processed')) {
-        console.log('Transaction may have been processed. Checking if capsule was created...')
         try {
           // Wait a bit for the transaction to be confirmed
           await new Promise(resolve => setTimeout(resolve, 2000))
@@ -288,8 +289,6 @@ export default function CreatePage() {
           if (publicKey) {
             const createdCapsule = await getCapsule(publicKey)
             if (createdCapsule && createdCapsule.isActive) {
-              // Capsule was successfully created despite the error
-              console.log('Capsule was successfully created despite error message')
               alert('Capsule created successfully!')
               window.location.href = '/capsules'
               setIsPending(false)
@@ -334,34 +333,96 @@ export default function CreatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
-      {/* 3D Hero Background */}
+    <div className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden">
+      {/* 3D Hero Background - 랜딩과 동일 */}
       <div className="fixed inset-0 w-full h-full z-0">
-        <Hero3D />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/80 z-10"></div>
+        <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
+        <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
+        <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
+        <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
+        <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
+        <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
+        <div className="absolute left-12 top-24 w-24 h-24 dream-bubble z-[8] opacity-60" />
+        <div className="absolute right-20 top-40 w-16 h-16 dream-bubble z-[8] opacity-60 [animation-duration:10s]" />
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+      <nav className="fixed top-0 w-full z-50 gsap-nav">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-3 group">
-            <div className="relative w-10 h-10 transition-transform group-hover:rotate-12">
+            <div className="relative w-9 h-9 md:w-10 md:h-10 transition-transform group-hover:rotate-6">
               <Image
-                src="/logo.svg"
-                alt="Lucid Logo"
+                src="/logo.png"
+                alt="Lucid"
                 fill
-                className="object-contain"
+                className="object-contain drop-shadow-[0_8px_18px_rgba(255,255,255,0.25)]"
                 priority
               />
             </div>
-            <span className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">Lucid</span>
+            <span className="sr-only">Lucid</span>
           </Link>
           <div className="flex items-center gap-4">
-            <div className="material-elevation-2 rounded-lg overflow-hidden">
-              <WalletMultiButton />
+            <div className="relative z-[9999] wallet-menu-container">
+              {connected && publicKey ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowWalletMenu(!showWalletMenu)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors gsap-button"
+                  >
+                    <span className="font-mono text-sm">
+                      {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
+                    </span>
+                    {showWalletMenu ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                  {showWalletMenu && (
+                    <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-[#A0ECFF]/25 overflow-hidden z-[10000] gsap-panel">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await disconnect()
+                            setShowWalletMenu(false)
+                          } catch (e) {
+                            console.error('Error disconnecting wallet:', e)
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
+                      >
+                        Disconnect
+                      </button>
+                      {wallets && wallets.length > 1 && (
+                        <>
+                          <div className="border-t border-[#A0ECFF]/20" />
+                          <div className="px-2 py-1 text-xs text-slate-300">Switch Wallet</div>
+                          {wallets.map((w: { adapter: { name: string } }) => (
+                            <button
+                              key={w.adapter.name}
+                              onClick={async () => {
+                                try {
+                                  await select(w.adapter.name)
+                                  setShowWalletMenu(false)
+                                } catch (e) {
+                                  console.error('Error switching wallet:', e)
+                                }
+                              }}
+                              className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
+                            >
+                              {w.adapter.name}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="material-elevation-2 rounded-lg overflow-hidden gsap-panel">
+                  <WalletMultiButton />
+                </div>
+              )}
             </div>
             <Link href="/dashboard">
-              <button className="material-button material-elevation-2 hover:material-elevation-4 flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/60 backdrop-blur-xl text-white rounded-lg border border-slate-700/50 hover:border-blue-500/50 transition-all">
+              <button className="material-button gsap-pill flex items-center gap-2 px-4 py-2 text-white rounded-lg border border-[#A0ECFF]/40 hover:border-[#A0ECFF]/60 transition-all">
                 <ArrowLeft className="w-4 h-4" />
                 Back
               </button>
@@ -373,18 +434,18 @@ export default function CreatePage() {
       <div className="relative pt-24 pb-20 px-6 z-20">
         <div className="max-w-4xl mx-auto">
           <div className="animate-fade-in">
-            <h1 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-[#A0ECFF] via-[#C7B8FF] to-[#FFCEEA] bg-clip-text text-transparent">
               Create Memory Capsule
             </h1>
-            <p className="text-lg md:text-xl text-slate-300 mb-12">
+            <p className="text-lg md:text-xl text-slate-200 mb-12">
               Define your intent. Set conditions. Preserve your decisions on Solana.
             </p>
 
             {!connected ? (
-              <div className="material-card material-elevation-4 rounded-2xl p-12 text-center">
-                <Shield className="w-16 h-16 text-blue-400 mx-auto mb-6" />
+              <div className="material-card gsap-panel rounded-2xl p-12 text-center border-[#A0ECFF]/30">
+                <Shield className="w-16 h-16 text-[#A0ECFF] mx-auto mb-6" />
                 <h2 className="text-2xl font-bold text-white mb-4">Connect Your Solana Wallet</h2>
-                <p className="text-slate-300 mb-8">
+                <p className="text-slate-200 mb-8">
                   Please connect your Solana wallet to create a Memory Capsule
                 </p>
               </div>
@@ -392,7 +453,7 @@ export default function CreatePage() {
               <div className="space-y-8">
                 {/* Existing Capsule Warning */}
                 {existingCapsule && (
-                  <div className="material-card material-elevation-4 rounded-2xl p-6 mb-6 bg-yellow-500/10 border-2 border-yellow-500/50">
+                  <div className="material-card gsap-panel rounded-2xl p-6 mb-6 bg-amber-500/10 border-2 border-amber-500/50">
                     <div className="flex items-start gap-4">
                       <Shield className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-1" />
                       <div className="flex-1">
@@ -402,7 +463,7 @@ export default function CreatePage() {
                           Please visit your existing capsule to update or deactivate it first.
                         </p>
                         <Link href="/capsules">
-                          <button className="material-button material-elevation-2 hover:material-elevation-4 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg font-semibold transition-all">
+                          <button className="material-button gsap-button px-4 py-2 text-white rounded-lg font-semibold transition-all">
                             View My Capsule
                           </button>
                         </Link>
@@ -412,10 +473,10 @@ export default function CreatePage() {
                 )}
 
                 {/* Intent Statement */}
-                <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+                <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-500/30">
-                      <Shield className="w-6 h-6 text-blue-400" />
+                    <div className="w-12 h-12 bg-gradient-to-br from-[#A0ECFF]/20 to-[#C7B8FF]/20 rounded-xl flex items-center justify-center border border-[#A0ECFF]/40">
+                      <Shield className="w-6 h-6 text-[#A0ECFF]" />
                     </div>
                     <h2 className="text-2xl font-bold text-white">Intent Statement</h2>
                   </div>
@@ -423,18 +484,18 @@ export default function CreatePage() {
                     value={intent}
                     onChange={(e) => setIntent(e.target.value)}
                     placeholder="If I am inactive for one year, transfer my assets to my family, and delegate DAO permissions to my co-founder."
-                    className="w-full h-32 bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition-colors resize-none backdrop-blur-sm"
+                    className="w-full h-32 bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#A0ECFF]/50 transition-colors resize-none backdrop-blur-sm"
                   />
-                  <p className="text-sm text-slate-400 mt-3">
+                  <p className="text-sm text-slate-300 mt-3">
                     Describe what should happen when you can no longer act
                   </p>
                 </div>
 
                 {/* Total Amount */}
-                <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+                <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-500/30">
-                      <User className="w-6 h-6 text-blue-400" />
+                    <div className="w-12 h-12 bg-gradient-to-br from-[#A0ECFF]/20 to-[#C7B8FF]/20 rounded-xl flex items-center justify-center border border-[#A0ECFF]/40">
+                      <User className="w-6 h-6 text-[#A0ECFF]" />
                     </div>
                     <h2 className="text-2xl font-bold text-white">Total Token Amount</h2>
                   </div>
@@ -465,21 +526,21 @@ export default function CreatePage() {
                         }}
                         placeholder="0.0"
                         step="0.001"
-                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition-colors backdrop-blur-sm"
+                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#A0ECFF]/50 transition-colors backdrop-blur-sm"
                       />
                     </div>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-slate-300">
                       Enter the total amount of tokens to be distributed. If using percentages, amounts will be automatically calculated.
                     </p>
                   </div>
                 </div>
 
                 {/* Beneficiaries */}
-                <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+                <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-500/30">
-                        <User className="w-6 h-6 text-blue-400" />
+                      <div className="w-12 h-12 bg-gradient-to-br from-[#A0ECFF]/20 to-[#C7B8FF]/20 rounded-xl flex items-center justify-center border border-[#A0ECFF]/40">
+                        <User className="w-6 h-6 text-[#A0ECFF]" />
                       </div>
                       <h2 className="text-2xl font-bold text-white">Beneficiaries (Solana Addresses)</h2>
                     </div>
@@ -495,7 +556,7 @@ export default function CreatePage() {
                               value={beneficiary.address}
                               onChange={(e) => updateBeneficiary(index, 'address', e.target.value.trim())}
                               placeholder="Solana address..."
-                              className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition-colors font-mono text-sm backdrop-blur-sm"
+                              className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#A0ECFF]/50 transition-colors font-mono text-sm backdrop-blur-sm"
                             />
                           </div>
                           
@@ -506,16 +567,16 @@ export default function CreatePage() {
                               onChange={(e) => updateBeneficiary(index, 'amount', e.target.value)}
                               placeholder={beneficiary.amountType === 'percentage' ? '0%' : '0.0'}
                               step={beneficiary.amountType === 'percentage' ? '0.1' : '0.001'}
-                              className="w-20 bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition-colors backdrop-blur-sm"
+                              className="w-20 bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#A0ECFF]/50 transition-colors backdrop-blur-sm"
                             />
                             <div className="flex bg-slate-900/50 border border-slate-700/50 rounded-xl overflow-hidden flex-shrink-0 h-[52px] backdrop-blur-sm">
                               <button
                                 type="button"
                                 onClick={() => updateBeneficiary(index, 'amountType', 'fixed')}
-                                className={`px-3 py-4 text-xs font-semibold transition-colors h-full flex items-center ${
+                                className={`px-3 py-4 text-xs font-semibold transition-colors h-full flex items-center rounded-l-lg ${
                                   beneficiary.amountType === 'fixed'
-                                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                                    : 'text-slate-400 hover:text-white'
+                                    ? 'gsap-pill-active text-[#0c1222]'
+                                    : 'gsap-pill text-slate-300 hover:text-white'
                                 }`}
                               >
                                 SOL
@@ -523,10 +584,10 @@ export default function CreatePage() {
                               <button
                                 type="button"
                                 onClick={() => updateBeneficiary(index, 'amountType', 'percentage')}
-                                className={`px-3 py-4 text-xs font-semibold transition-colors h-full flex items-center ${
+                                className={`px-3 py-4 text-xs font-semibold transition-colors h-full flex items-center rounded-r-lg ${
                                   beneficiary.amountType === 'percentage'
-                                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                                    : 'text-slate-400 hover:text-white'
+                                    ? 'gsap-pill-active text-[#0c1222]'
+                                    : 'gsap-pill text-slate-300 hover:text-white'
                                 }`}
                               >
                                 %
@@ -635,7 +696,7 @@ export default function CreatePage() {
                                 </p>
                               )}
                               <div className="mt-3 space-y-1">
-                                <p className="text-xs text-slate-400 font-semibold">Distribution breakdown:</p>
+                                <p className="text-xs text-slate-300 font-semibold">Distribution breakdown:</p>
                                 {distributionDetails.map((detail, idx) => (
                                   <p key={idx} className="text-xs text-slate-300 font-mono">
                                     {detail.address.slice(0, 8)}...{detail.address.slice(-8)}: {detail.amount.toFixed(6)} SOL ({detail.percentage.toFixed(2)}%)
@@ -651,23 +712,23 @@ export default function CreatePage() {
                     <button
                       type="button"
                       onClick={addBeneficiary}
-                      className="material-button material-elevation-1 hover:material-elevation-2 w-full flex items-center justify-center gap-2 p-4 bg-slate-900/50 border border-slate-700/50 rounded-xl text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/50 transition-colors backdrop-blur-sm"
+                      className="material-button gsap-pill w-full flex items-center justify-center gap-2 p-4 text-white rounded-xl border border-[#A0ECFF]/40 hover:border-[#A0ECFF]/60 transition-colors"
                     >
                       <Plus className="w-5 h-5" />
                       <span>Add Beneficiary</span>
                     </button>
                   </div>
                   
-                  <p className="text-sm text-slate-400 mt-4">
+                  <p className="text-sm text-slate-300 mt-4">
                     Add multiple beneficiaries with Solana addresses
                   </p>
                 </div>
 
                 {/* Trigger Conditions */}
-                <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+                <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-500/30">
-                      <Clock className="w-6 h-6 text-blue-400" />
+                    <div className="w-12 h-12 bg-gradient-to-br from-[#A0ECFF]/20 to-[#C7B8FF]/20 rounded-xl flex items-center justify-center border border-[#A0ECFF]/40">
+                      <Clock className="w-6 h-6 text-[#A0ECFF]" />
                     </div>
                     <h2 className="text-2xl font-bold text-white">Trigger Conditions</h2>
                   </div>
@@ -695,7 +756,7 @@ export default function CreatePage() {
                           }
                         }}
                         min={new Date().toISOString().split('T')[0]}
-                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white focus:outline-none focus:border-blue-500/50 transition-colors backdrop-blur-sm"
+                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white focus:outline-none focus:border-[#A0ECFF]/50 transition-colors backdrop-blur-sm"
                       />
                       {targetDate && inactivityDays && (
                         <p className="text-xs text-blue-400 mt-2">
@@ -709,7 +770,7 @@ export default function CreatePage() {
                         type="number"
                         value={delayDays}
                         onChange={(e) => setDelayDays(e.target.value)}
-                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white focus:outline-none focus:border-blue-500/50 transition-colors backdrop-blur-sm"
+                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white focus:outline-none focus:border-[#A0ECFF]/50 transition-colors backdrop-blur-sm"
                       />
                     </div>
                   </div>
@@ -730,10 +791,10 @@ export default function CreatePage() {
                         }
                       }}
                       placeholder="Enter days"
-                      className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition-colors backdrop-blur-sm"
+                      className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#A0ECFF]/50 transition-colors backdrop-blur-sm"
                     />
                   </div>
-                  <p className="text-sm text-slate-400 mt-4">
+                  <p className="text-sm text-slate-300 mt-4">
                     {targetDate 
                       ? `The capsule will trigger on ${new Date(targetDate).toLocaleDateString()}, with a ${delayDays}-day delay window`
                       : inactivityDays 
@@ -746,7 +807,7 @@ export default function CreatePage() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button
                     onClick={simulateExecution}
-                    className="material-button material-elevation-2 hover:material-elevation-4 flex-1 px-8 py-4 bg-slate-800/60 hover:bg-slate-700/60 text-white rounded-xl font-semibold flex items-center justify-center gap-2 border border-slate-700/50 hover:border-blue-500/50 transition-all backdrop-blur-xl"
+                    className="material-button gsap-pill flex-1 px-8 py-4 text-white rounded-xl font-semibold flex items-center justify-center gap-2 border border-[#A0ECFF]/40 hover:border-[#A0ECFF]/60 transition-all"
                   >
                     <Eye className="w-5 h-5" />
                     Simulate Execution
@@ -754,7 +815,7 @@ export default function CreatePage() {
                   <button
                     onClick={handleCreate}
                     disabled={isPending || !intent || !inactivityDays || parseInt(inactivityDays) <= 0 || beneficiaries.length === 0 || beneficiaries.some(b => !b.address || !b.amount)}
-                    className="material-button material-elevation-4 hover:material-elevation-8 flex-1 px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50"
+                    className="material-button gsap-button flex-1 px-8 py-4 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-semibold transition-all"
                   >
                     {isPending ? 'Creating...' : 'Create Capsule'}
                   </button>
@@ -775,28 +836,28 @@ export default function CreatePage() {
                 {/* Simulation Modal */}
                 {showSimulation && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-                    <div className="material-card material-elevation-8 rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-slate-900/90 backdrop-blur-xl">
+                    <div className="material-card gsap-panel rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border-[#A0ECFF]/30">
                       <div className="flex items-center justify-between mb-6">
                         <h3 className="text-2xl font-bold text-white">Execution Simulation</h3>
                         <button
                           onClick={() => setShowSimulation(false)}
-                          className="text-slate-400 hover:text-white transition-colors"
+                          className="text-slate-300 hover:text-white transition-colors"
                         >
                           ✕
                         </button>
                       </div>
                       <div className="space-y-4">
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                          <p className="text-sm text-slate-400 mb-2">Intent</p>
+                          <p className="text-sm text-slate-300 mb-2">Intent</p>
                           <p className="text-white">{intent || 'No intent specified'}</p>
                         </div>
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                          <p className="text-sm text-slate-400 mb-3">Beneficiaries</p>
+                          <p className="text-sm text-slate-300 mb-3">Beneficiaries</p>
                           <div className="space-y-2">
                             {beneficiaries.map((beneficiary, index) => (
                               <div key={index} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
                                 <p className="text-white font-mono text-sm">{beneficiary.address || 'Not set'}</p>
-                                <p className="text-blue-400 font-semibold">
+                                <p className="text-[#A0ECFF] font-semibold">
                                   {beneficiary.amount} {beneficiary.amountType === 'percentage' ? '%' : 'SOL'}
                                 </p>
                               </div>
@@ -804,24 +865,24 @@ export default function CreatePage() {
                           </div>
                         </div>
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                          <p className="text-sm text-slate-400 mb-2">Trigger Conditions</p>
+                          <p className="text-sm text-slate-300 mb-2">Trigger Conditions</p>
                           <p className="text-white">
                             After {inactivityDays} days of inactivity + {delayDays} day delay window
                           </p>
                         </div>
-                        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/50 rounded-xl p-4">
-                          <p className="text-blue-300 font-semibold flex items-center gap-2">
+                        <div className="bg-gradient-to-br from-[#A0ECFF]/20 to-[#C7B8FF]/20 border border-[#A0ECFF]/50 rounded-xl p-4">
+                          <p className="text-[#A0ECFF] font-semibold flex items-center gap-2">
                             <CheckCircle className="w-5 h-5" />
                             Execution would succeed
                           </p>
-                          <p className="text-sm text-blue-400 mt-2">
+                          <p className="text-sm text-slate-200 mt-2">
                             All conditions are met. The capsule would execute automatically.
                           </p>
                         </div>
                       </div>
                       <button
                         onClick={() => setShowSimulation(false)}
-                        className="material-button material-elevation-2 hover:material-elevation-4 mt-6 w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl font-semibold transition-all"
+                        className="material-button gsap-button mt-6 w-full px-6 py-3 text-white rounded-xl font-semibold transition-all"
                       >
                         Close
                       </button>

@@ -15,7 +15,6 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { PublicKey } from '@solana/web3.js'
-import Hero3D from '@/components/Hero3D'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG } from '@/constants'
 
@@ -348,7 +347,7 @@ export default function DashboardPage() {
   const [capsules, setCapsules] = useState<CapsuleRow[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [filterMode, setFilterMode] = useState<'all' | 'created' | 'executed' | 'waiting'>('created')
+  const [filterMode, setFilterMode] = useState<'all' | 'created' | 'executed' | 'waiting' | 'active' | 'expired'>('all')
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
@@ -609,7 +608,6 @@ export default function DashboardPage() {
           } as CapsuleRow
         })
 
-        const combinedRows = [...eventRows]
         const totalEventSignatures = eventRows.length
         const executedEventSignatures = eventRows.filter((row) => row.status === 'Executed').length
 
@@ -619,6 +617,12 @@ export default function DashboardPage() {
         const waitingCapsules = Math.max(0, capsuleRows.length - activeCapsules - executedCapsules - expiredCapsules)
         const successRate =
           totalProofsSubmitted > 0 ? (verifiedProofs / totalProofsSubmitted) * 100 : 0
+
+        const combinedRows: CapsuleRow[] = [...capsuleRows, ...eventRows].sort((a, b) => {
+          const aTime = a.lastActivityMs ?? a.executedAtMs ?? 0
+          const bTime = b.lastActivityMs ?? b.executedAtMs ?? 0
+          return bTime - aTime
+        })
 
         if (isMounted) {
           setCapsules(combinedRows)
@@ -654,6 +658,8 @@ export default function DashboardPage() {
       if (filterMode === 'created' && capsule.status !== 'Created') return false
       if (filterMode === 'executed' && capsule.status !== 'Executed') return false
       if (filterMode === 'waiting' && capsule.status !== 'Waiting') return false
+      if (filterMode === 'active' && capsule.status !== 'Active') return false
+      if (filterMode === 'expired' && capsule.status !== 'Expired') return false
       if (!value) return true
       return (
         capsule.capsuleAddress.toLowerCase().includes(value) ||
@@ -686,21 +692,24 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden text-slate-100">
+    <div className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden text-slate-100">
       <div className="fixed inset-0 w-full h-full z-0">
-        <Hero3D />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/80 z-10" />
+        <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
+        <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
+        <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
+        <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
+        <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
+        <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
       </div>
 
-      <nav className="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+      <nav className="fixed top-0 w-full z-50 gsap-nav">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-3 group">
-            <div className="relative w-10 h-10 transition-transform group-hover:rotate-12">
-              <Image src="/logo.svg" alt="Lucid Logo" fill className="object-contain" priority />
+            <div className="relative w-10 h-10 transition-transform group-hover:rotate-6">
+              <Image src="/logo.png" alt="Lucid Logo" fill className="object-contain" priority />
             </div>
-            <span className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">
-              Lucid
-            </span>
+            <span className="sr-only">Lucid</span>
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/dashboard" className={navLinkClass('/dashboard')}>
@@ -717,7 +726,7 @@ export default function DashboardPage() {
                 <div className="relative">
                   <button
                     onClick={() => setShowWalletMenu(!showWalletMenu)}
-                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors gsap-button"
                   >
                     <span className="font-mono text-sm">
                       {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
@@ -725,7 +734,7 @@ export default function DashboardPage() {
                     {showWalletMenu ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                   {showWalletMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-lg border border-slate-700 overflow-hidden z-[10000]">
+                    <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-[#A0ECFF]/25 overflow-hidden z-[10000] gsap-panel">
                       <button
                         onClick={async () => {
                           try {
@@ -735,14 +744,14 @@ export default function DashboardPage() {
                             console.error('Error disconnecting wallet:', disconnectError)
                           }
                         }}
-                        className="w-full text-left px-4 py-2 text-white hover:bg-slate-700 transition-colors"
+                        className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
                       >
                         Disconnect
                       </button>
                       {wallets && wallets.length > 1 && (
                         <>
-                          <div className="border-t border-slate-700" />
-                          <div className="px-2 py-1 text-xs text-slate-400">Switch Wallet</div>
+                          <div className="border-t border-[#A0ECFF]/20" />
+                          <div className="px-2 py-1 text-xs text-slate-300">Switch Wallet</div>
                           {wallets.map((w: any) => (
                             <button
                               key={w.adapter.name}
@@ -754,7 +763,7 @@ export default function DashboardPage() {
                                   console.error('Error switching wallet:', switchError)
                                 }
                               }}
-                              className="w-full text-left px-4 py-2 text-white hover:bg-slate-700 transition-colors"
+                              className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
                             >
                               {w.adapter.name}
                             </button>
@@ -778,21 +787,21 @@ export default function DashboardPage() {
         <section className="max-w-7xl mx-auto">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between animate-fade-in">
             <div className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.32em] text-cyan-400/70">Network Dashboard</p>
-              <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              <p className="text-xs uppercase tracking-[0.35em] text-[#A0ECFF] font-medium">Network Dashboard</p>
+              <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#A0ECFF] via-[#C7B8FF] to-[#FFCEEA] bg-clip-text text-transparent">
                 Capsule activity overview
               </h1>
-              <p className="text-base text-slate-400 max-w-xl">
+              <p className="text-base text-slate-100 max-w-xl">
                 Inspired by Graph Explorer: track capsule status, proofs, and execution cadence in one view.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-              <span className="rounded-full border border-slate-800/60 bg-slate-900/40 px-3 py-1 flex items-center gap-2">
-                <Signal className="w-3 h-3 text-emerald-400" />
+            <div className="flex flex-wrap gap-3 text-xs text-slate-200">
+              <span className="rounded-full border border-[#A0ECFF]/30 bg-[#0c1222]/80 px-3 py-1 flex items-center gap-2 backdrop-blur-sm">
+                <Signal className="w-3 h-3 text-[#A0ECFF]" />
                 {SOLANA_CONFIG.NETWORK ? `Solana ${SOLANA_CONFIG.NETWORK}` : 'Solana'}
               </span>
-              <span className="rounded-full border border-slate-800/60 bg-slate-900/40 px-3 py-1 flex items-center gap-2">
-                <RefreshCw className="w-3 h-3 text-cyan-300 animate-spin [animation-duration:4s]" />
+              <span className="rounded-full border border-[#A0ECFF]/30 bg-[#0c1222]/80 px-3 py-1 flex items-center gap-2 backdrop-blur-sm">
+                <RefreshCw className="w-3 h-3 text-[#A0ECFF] animate-spin [animation-duration:4s]" />
                 {lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : 'Syncing'}
               </span>
             </div>
@@ -809,27 +818,27 @@ export default function DashboardPage() {
           {statCards.map((card) => (
             <div
               key={card.label}
-              className="material-card material-elevation-2 hover:material-elevation-4 rounded-2xl border border-slate-800/70 bg-slate-900/40 p-5 transition-all"
+              className="rounded-2xl border-2 border-[#A0ECFF]/40 bg-[#0c1222]/95 backdrop-blur-sm p-5 transition-all hover:border-[#A0ECFF]/60 shadow-xl"
             >
               <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">{card.label}</p>
-                <Sparkles className="w-4 h-4 text-blue-400/60" />
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-200">{card.label}</p>
+                <Sparkles className="w-4 h-4 text-[#A0ECFF]" />
               </div>
               <div className={`mt-3 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
-              <p className="mt-1 text-xs text-slate-500">Protocol health pulse</p>
+              <p className="mt-1 text-xs text-slate-300">Protocol health pulse</p>
             </div>
           ))}
         </section>
 
         <section className="max-w-7xl mx-auto mt-10">
-          <div className="material-card material-elevation-2 rounded-3xl border border-slate-800/70 bg-slate-900/40 p-6">
+          <div className="rounded-3xl border-2 border-[#A0ECFF]/40 bg-[#0c1222]/95 backdrop-blur-sm p-6 shadow-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Capsule telemetry</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-[#A0ECFF] font-medium">Capsule telemetry</p>
                 <h2 className="mt-2 text-xl font-semibold text-white">All capsules</h2>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Database className="w-3 h-3" />
+              <div className="flex items-center gap-2 text-xs text-slate-200">
+                <Database className="w-3 h-3 text-[#A0ECFF]" />
                 {formatNumber(filteredCapsules.length)} records
               </div>
             </div>
@@ -839,7 +848,7 @@ export default function DashboardPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search by capsule address, owner, or signature"
-                className="w-full rounded-xl border border-slate-800/70 bg-slate-950/60 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 transition"
+                className="w-full rounded-xl border-2 border-[#A0ECFF]/30 bg-[#0f1629]/80 px-4 py-3 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[#A0ECFF]/60 transition backdrop-blur-sm"
               />
             </div>
 
@@ -850,15 +859,17 @@ export default function DashboardPage() {
                   { key: 'created', label: 'Created' },
                   { key: 'executed', label: 'Executed' },
                   { key: 'waiting', label: 'Waiting' },
+                  { key: 'active', label: 'Active' },
+                  { key: 'expired', label: 'Expired' },
                 ].map((option) => (
                   <button
                     key={option.key}
                     type="button"
                     onClick={() => setFilterMode(option.key as typeof filterMode)}
-                    className={`rounded-full border px-3 py-1 transition ${
+                    className={`rounded-full border-2 px-3 py-1 transition ${
                       filterMode === option.key
-                        ? 'border-cyan-500/60 bg-cyan-500/10 text-cyan-200'
-                        : 'border-slate-800/70 bg-slate-950/60 text-slate-400 hover:text-slate-200'
+                        ? 'border-[#A0ECFF] bg-[#A0ECFF]/20 text-[#A0ECFF]'
+                        : 'border-[#A0ECFF]/30 bg-[#0f1629]/80 text-slate-200 hover:border-[#A0ECFF]/50 hover:text-white'
                     }`}
                   >
                     {option.label}
@@ -868,7 +879,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
-                className="rounded-full border border-slate-800/70 bg-slate-950/60 px-3 py-1 text-xs text-slate-300 transition hover:border-cyan-500/60"
+                className="rounded-full border-2 border-[#A0ECFF]/30 bg-[#0f1629]/80 px-3 py-1 text-xs text-slate-200 transition hover:border-[#A0ECFF]/50"
               >
                 {sortOrder === 'newest' ? 'Newest first' : 'Oldest first'}
               </button>
@@ -893,7 +904,7 @@ export default function DashboardPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-2">
                       <div className="flex items-center gap-3 text-sm text-slate-200">
-                        <span className="rounded-full border border-slate-800/70 bg-slate-900/60 px-2 py-1 text-[10px] uppercase tracking-[0.3em] text-slate-400">
+                        <span className="rounded-full border border-slate-800/70 bg-slate-900/60 px-2 py-1 text-[10px] uppercase tracking-[0.3em] text-slate-300">
                           {capsule.kind === 'event' ? 'Event' : 'Capsule'}
                         </span>
                         <span
@@ -908,16 +919,16 @@ export default function DashboardPage() {
                           {capsule.signature ? maskAddress(capsule.signature) : '—'}
                         </span>
                       </div>
-                      <div className="grid gap-2 text-xs text-slate-400 md:grid-cols-3">
+                      <div className="grid gap-2 text-xs text-slate-300 md:grid-cols-3">
                         <div>
                           <p className="uppercase tracking-[0.2em] text-slate-500 text-[10px]">Capsule</p>
-                          <p className="font-mono text-slate-300">
+                          <p className="font-mono text-slate-300 break-all">
                             {maskAddress(capsule.capsuleAddress)}
                           </p>
                         </div>
                         <div>
                           <p className="uppercase tracking-[0.2em] text-slate-500 text-[10px]">Owner</p>
-                          <p className="font-mono text-slate-300">
+                          <p className="font-mono text-slate-300 break-all">
                             {capsule.owner ? maskAddress(capsule.owner) : '—'}
                           </p>
                         </div>
@@ -932,6 +943,19 @@ export default function DashboardPage() {
                           </p>
                         </div>
                       </div>
+                      {capsule.kind === 'event' && (capsule.tokenDelta != null || capsule.solDelta != null || capsule.proofBytes != null) && (
+                        <div className="flex flex-wrap gap-3 text-[11px] text-slate-400">
+                          {capsule.tokenDelta != null && (
+                            <span className="font-mono">Token Δ: {capsule.tokenDelta}</span>
+                          )}
+                          {capsule.solDelta != null && (
+                            <span className="font-mono">SOL Δ: {capsule.solDelta.toFixed(4)}</span>
+                          )}
+                          {capsule.proofBytes != null && (
+                            <span>Noir proof: {capsule.proofBytes} bytes</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -948,8 +972,8 @@ export default function DashboardPage() {
                   </div>
 
                   {expandedId === capsule.id && (
-                    <div className="mt-4 rounded-xl border border-slate-800/70 bg-slate-900/60 px-4 py-4 text-xs text-slate-300 space-y-4">
-                      <div className="grid gap-3 md:grid-cols-2">
+                    <div className="mt-4 w-full min-w-0 rounded-xl border border-slate-800/70 bg-slate-900/60 px-4 py-4 text-xs text-slate-300 space-y-4 overflow-hidden">
+                      <div className="grid gap-3 md:grid-cols-2 max-w-full">
                         <div>
                           <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Capsule</p>
                           <p className="font-mono text-slate-200 break-all">{capsule.capsuleAddress}</p>
@@ -1030,17 +1054,20 @@ export default function DashboardPage() {
                                     {event.blockTime ? timeAgo(event.blockTime * 1000) : '—'}
                                   </span>
                                 </div>
-                                <div className="mt-2 flex items-start justify-between gap-2 text-[11px] text-slate-400">
+                                <div className="mt-2 flex items-start justify-between gap-2 text-[11px] text-slate-300">
                                   <span className="font-mono break-all">{event.signature}</span>
                                   <span className={event.status === 'success' ? 'text-emerald-300' : 'text-rose-300'}>
                                     {event.status}
                                   </span>
                                 </div>
                                 {event.logs.length > 0 && (
-                                  <div className="mt-2 space-y-1 text-[11px] text-slate-500 font-mono break-all whitespace-pre-wrap">
+                                  <div className="mt-2 max-h-48 overflow-y-auto space-y-1 text-[11px] text-slate-500 font-mono break-all whitespace-pre-wrap overflow-x-hidden">
                                     {event.logs.map((log, index) => (
                                       <div key={`${event.signature}-${index}`}>{log}</div>
                                     ))}
+                                    <p className="text-[10px] text-slate-600 pt-1">
+                                      {event.logs.length} log{event.logs.length !== 1 ? 's' : ''} total
+                                    </p>
                                   </div>
                                 )}
                               </div>

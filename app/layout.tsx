@@ -10,11 +10,11 @@ export const metadata: Metadata = {
   description: 'Preserve your decisions, not just your assets. An on-chain intent inheritance protocol.',
   icons: {
     icon: [
-      { url: '/logo.svg', type: 'image/svg+xml' },
+      { url: '/logo.png', type: 'image/png' },
       { url: '/favicon.svg', type: 'image/svg+xml' },
     ],
     apple: [
-      { url: '/logo.svg', type: 'image/svg+xml' },
+      { url: '/logo.png', type: 'image/png' },
     ],
   },
 }

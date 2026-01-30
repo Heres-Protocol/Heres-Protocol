@@ -15,13 +15,8 @@ export function Providers({ children }: { children: ReactNode }) {
     // Use Helius RPC endpoint if available
     const heliusApiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY
     if (heliusApiKey) {
-      // Use Helius RPC for devnet
-      const heliusUrl = `https://devnet.helius-rpc.com/?api-key=${heliusApiKey}`
-      console.log('Using Helius RPC endpoint for wallet connection')
-      return heliusUrl
+      return `https://devnet.helius-rpc.com/?api-key=${heliusApiKey}`
     }
-    // Fallback to public Solana RPC
-    console.log('Using public Solana RPC endpoint')
     return clusterApiUrl(network)
   }, [network])
 

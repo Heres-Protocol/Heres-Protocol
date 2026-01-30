@@ -362,30 +362,75 @@ button:hover::after {
 
 /* Enhanced Material Card */
 .material-card {
-  background: rgba(30, 41, 59, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(18, 22, 40, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-radius: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(180, 220, 255, 0.2);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .material-card:hover {
   transform: translateY(-8px);
-  border-color: rgba(96, 165, 250, 0.3);
+  border-color: rgba(199, 184, 255, 0.6);
 }
 
 /* Glass morphism effect */
 .glass {
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(18, 22, 40, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+@keyframes dream-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) scale(1.01);
+  }
+}
+
+@keyframes bubble-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate3d(0, -40px, 0);
+    opacity: 0.2;
+  }
+}
+
+.dream-bg {
+  background-image: url('/dream-bg.png');
+  background-size: cover;
+  background-position: center;
+  filter: none;
+  animation: dream-float 18s ease-in-out infinite;
+}
+
+.dream-glow {
+  background: radial-gradient(circle at 20% 30%, rgba(160, 236, 255, 0.35), transparent 55%),
+    radial-gradient(circle at 80% 20%, rgba(199, 184, 255, 0.3), transparent 55%),
+    radial-gradient(circle at 60% 80%, rgba(255, 206, 234, 0.28), transparent 60%);
+  mix-blend-mode: screen;
+  animation: aurora-shift 20s ease-in-out infinite;
+}
+
+.dream-bubble {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.65), transparent 70%);
+  filter: blur(1px);
+  animation: bubble-drift 12s ease-in-out infinite;
 }
 
 /* Glow effects */
 .glow-blue {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 22px rgba(160, 236, 255, 0.35);
 }
 
 /* Animation utilities */
@@ -402,4 +447,155 @@ button:hover::after {
 
 .zoom-in-95 {
   animation: zoom-in-95 0.3s ease-out;
+}
+
+/* === GSAP-inspired pastel glass theme === */
+:root {
+  --foreground-rgb: 238, 245, 255;
+  --background-start-rgb: 10, 12, 22;
+  --background-end-rgb: 18, 22, 36;
+  --gsap-accent: 160, 236, 255;
+  --gsap-accent-2: 199, 184, 255;
+  --gsap-accent-3: 255, 206, 234;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: radial-gradient(circle at 15% 20%, rgba(160, 236, 255, 0.18), transparent 45%),
+    radial-gradient(circle at 85% 10%, rgba(199, 184, 255, 0.2), transparent 55%),
+    radial-gradient(circle at 60% 80%, rgba(255, 206, 234, 0.18), transparent 60%),
+    linear-gradient(180deg, rgb(var(--background-start-rgb)) 0%, rgb(var(--background-end-rgb)) 100%);
+}
+
+.material-card {
+  background: rgba(16, 20, 34, 0.5);
+  backdrop-filter: blur(30px) saturate(175%);
+  border: 1px solid rgba(180, 220, 255, 0.2);
+  border-radius: 24px;
+}
+
+.material-card:hover {
+  border-color: rgba(199, 184, 255, 0.6);
+  box-shadow: 0 28px 60px rgba(10, 12, 22, 0.65);
+}
+
+.gsap-nav {
+  background: rgba(12, 14, 26, 0.45);
+  border-bottom: 1px solid rgba(180, 220, 255, 0.25);
+  backdrop-filter: blur(32px) saturate(180%);
+  box-shadow: 0 16px 40px rgba(8, 10, 18, 0.55);
+}
+
+.gsap-grid {
+  background-image: radial-gradient(rgba(180, 220, 255, 0.18) 1px, transparent 1px);
+  background-size: 30px 30px;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.9), transparent 75%);
+}
+
+.gsap-panel {
+  background: rgba(14, 18, 32, 0.82);
+  border: 1px solid rgba(180, 220, 255, 0.28);
+  box-shadow: 0 26px 60px rgba(10, 12, 22, 0.55);
+  backdrop-filter: blur(10px) saturate(170%);
+}
+
+.gsap-pill,
+.gsap-chip {
+  background: rgba(20, 24, 40, 0.5);
+  border: 1px solid rgba(180, 220, 255, 0.25);
+  color: rgba(232, 242, 255, 0.9);
+}
+
+.gsap-pill-active,
+.gsap-chip-active {
+  background: rgba(160, 236, 255, 0.3);
+  border: 1px solid rgba(160, 236, 255, 0.8);
+  color: rgb(160, 236, 255);
+}
+
+.gsap-button {
+  background: linear-gradient(120deg, rgba(160, 236, 255, 0.95), rgba(199, 184, 255, 0.95), rgba(255, 206, 234, 0.9));
+  color: #0c1428;
+  box-shadow: 0 18px 36px rgba(160, 236, 255, 0.25);
+}
+
+.gsap-button:hover {
+  box-shadow: 0 26px 46px rgba(199, 184, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+@keyframes aurora-shift {
+  0% {
+    transform: translate3d(-5%, -5%, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(5%, 6%, 0) rotate(3deg);
+  }
+  100% {
+    transform: translate3d(-5%, -5%, 0) rotate(0deg);
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -18px, 0);
+  }
+}
+
+.gsap-aurora {
+  background: radial-gradient(circle at 20% 20%, rgba(160, 236, 255, 0.28), transparent 55%),
+    radial-gradient(circle at 80% 20%, rgba(199, 184, 255, 0.25), transparent 55%),
+    radial-gradient(circle at 40% 85%, rgba(255, 206, 234, 0.22), transparent 60%);
+  filter: blur(26px);
+  animation: aurora-shift 16s ease-in-out infinite;
+}
+
+.gsap-orb {
+  background: radial-gradient(circle, rgba(160, 236, 255, 0.4), transparent 60%);
+  filter: blur(8px);
+  animation: float-slow 10s ease-in-out infinite;
+}
+
+/* Legacy aliases */
+.sxt-grid {
+  background-image: radial-gradient(rgba(180, 220, 255, 0.18) 1px, transparent 1px);
+  background-size: 30px 30px;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.9), transparent 75%);
+}
+.sxt-nav {
+  background: rgba(12, 14, 26, 0.45);
+  border-bottom: 1px solid rgba(180, 220, 255, 0.25);
+  backdrop-filter: blur(32px) saturate(180%);
+  box-shadow: 0 16px 40px rgba(8, 10, 18, 0.55);
+}
+.sxt-surface {
+  background: rgba(16, 20, 34, 0.5);
+  border: 1px solid rgba(180, 220, 255, 0.2);
+  backdrop-filter: blur(30px) saturate(175%);
+}
+.sxt-panel {
+  background: rgba(12, 16, 28, 0.55);
+  border: 1px solid rgba(180, 220, 255, 0.28);
+  box-shadow: 0 26px 60px rgba(10, 12, 22, 0.55);
+  backdrop-filter: blur(34px) saturate(185%);
+}
+.sxt-pill,
+.sxt-chip {
+  background: rgba(20, 24, 40, 0.5);
+  border: 1px solid rgba(180, 220, 255, 0.25);
+  color: rgba(232, 242, 255, 0.9);
+}
+.sxt-pill-active,
+.sxt-chip-active {
+  background: rgba(160, 236, 255, 0.3);
+  border: 1px solid rgba(160, 236, 255, 0.8);
+  color: rgb(160, 236, 255);
+}
+.sxt-button {
+  background: linear-gradient(120deg, rgba(160, 236, 255, 0.95), rgba(199, 184, 255, 0.95), rgba(255, 206, 234, 0.9));
+  color: #0c1428;
+  box-shadow: 0 18px 36px rgba(160, 236, 255, 0.25);
 }

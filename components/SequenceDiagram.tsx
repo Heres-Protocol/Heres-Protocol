@@ -84,7 +84,7 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
 
   return (
     <div 
-      className={`relative w-full glass rounded-3xl mb-8 select-none border-white/5 shadow-2xl bg-slate-950/40 overflow-hidden group/viewport ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      className={`relative w-full rounded-3xl mb-8 select-none border-2 border-[#A0ECFF]/45 shadow-xl bg-[#0c1222]/95 overflow-hidden group/viewport backdrop-blur-sm ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       ref={containerRef}
       onMouseDown={handleMouseDown}
     >
@@ -125,9 +125,9 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
         <div className="flex justify-between mb-8 relative z-30">
           {Actors.map((actor) => (
             <div key={actor} className="flex flex-col items-center w-1/4">
-              <div className="px-3 py-2 rounded-lg bg-blue-600/10 border border-blue-500/30 text-blue-400 font-black mb-2 glow-blue min-w-[90px] md:min-w-[120px] text-center backdrop-blur-md">
+              <div className="px-3 py-2 rounded-lg bg-[#A0ECFF]/10 border-2 border-[#A0ECFF]/50 text-[#A0ECFF] font-black mb-2 min-w-[90px] md:min-w-[120px] text-center shadow-lg">
                 <span className="tracking-widest text-[9px] md:text-[10px] uppercase">{actor}</span>
-                <div className="text-[7px] md:text-[8px] font-medium opacity-60 mt-0.5 uppercase tracking-[0.15em] text-slate-300">
+                <div className="text-[7px] md:text-[8px] font-medium mt-0.5 uppercase tracking-[0.15em] text-slate-200">
                   {ActorLabels[actor]}
                 </div>
               </div>
@@ -142,7 +142,7 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
             {Actors.map((actor) => (
               <div 
                 key={`lifeline-${actor}`}
-                className="absolute top-0 bottom-0 w-[1px] bg-gradient-to-b from-blue-500/30 via-blue-500/5 to-transparent" 
+                className="absolute top-0 bottom-0 w-[1px] bg-gradient-to-b from-slate-500 via-slate-500/50 to-transparent" 
                 style={{ left: getXPosition(actor) }} 
               />
             ))}
@@ -150,7 +150,7 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
 
           {/* Dimming Layer */}
           <div 
-            className={`absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] transition-opacity duration-300 pointer-events-none z-40 ${activeStep !== null ? 'opacity-100' : 'opacity-0'}`} 
+            className={`absolute inset-0 bg-[#0f1629]/30 backdrop-blur-[2px] transition-opacity duration-300 pointer-events-none z-40 ${activeStep !== null ? 'opacity-100' : 'opacity-0'}`} 
           />
 
           {ARCHITECTURE_STEPS.map((step, idx) => {
@@ -176,7 +176,7 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
                       style={{
                         left: `calc(${Math.min(parseFloat(fromX), parseFloat(toX))}% + 1px)`,
                         width: `calc(${Math.abs(parseFloat(fromX) - parseFloat(toX))}% - 2px)`,
-                        background: isActive ? '#3b82f6' : 'rgba(59, 130, 246, 0.2)'
+                        background: isActive ? '#A0ECFF' : 'rgba(148, 163, 184, 0.6)'
                       }}
                     >
                       {/* Flowing Pulse */}
@@ -184,7 +184,7 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
                            style={{ animationDelay: `${idx * 0.1}s` }} />
                       
                       <div 
-                        className={`absolute w-2 h-2 border-t-2 border-r-2 transform transition-all duration-300 ${isActive ? 'border-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]' : 'border-blue-500/40'}`}
+                        className={`absolute w-2 h-2 border-t-2 border-r-2 transform transition-all duration-300 ${isActive ? 'border-[#A0ECFF] shadow-[0_0_8px_rgba(160,236,255,0.6)]' : 'border-slate-400'}`}
                         style={{
                           right: isRightFlow ? '-1px' : 'auto',
                           left: !isRightFlow ? '-1px' : 'auto',
@@ -195,17 +195,17 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
                     </div>
                   ) : (
                     <div 
-                      className={`absolute w-10 h-8 border-2 border-l-0 rounded-r-xl transition-all duration-300 top-1/2 -translate-y-1/2 ${isActive ? 'border-blue-400 glow-blue shadow-[0_0_12px_rgba(96,165,250,0.3)]' : 'border-blue-500/10'}`}
+                      className={`absolute w-10 h-8 border-2 border-l-0 rounded-r-xl transition-all duration-300 top-1/2 -translate-y-1/2 ${isActive ? 'border-[#A0ECFF] shadow-[0_0_12px_rgba(160,236,255,0.4)]' : 'border-slate-500'}`}
                       style={{
                         left: fromX,
                         marginLeft: '1px'
                       }}
                     >
                       {/* Loop Animation */}
-                      <div className={`absolute inset-0 rounded-r-xl animate-pulse opacity-30 bg-blue-500/20`} />
+                      <div className={`absolute inset-0 rounded-r-xl animate-pulse opacity-40 bg-[#A0ECFF]/20`} />
                       
                       <div 
-                        className={`absolute bottom-[-5px] left-[-3.5px] w-2 h-2 border-b-2 border-l-2 transform rotate-[-45deg] transition-all duration-300 ${isActive ? 'border-blue-400' : 'border-blue-500/20'}`}
+                        className={`absolute bottom-[-5px] left-[-3.5px] w-2 h-2 border-b-2 border-l-2 transform rotate-[-45deg] transition-all duration-300 ${isActive ? 'border-[#A0ECFF]' : 'border-slate-500'}`}
                       />
                     </div>
                   )}
@@ -220,19 +220,19 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
                 >
                   <div className="relative cursor-help group">
                     <div className={`
-                      absolute -left-2 -top-2 flex items-center justify-center w-6 h-6 rounded-full border text-[10px] font-black transition-all duration-300 z-20 shadow-xl
+                      absolute -left-2 -top-2 flex items-center justify-center w-6 h-6 rounded-full border-2 text-[10px] font-black transition-all duration-300 z-20 shadow-lg
                       ${isActive 
-                        ? 'bg-blue-500 border-blue-200 text-white scale-110 shadow-blue-500/50' 
-                        : 'bg-blue-600 border-blue-400/50 text-white'}
+                        ? 'bg-[#A0ECFF] border-[#A0ECFF] text-[#0c1222] scale-110' 
+                        : 'bg-[#A0ECFF]/20 border-[#A0ECFF]/50 text-[#A0ECFF]'}
                     `}>
                       {step.id}
                     </div>
 
                     <div className={`
-                      px-4 py-1.5 rounded-lg border text-[9px] md:text-[10px] font-bold tracking-tight transition-all duration-300 min-w-[120px] md:min-w-[140px] text-center backdrop-blur-md
+                      px-4 py-1.5 rounded-lg border-2 text-[9px] md:text-[10px] font-bold tracking-tight transition-all duration-300 min-w-[120px] md:min-w-[140px] text-center
                       ${isActive 
-                        ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)]' 
-                        : 'bg-slate-900/90 border-blue-500/20 text-slate-400'}
+                        ? 'bg-[#A0ECFF]/25 border-[#A0ECFF] text-white shadow-lg shadow-[#A0ECFF]/25' 
+                        : 'bg-[#0f1629]/90 border-[#A0ECFF]/40 text-slate-200'}
                     `}>
                       {step.label}
                     </div>
@@ -242,7 +242,7 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
                 {/* Tooltip detail */}
                 {isActive && (
                   <div 
-                    className={`absolute left-1/2 -translate-x-1/2 w-72 md:w-80 p-5 bg-slate-950 border border-blue-400/60 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,1)] z-[100] animate-in fade-in zoom-in-95 duration-300 pointer-events-none ring-1 ring-white/10
+                    className={`absolute left-1/2 -translate-x-1/2 w-72 md:w-80 p-5 bg-[#0c1222]/98 border-2 border-[#A0ECFF]/60 rounded-2xl shadow-2xl z-[100] animate-in fade-in zoom-in-95 duration-300 pointer-events-none ring-2 ring-[#A0ECFF]/30 backdrop-blur-sm
                       ${isBottomSteps ? 'bottom-full mb-4' : 'top-full mt-4'}`}
                     style={{
                       transform: `scale(${1 / scale}) translateX(-50%)`,
@@ -250,8 +250,8 @@ export const SequenceDiagram: React.FC<SequenceDiagramProps> = ({ activeStep, on
                     }}
                   >
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="text-blue-400 font-black uppercase tracking-[0.2em] text-[9px]">Node {step.id} Detail</span>
-                      <div className="h-[1px] flex-1 bg-gradient-to-r from-blue-500/40 to-transparent" />
+                      <span className="text-[#A0ECFF] font-black uppercase tracking-[0.2em] text-[9px]">Node {step.id} Detail</span>
+                      <div className="h-[1px] flex-1 bg-gradient-to-r from-[#A0ECFF]/60 to-transparent" />
                     </div>
                     <p className="text-white font-black text-sm md:text-base mb-2 leading-tight tracking-tight">{step.label}</p>
                     <p className="text-slate-300 leading-relaxed text-[11px] font-medium">{step.description}</p>

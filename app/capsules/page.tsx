@@ -15,8 +15,6 @@ import { decodeIntentData, secondsToDays } from '@/utils/intent'
 import { SOLANA_CONFIG, HELIUS_CONFIG, STORAGE_KEYS } from '@/constants'
 import dynamic from 'next/dynamic'
 import type { IntentCapsule } from '@/types'
-import Hero3D from '@/components/Hero3D'
-
 // Dynamic import to prevent hydration errors
 const WalletMultiButton = dynamic(
   async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
@@ -72,11 +70,6 @@ export default function CapsulesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, publicKey])
 
-  // Debug: Log transactions state changes
-  useEffect(() => {
-    console.log('Transactions state changed:', transactions.length, transactions)
-  }, [transactions])
-
   // Auto-execute capsule when inactivity period is met
   useEffect(() => {
     if (!capsule || !publicKey || !wallet || !capsule.isActive) return
@@ -112,7 +105,6 @@ export default function CapsulesPage() {
         // If no recent activity and inactivity period is met, execute automatically
         // Only execute once - check if already executing or capsule is executed
         if (!isExecuting && capsule.isActive && !capsule.executedAt) {
-          console.log('Auto-executing capsule: inactivity period met')
           await handleExecute()
         }
       } catch (error) {
@@ -153,16 +145,7 @@ export default function CapsulesPage() {
         }
         // Always update to reflect the most current transaction data
         setWalletActivity(updatedActivity)
-        console.log('Updated walletActivity from transactions:', {
-          transactionCount: updatedActivity.transactionCount,
-          lastSignature: updatedActivity.lastSignature.substring(0, 8) + '...',
-          lastActivity: new Date(updatedActivity.lastActivityTimestamp).toLocaleString()
-        })
       }
-    } else if (transactions.length === 0 && publicKey && walletActivity && walletActivity.transactionCount > 0) {
-      // If transactions list is cleared but we had activity, keep the count
-      // This prevents flickering when transactions are being reloaded
-      console.log('Transactions list is empty, keeping existing walletActivity')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions, publicKey])
@@ -174,26 +157,13 @@ export default function CapsulesPage() {
     setError(null)
 
     try {
-      // Fetch capsule data first
-      console.log('Loading capsule data for:', publicKey.toString())
       const capsuleData = await getCapsule(publicKey)
-      console.log('Capsule data received:', capsuleData ? 'Found' : 'Not found')
-      
-      if (capsuleData) {
-        console.log('Capsule details:', {
-          isActive: capsuleData.isActive,
-          executedAt: capsuleData.executedAt,
-          hasIntentData: capsuleData.intentData.length > 0,
-        })
-      }
-      
       setCapsule(capsuleData)
 
       if (capsuleData && capsuleData.intentData.length > 0) {
         try {
           const decoded = decodeIntentData(capsuleData.intentData)
           setIntentData(decoded)
-          console.log('Intent data decoded successfully')
         } catch (decodeError) {
           console.error('Error decoding intent data:', decodeError)
           setIntentData(null)
@@ -211,9 +181,7 @@ export default function CapsulesPage() {
           allCreationTxKeys.push(key)
         }
       }
-      
-      console.log('Found creation transaction keys in localStorage:', allCreationTxKeys.length)
-      
+
       // Get the most recent creation transaction by comparing all available transactions
       const txKey = STORAGE_KEYS.CAPSULE_CREATION_TX(publicKey.toString())
       let savedTx = localStorage.getItem(txKey)
@@ -240,7 +208,6 @@ export default function CapsulesPage() {
         try {
           const parsed = JSON.parse(savedExecutedCapsules)
           loadedExecutedCapsules = Array.isArray(parsed) ? parsed : []
-          console.log('Loaded executed capsules from localStorage:', loadedExecutedCapsules.length)
         } catch (e) {
           console.error('Error parsing executed capsules:', e)
           loadedExecutedCapsules = []
@@ -635,18 +602,11 @@ export default function CapsulesPage() {
           const updated = [...currentExecutedCapsules, executedCapsuleData]
           setExecutedCapsules(updated)
           localStorage.setItem(executedCapsulesKey, JSON.stringify(updated))
-          console.log('Saved executed capsule to localStorage:', executedCapsuleData)
         }
       }
 
       // Fetch transaction history first to get valid transactions
-      console.log('Calling fetchTransactionHistory with:', {
-        walletAddress: publicKey.toString(),
-        creationTx: savedTx || null,
-        executionTx: savedExecutionTx || null
-      })
       await fetchTransactionHistory(publicKey.toString(), savedTx || null, savedExecutionTx || null)
-      console.log('fetchTransactionHistory completed, current transactions:', transactions.length)
       
       // Use transactions list to set wallet activity (most accurate source)
       // This ensures we show the most recent capsule transaction and accurate count
@@ -665,23 +625,14 @@ export default function CapsulesPage() {
           transactionCount: transactions.length, // Use actual transaction count from our list
         }
         
-        console.log('Setting wallet activity from transactions:', finalActivity)
-        console.log('Most recent transaction:', {
-          signature: mostRecentTx.signature?.substring(0, 8) + '...',
-          type: mostRecentTx.type,
-          timestamp: mostRecentTx.timestamp ? new Date(mostRecentTx.timestamp * 1000).toLocaleString() : 'N/A'
-        })
         setWalletActivity(finalActivity)
       } else {
         // Try to fetch from Helius RPC as fallback
         const activity = await getWalletActivity(publicKey.toString())
         
         if (activity) {
-          console.log('Setting wallet activity from Helius RPC (fallback):', activity)
           setWalletActivity(activity)
         } else {
-          // No data available - set empty state
-          console.log('No wallet activity data available')
           setWalletActivity({
             wallet: publicKey.toString(),
             lastSignature: '',
@@ -2249,19 +2200,24 @@ export default function CapsulesPage() {
 
   if (!connected || !publicKey) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden">
         <div className="fixed inset-0 w-full h-full z-0">
-          <Hero3D />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/80 z-10"></div>
+          <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
+          <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
+          <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
+          <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
+          <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
+          <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
         </div>
         <div className="relative z-20 flex items-center justify-center min-h-screen p-6">
-          <div className="material-card material-elevation-4 rounded-2xl p-12 text-center max-w-md">
-            <Shield className="w-16 h-16 text-blue-400 mx-auto mb-6" />
+          <div className="material-card gsap-panel rounded-2xl p-12 text-center max-w-md border-[#A0ECFF]/30">
+            <Shield className="w-16 h-16 text-[#A0ECFF] mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-white mb-4">Connect Your Wallet</h2>
-            <p className="text-slate-300 mb-8">
+            <p className="text-slate-200 mb-8">
               Please connect your Solana wallet to view your capsules
             </p>
-            <div className="relative z-[9999] inline-block">
+            <div className="relative z-[9999] inline-block material-elevation-2 rounded-lg overflow-hidden gsap-panel">
               <WalletMultiButton />
             </div>
           </div>
@@ -2272,15 +2228,20 @@ export default function CapsulesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden text-slate-100">
         <div className="fixed inset-0 w-full h-full z-0">
-          <Hero3D />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/80 z-10"></div>
+          <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
+          <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
+          <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
+          <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
+          <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
+          <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
         </div>
         <div className="relative z-20 flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-slate-300">Loading capsule data...</p>
+            <div className="animate-spin rounded-full h-16 w-16 border-2 border-[#A0ECFF]/30 border-t-[#A0ECFF]/80 border-b-[#C7B8FF]/60 mx-auto mb-4" />
+            <p className="text-slate-200 font-medium">Loading capsule data...</p>
           </div>
         </div>
       </div>
@@ -2289,19 +2250,24 @@ export default function CapsulesPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden text-slate-100">
         <div className="fixed inset-0 w-full h-full z-0">
-          <Hero3D />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/80 z-10"></div>
+          <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
+          <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
+          <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
+          <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
+          <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
+          <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
         </div>
         <div className="relative z-20 flex items-center justify-center min-h-screen p-6">
-          <div className="material-card material-elevation-4 rounded-2xl p-12 border-2 border-red-500/50 text-center max-w-md bg-red-500/10">
-            <XCircle className="w-16 h-16 text-red-400 mx-auto mb-6" />
+          <div className="material-card gsap-panel rounded-2xl p-12 border-2 border-rose-500/50 text-center max-w-md bg-rose-500/10 border-[#A0ECFF]/30">
+            <XCircle className="w-16 h-16 text-rose-400 mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-white mb-4">Error</h2>
-            <p className="text-slate-300 mb-8">{error}</p>
+            <p className="text-slate-200 mb-8">{error}</p>
             <button
               onClick={loadCapsuleData}
-              className="material-button material-elevation-2 hover:material-elevation-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl font-semibold transition-all"
+              className="material-button gsap-button px-6 py-3 text-white rounded-xl font-semibold transition-all"
             >
               Retry
             </button>
@@ -2313,20 +2279,25 @@ export default function CapsulesPage() {
 
   if (!capsule) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden">
         <div className="fixed inset-0 w-full h-full z-0">
-          <Hero3D />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/80 z-10"></div>
+          <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
+          <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
+          <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
+          <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
+          <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
+          <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
         </div>
         <div className="relative z-20 flex items-center justify-center min-h-screen p-6">
-          <div className="material-card material-elevation-4 rounded-2xl p-12 text-center max-w-md">
-            <Shield className="w-16 h-16 text-blue-400 mx-auto mb-6" />
+          <div className="material-card gsap-panel rounded-2xl p-12 text-center max-w-md border-[#A0ECFF]/30">
+            <Shield className="w-16 h-16 text-[#A0ECFF] mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-white mb-4">No Capsule Found</h2>
-            <p className="text-slate-300 mb-8">
+            <p className="text-slate-200 mb-8">
               You don't have any capsules yet. Create one to get started!
             </p>
             <Link href="/create">
-              <button className="material-button material-elevation-2 hover:material-elevation-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl font-semibold transition-all">
+              <button className="material-button gsap-button px-6 py-3 text-white rounded-xl font-semibold transition-all">
                 Create Capsule
               </button>
             </Link>
@@ -2337,24 +2308,29 @@ export default function CapsulesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
-      {/* 3D Hero Background */}
+    <div className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden">
+      {/* 3D Hero Background - 랜딩과 동일 */}
       <div className="fixed inset-0 w-full h-full z-0">
-        <Hero3D />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/80 z-10"></div>
+        <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
+        <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
+        <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
+        <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
+        <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
+        <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
+        <div className="absolute left-12 top-24 w-24 h-24 dream-bubble z-[8] opacity-60" />
+        <div className="absolute right-20 top-40 w-16 h-16 dream-bubble z-[8] opacity-60 [animation-duration:10s]" />
       </div>
 
       {/* Header */}
-      <header className="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50 overflow-visible">
+      <nav className="fixed top-0 w-full z-50 gsap-nav overflow-visible">
         <div className="max-w-7xl mx-auto px-6 py-4 overflow-visible">
           <div className="flex items-center justify-between overflow-visible">
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative w-10 h-10 transition-transform group-hover:rotate-12">
-                <Image src="/logo.svg" alt="Lucid" fill className="object-contain" />
+              <div className="relative w-9 h-9 md:w-10 md:h-10 transition-transform group-hover:rotate-6">
+                <Image src="/logo.png" alt="Lucid" fill className="object-contain drop-shadow-[0_8px_18px_rgba(255,255,255,0.25)]" />
               </div>
-              <span className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">
-                Lucid
-              </span>
+              <span className="sr-only">Lucid</span>
             </Link>
             <div className="flex items-center gap-4">
               <div className="relative z-[9999] wallet-menu-container">
@@ -2362,7 +2338,7 @@ export default function CapsulesPage() {
                   <div className="relative">
                     <button
                       onClick={() => setShowWalletMenu(!showWalletMenu)}
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors gsap-button"
                     >
                       <span className="font-mono text-sm">
                         {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
@@ -2374,7 +2350,7 @@ export default function CapsulesPage() {
                       )}
                     </button>
                     {showWalletMenu && (
-                      <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-lg border border-slate-700 overflow-hidden z-[10000]">
+                    <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-[#A0ECFF]/25 overflow-hidden z-[10000] gsap-panel">
                         <button
                           onClick={async () => {
                             try {
@@ -2384,14 +2360,14 @@ export default function CapsulesPage() {
                               console.error('Error disconnecting wallet:', err)
                             }
                           }}
-                          className="w-full text-left px-4 py-2 text-white hover:bg-slate-700 transition-colors"
+                      className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
                         >
                           Disconnect
                         </button>
                         {wallets && wallets.length > 1 && (
                           <>
-                            <div className="border-t border-slate-700"></div>
-                            <div className="px-2 py-1 text-xs text-slate-400">Switch Wallet</div>
+                        <div className="border-t border-[#A0ECFF]/20"></div>
+                            <div className="px-2 py-1 text-xs text-slate-300">Switch Wallet</div>
                             {wallets.map((w: any) => (
                               <button
                                 key={w.adapter.name}
@@ -2403,7 +2379,7 @@ export default function CapsulesPage() {
                                     console.error('Error switching wallet:', err)
                                   }
                                 }}
-                                className="w-full text-left px-4 py-2 text-white hover:bg-slate-700 transition-colors"
+                            className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
                               >
                                 {w.adapter.name}
                               </button>
@@ -2414,11 +2390,13 @@ export default function CapsulesPage() {
                     )}
                   </div>
                 ) : (
-                  <WalletMultiButton />
+                  <div className="material-elevation-2 rounded-lg overflow-hidden gsap-panel">
+                    <WalletMultiButton />
+                  </div>
                 )}
               </div>
               <Link href="/dashboard">
-                <button className="material-button material-elevation-2 hover:material-elevation-4 flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/60 backdrop-blur-xl text-white rounded-lg border border-slate-700/50 hover:border-blue-500/50 transition-all">
+                <button className="material-button gsap-pill flex items-center gap-2 px-4 py-2 text-white rounded-lg border border-[#A0ECFF]/40 hover:border-[#A0ECFF]/60 transition-all">
                   <ArrowLeft className="w-4 h-4" />
                   Back
                 </button>
@@ -2426,23 +2404,25 @@ export default function CapsulesPage() {
             </div>
           </div>
         </div>
-      </header>
+      </nav>
 
       <main className="relative z-20 max-w-7xl mx-auto px-6 pt-24 pb-12">
         <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-black text-white mb-2">My Intent Capsule</h1>
-          <p className="text-slate-300">View your capsule details and activity</p>
+          <h1 className="text-4xl md:text-5xl font-black mb-2 bg-gradient-to-r from-[#A0ECFF] via-[#C7B8FF] to-[#FFCEEA] bg-clip-text text-transparent">
+            My Intent Capsule
+          </h1>
+          <p className="text-slate-200">View your capsule details and activity</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Capsule Status */}
-            <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+            <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-500/30">
-                    <Shield className="w-6 h-6 text-blue-400" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#A0ECFF]/20 to-[#C7B8FF]/20 rounded-xl flex items-center justify-center border border-[#A0ECFF]/40">
+                    <Shield className="w-6 h-6 text-[#A0ECFF]" />
                   </div>
                   <h2 className="text-2xl font-bold text-white">Capsule Status</h2>
                 </div>
@@ -2475,7 +2455,7 @@ export default function CapsulesPage() {
                       <span className={`font-semibold ${
                         canExecute(capsule.lastActivity, capsule.inactivityPeriod)
                           ? 'text-green-400'
-                          : 'text-blue-400'
+                          : 'text-[#A0ECFF]'
                       }`}>
                         {getTimeRemaining(capsule.lastActivity, capsule.inactivityPeriod)}
                       </span>
@@ -2485,7 +2465,7 @@ export default function CapsulesPage() {
                         <button
                           onClick={handleExecute}
                           disabled={isExecuting}
-                          className="material-button material-elevation-4 hover:material-elevation-8 w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-xl shadow-green-500/30 hover:shadow-green-500/50"
+                          className="material-button gsap-button w-full px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
                         >
                           <Zap className="w-5 h-5" />
                           {isExecuting ? 'Executing...' : 'Execute Capsule'}
@@ -2516,7 +2496,7 @@ export default function CapsulesPage() {
                         href={getOrbMarketsUrl(creationTxSignature)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm transition-colors"
+                        className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-sm transition-colors"
                       >
                         View on Orb Markets
                         <ExternalLink className="w-4 h-4" />
@@ -2537,7 +2517,7 @@ export default function CapsulesPage() {
                         href={getOrbMarketsUrl(executionTxSignature)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm transition-colors"
+                        className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-sm transition-colors"
                       >
                         View on Orb Markets
                         <ExternalLink className="w-4 h-4" />
@@ -2550,7 +2530,7 @@ export default function CapsulesPage() {
 
             {/* Intent Data */}
             {intentData && (
-              <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+              <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
                 <h2 className="text-2xl font-bold text-white mb-6">Intent Details</h2>
                 <div className="space-y-4">
                   <div>
@@ -2564,7 +2544,7 @@ export default function CapsulesPage() {
                         {Array.isArray(intentData.beneficiaries) && intentData.beneficiaries.map((b: any, idx: number) => (
                           <div key={idx} className="bg-slate-900/50 backdrop-blur-sm rounded-lg p-3 flex justify-between items-center">
                             <span className="text-white font-mono text-sm">{b.address.slice(0, 8)}...{b.address.slice(-8)}</span>
-                            <span className="text-blue-400">
+                            <span className="text-[#A0ECFF]">
                               {b.amount} {b.amountType === 'percentage' ? '%' : 'SOL'}
                             </span>
                           </div>
@@ -2583,9 +2563,9 @@ export default function CapsulesPage() {
             )}
 
             {/* Noir ZK Integration */}
-            <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+            <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
               <div className="flex items-center gap-3 mb-6">
-                <Lock className="w-6 h-6 text-blue-400" />
+                <Lock className="w-6 h-6 text-[#A0ECFF]" />
                 <h2 className="text-2xl font-bold text-white">Noir ZK Integration</h2>
               </div>
               <div className="space-y-4">
@@ -2601,7 +2581,7 @@ export default function CapsulesPage() {
                 </div>
                 <div className="bg-slate-900/50 backdrop-blur-sm rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-5 h-5 text-blue-400" />
+                    <Shield className="w-5 h-5 text-[#A0ECFF]" />
                     <span className="text-white font-semibold">Proof Requirements</span>
                   </div>
                   <ul className="text-slate-300 text-sm space-y-1 ml-7">
@@ -2627,12 +2607,12 @@ export default function CapsulesPage() {
                       <div className="mt-3 pt-3 border-t border-green-500/30 space-y-3">
                         <div className="bg-slate-900/50 rounded-lg p-3">
                           <div className="flex items-center gap-2 mb-2">
-                            <Shield className="w-4 h-4 text-blue-400" />
+                            <Shield className="w-4 h-4 text-[#A0ECFF]" />
                             <span className="text-slate-300 text-xs font-semibold">ZK Proof Details</span>
                           </div>
                           {zkProofHash && (
                             <div className="mb-2">
-                              <span className="text-slate-400 text-xs">Proof Hash:</span>
+                              <span className="text-slate-300 text-xs">Proof Hash:</span>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-white font-mono text-xs bg-slate-800/50 px-2 py-1 rounded">
                                   {zkProofHash}...
@@ -2643,7 +2623,7 @@ export default function CapsulesPage() {
                           )}
                           {zkPublicInputsHash && (
                             <div>
-                              <span className="text-slate-400 text-xs">Public Inputs Hash:</span>
+                              <span className="text-slate-300 text-xs">Public Inputs Hash:</span>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-white font-mono text-xs bg-slate-800/50 px-2 py-1 rounded">
                                   {zkPublicInputsHash}...
@@ -2661,7 +2641,7 @@ export default function CapsulesPage() {
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-slate-300 text-sm font-semibold">On-Chain Verification Transaction:</span>
                         </div>
-                        <p className="text-slate-400 text-xs mb-2">
+                        <p className="text-slate-300 text-xs mb-2">
                           This transaction contains the ZK proof and was verified on-chain by the Solana program.
                         </p>
                         <div className="flex items-center gap-2 mb-3">
@@ -2674,7 +2654,7 @@ export default function CapsulesPage() {
                             href={getOrbMarketsUrl(executionTxSignature)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors bg-slate-800/50 px-3 py-1.5 rounded-lg hover:bg-slate-700/50"
+                            className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors bg-slate-800/50 px-3 py-1.5 rounded-lg hover:bg-slate-700/50"
                           >
                             View on Orb Markets
                             <ExternalLink className="w-3 h-3" />
@@ -2683,7 +2663,7 @@ export default function CapsulesPage() {
                             href={getSolscanUrl(executionTxSignature)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors bg-slate-800/50 px-3 py-1.5 rounded-lg hover:bg-slate-700/50"
+                            className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors bg-slate-800/50 px-3 py-1.5 rounded-lg hover:bg-slate-700/50"
                           >
                             View on Solscan
                             <ExternalLink className="w-3 h-3" />
@@ -2700,9 +2680,9 @@ export default function CapsulesPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Helius Integration */}
-            <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+            <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
               <div className="flex items-center gap-3 mb-6">
-                <Activity className="w-6 h-6 text-blue-400" />
+                <Activity className="w-6 h-6 text-[#A0ECFF]" />
                 <h2 className="text-2xl font-bold text-white">Helius Activity</h2>
               </div>
               <div className="space-y-4">
@@ -2734,7 +2714,7 @@ export default function CapsulesPage() {
                                   href={walletUrls.solscan}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                                  className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors"
                                 >
                                   Solscan
                                   <ExternalLink className="w-3 h-3" />
@@ -2743,7 +2723,7 @@ export default function CapsulesPage() {
                                   href={walletUrls.orbMarkets}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                                  className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors"
                                 >
                                   Orb Markets
                                   <ExternalLink className="w-3 h-3" />
@@ -2783,7 +2763,7 @@ export default function CapsulesPage() {
                                 href={getSolscanUrl(walletActivity.lastSignature)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                                className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors"
                               >
                                 Solscan
                                 <ExternalLink className="w-3 h-3" />
@@ -2792,7 +2772,7 @@ export default function CapsulesPage() {
                                 href={getOrbMarketsUrl(walletActivity.lastSignature)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                                className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors"
                               >
                                 Orb Markets
                                 <ExternalLink className="w-3 h-3" />
@@ -2806,7 +2786,7 @@ export default function CapsulesPage() {
                 )}
                 <div className="bg-slate-900/50 backdrop-blur-sm rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Activity className="w-5 h-5 text-blue-400" />
+                    <Activity className="w-5 h-5 text-[#A0ECFF]" />
                     <span className="text-white font-semibold">Helius Features</span>
                   </div>
                   <ul className="text-slate-300 text-sm space-y-1 ml-7">
@@ -2819,11 +2799,11 @@ export default function CapsulesPage() {
             </div>
 
             {/* Transaction History */}
-            <div className="material-card material-elevation-2 hover:material-elevation-4 p-8">
+            <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30">
               <h2 className="text-2xl font-bold text-white mb-6">
                 Recent capsule transactions
                 {transactions.length > 0 && (
-                  <span className="ml-2 text-sm text-slate-400">({transactions.length})</span>
+                  <span className="ml-2 text-sm text-slate-300">({transactions.length})</span>
                 )}
               </h2>
               {Array.isArray(transactions) && transactions.length > 0 ? (
@@ -2837,7 +2817,7 @@ export default function CapsulesPage() {
                           </span>
                         )}
                         {tx.type === 'creation' && (
-                          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded border border-blue-500/50">
+                          <span className="px-2 py-0.5 bg-[#A0ECFF]/20 text-[#A0ECFF] text-xs rounded border border-[#A0ECFF]/50">
                             Creation
                           </span>
                         )}
@@ -2849,7 +2829,7 @@ export default function CapsulesPage() {
                       {/* Transaction Details */}
                       <div className="mt-2 pt-2 border-t border-slate-700/50 space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400">Status:</span>
+                          <span className="text-slate-300">Status:</span>
                           <span className={tx.err ? 'text-red-400' : 'text-green-400'}>
                             {tx.err 
                               ? 'Failed' 
@@ -2859,7 +2839,7 @@ export default function CapsulesPage() {
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400">Date:</span>
+                          <span className="text-slate-300">Date:</span>
                           <span className="text-white">
                             {tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : 'N/A'}
                           </span>
@@ -2878,7 +2858,7 @@ export default function CapsulesPage() {
                           href={getSolscanUrl(tx.signature)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                          className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors"
                         >
                           Solscan
                           <ExternalLink className="w-3 h-3" />
@@ -2887,7 +2867,7 @@ export default function CapsulesPage() {
                           href={getOrbMarketsUrl(tx.signature)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                          className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors"
                         >
                           Orb Markets
                           <ExternalLink className="w-3 h-3" />
@@ -2898,23 +2878,23 @@ export default function CapsulesPage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-slate-400 text-sm">No transactions found</p>
+                  <p className="text-slate-300 text-sm">No transactions found</p>
                 </div>
               )}
             </div>
 
             {/* Executed Capsules Dropdown */}
             {executedCapsules.length > 0 && (
-              <div className="material-card material-elevation-2 hover:material-elevation-4 p-8 mt-6">
+              <div className="material-card gsap-panel p-8 rounded-2xl border-[#A0ECFF]/30 mt-6">
                 <button
                   onClick={() => setShowExecutedCapsules(!showExecutedCapsules)}
                   className="w-full flex items-center justify-between mb-4"
                 >
                   <h2 className="text-2xl font-bold text-white">Executed Capsules</h2>
                   {showExecutedCapsules ? (
-                    <ChevronUp className="w-6 h-6 text-slate-400" />
+                    <ChevronUp className="w-6 h-6 text-slate-300" />
                   ) : (
-                    <ChevronDown className="w-6 h-6 text-slate-400" />
+                    <ChevronDown className="w-6 h-6 text-slate-300" />
                   )}
                 </button>
                 
@@ -2929,17 +2909,17 @@ export default function CapsulesPage() {
                         >
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center border border-blue-500/30">
-                                <CheckCircle className="w-6 h-6 text-blue-400" />
+                              <div className="w-12 h-12 bg-[#A0ECFF]/20 rounded-xl flex items-center justify-center border border-[#A0ECFF]/40">
+                                <CheckCircle className="w-6 h-6 text-[#A0ECFF]" />
                               </div>
                               <div>
                                 <h3 className="text-lg font-bold text-white">Executed Capsule</h3>
-                                <p className="text-slate-400 text-sm">
+                                <p className="text-slate-300 text-sm">
                                   Executed: {formatDate(executedCapsule.executedAt)}
                                 </p>
                               </div>
                             </div>
-                            <div className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg font-semibold text-sm border border-blue-500/50">
+                            <div className="px-3 py-1.5 bg-[#A0ECFF]/20 text-[#A0ECFF] rounded-lg font-semibold text-sm border border-[#A0ECFF]/50">
                               Executed
                             </div>
                           </div>
@@ -2972,7 +2952,7 @@ export default function CapsulesPage() {
                                       {Array.isArray(executedCapsule.intentData?.beneficiaries) && executedCapsule.intentData.beneficiaries.map((b: any, bidx: number) => (
                                         <div key={bidx} className="bg-slate-800/50 rounded-lg p-2 flex justify-between items-center">
                                           <span className="text-white font-mono text-xs">{b.address.slice(0, 8)}...{b.address.slice(-8)}</span>
-                                          <span className="text-blue-400 text-sm">
+                                          <span className="text-[#A0ECFF] text-sm">
                                             {b.amount} {b.amountType === 'percentage' ? '%' : 'SOL'}
                                           </span>
                                         </div>
@@ -3001,7 +2981,7 @@ export default function CapsulesPage() {
                                     href={getOrbMarketsUrl(executedCapsule.executionTx)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                                    className="flex items-center gap-1 text-[#A0ECFF] hover:text-[#C7B8FF] text-xs transition-colors"
                                   >
                                     View on Orb Markets
                                     <ExternalLink className="w-3 h-3" />
