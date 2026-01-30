@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
+import type { WalletName } from '@solana/wallet-adapter-base'
 import dynamic from 'next/dynamic'
 import { ArrowLeft, Clock, User, Shield, Eye, Plus, X, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react'
 
@@ -394,7 +395,7 @@ export default function CreatePage() {
                         <>
                           <div className="border-t border-[#A0ECFF]/20" />
                           <div className="px-2 py-1 text-xs text-slate-300">Switch Wallet</div>
-                          {wallets.map((w: { adapter: { name: string } }) => (
+                          {wallets.map((w: { adapter: { name: WalletName } }) => (
                             <button
                               key={w.adapter.name}
                               onClick={async () => {
