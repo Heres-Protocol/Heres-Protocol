@@ -240,6 +240,57 @@ The web application provides:
 - **Solana RPC**: Direct blockchain interaction via Helius RPC endpoint
 - **Noir ZK**: Zero-Knowledge proof generation (development mode, production verifier planned)
 
+## 🔗 Solana, Helius, and Aztec Noir ZK Integration
+
+Lucid integrates **Solana** (on-chain program and RPC), **Helius** (RPC and transaction APIs), and **Aztec Noir ZK** (zero-knowledge proof verification) to deliver an intent-inheritance protocol. Below is how each is used in the codebase, with links to the relevant source.
+
+### Solana
+
+- **On-chain program (Anchor/Rust)**  
+  The Intent Capsule lives on Solana as a PDA. Instructions: `create_capsule`, `update_intent`, `execute_intent` (with ZK proof verification), `update_activity`, `deactivate_capsule`, `recreate_capsule`. SOL is distributed to beneficiaries inside `execute_intent`.  
+  → [lucid_program/programs/lucid_program/src/lib.rs](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/lucid_program/programs/lucid_program/src/lib.rs)
+
+- **Client (create, execute, get capsule)**  
+  Next.js app talks to the program via Anchor: create capsule, execute intent (with proof/public inputs), get capsule state, update activity, recreate capsule. Uses Helius RPC for sending transactions.  
+  → [lib/solana.ts](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/lib/solana.ts)
+
+- **Connection and RPC**  
+  Solana `Connection` is created with Helius RPC URL; used for all on-chain reads and transaction submission.  
+  → [config/solana.ts](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/config/solana.ts)  
+  → [constants/index.ts](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/constants/index.ts) (program ID, network, Helius key)
+
+### Helius
+
+- **RPC endpoint**  
+  Wallet connection and all Solana RPC calls (getProgramAccounts, getBalance, sendTransaction, etc.) go through the Helius devnet RPC.  
+  → [config/solana.ts](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/config/solana.ts)  
+  → [app/providers.tsx](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/app/providers.tsx) (WalletProvider endpoint)
+
+- **Transaction history and activity**  
+  Helius `getTransactionsForAddress` (and related) is used to fetch transaction history and last-activity timestamps for capsule owners, used for monitoring inactivity and for the capsules UI.  
+  → [lib/helius.ts](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/lib/helius.ts)
+
+- **On-chain “dormant” stats**  
+  The app fetches program accounts and balances via RPC (Helius) to show dormant-wallet counts and estimated locked SOL/USD on the landing page.  
+  → [app/api/dormant-wallets/route.ts](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/app/api/dormant-wallets/route.ts)
+
+### Aztec Noir ZK
+
+- **Noir ZK in the flow**  
+  The architecture treats “silence” (inactivity) as a provable fact: the frontend requests a proof, and the Solana program verifies it before executing the intent. The flow (request proof → Noir ZK → verify on Solana) is described in the app’s architecture copy.  
+  → [constants/architecture.ts](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/constants/architecture.ts)
+
+- **On-chain verification (Noir proof)**  
+  `execute_intent` in the Solana program takes a proof and public inputs, then calls `verify_noir_proof`. That function checks proof/public-input structure and consistency (owner, last_activity, inactivity_period, current_time). Production would plug in a full Noir verifier; the repo currently uses a development-mode verifier.  
+  → [lucid_program/programs/lucid_program/src/lib.rs](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/lucid_program/programs/lucid_program/src/lib.rs) (see `execute_intent` and `verify_noir_proof`)
+
+- **Frontend: proof and public inputs for execution**  
+  The UI builds the proof and public inputs (e.g. from inactivity data) and calls the client `executeIntent`, which sends them to the program’s `execute_intent`.  
+  → [lib/solana.ts](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/lib/solana.ts) (`executeIntent`)  
+  → [app/capsules/page.tsx](https://github.com/Joseph-hackathon/Lucid_solana/blob/main/app/capsules/page.tsx) (where execution is triggered from the UI)
+
+Together, **Solana** holds the capsule state and executes intents, **Helius** provides RPC and transaction data for monitoring and UX, and **Noir ZK** (via the on-chain verifier and future prover integration) ensures inactivity can be proven and verified without revealing private details.
+
 ## 📁 Project Structure
 
 ```
