@@ -226,7 +226,7 @@ if anchor deploy; then
     echo "NEXT_PUBLIC_PROGRAM_ID=$PROGRAM_ID"
     echo ""
     
-    print_info "Note: Program ID is D6ZiV1bkZ6m27iHUsgsrZKV8WVa7bAHaFhC61CtXc5qA"
+    print_info "Note: Program ID is BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms"
 else
     echo ""
     print_error "Deployment failed!"

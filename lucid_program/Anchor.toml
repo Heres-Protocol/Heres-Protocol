@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-lucid_program = "D6ZiV1bkZ6m27iHUsgsrZKV8WVa7bAHaFhC61CtXc5qA"
+lucid_program = "BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms"
 
 [programs.localnet]
-lucid_program = "D6ZiV1bkZ6m27iHUsgsrZKV8WVa7bAHaFhC61CtXc5qA"
+lucid_program = "BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms"
 
 [registry]
 url = "https://api.apr.dev"

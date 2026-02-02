@@ -8,6 +8,7 @@ import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/lucid_program.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
 import { getCapsulePDA } from './program'
+import { MAGICBLOCK_ER } from '@/constants'
 import type { IntentCapsule } from '@/types'
 
 // Re-export connection function
@@ -152,13 +153,11 @@ export async function updateIntent(
 }
 
 /**
- * Execute intent (when inactivity is proven with ZK proof)
+ * Execute intent when inactivity period is met (Magicblock ER private monitoring → Magic Action on Devnet)
  */
 export async function executeIntent(
   wallet: WalletContextState,
   ownerPublicKey: PublicKey,
-  inactivityProof: Uint8Array,
-  proofPublicInputs: Uint8Array,
   beneficiaries?: Array<{ address: string; amount: string; amountType: string }>
 ): Promise<string> {
   const program = getProgram(wallet)
@@ -171,30 +170,13 @@ export async function executeIntent(
 
   const [capsulePDA] = getCapsulePDA(ownerPublicKey)
 
-  // Convert Uint8Array to Buffer for Anchor (required by Blob.encode)
-  // In browser environment, use Buffer polyfill or convert to number array
-  let proofBuffer: Buffer | number[]
-  let inputsBuffer: Buffer | number[]
-  
-  if (typeof Buffer !== 'undefined') {
-    proofBuffer = Buffer.from(inactivityProof)
-    inputsBuffer = Buffer.from(proofPublicInputs)
-  } else {
-    // Fallback for environments without Buffer
-    proofBuffer = Array.from(inactivityProof)
-    inputsBuffer = Array.from(proofPublicInputs)
-  }
-
-  // Build accounts object
-  // Owner and executor are the same (owner must sign to transfer SOL)
   const accounts = {
     capsule: capsulePDA,
-    owner: ownerPublicKey, // Owner must sign to transfer SOL
+    owner: ownerPublicKey,
     systemProgram: SystemProgram.programId,
-    executor: wallet.publicKey!, // Executor is the same as owner
+    executor: wallet.publicKey!,
   }
 
-  // Add beneficiary accounts as remaining accounts if provided
   const remainingAccounts = beneficiaries?.map(b => ({
     pubkey: new PublicKey(b.address),
     isSigner: false,
@@ -202,9 +184,118 @@ export async function executeIntent(
   })) || []
 
   const tx = await program.methods
-    .executeIntent(proofBuffer, inputsBuffer)
+    .executeIntent()
     .accounts(accounts)
     .remainingAccounts(remainingAccounts)
+    .rpc()
+
+  return tx
+}
+
+/**
+ * Delegate capsule PDA to Magicblock ER for private monitoring (conditions checked in ER).
+ * Pass validatorPubkey (e.g. MAGICBLOCK_ER.VALIDATOR_ASIA) to target a specific ER validator.
+ */
+export async function delegateCapsule(
+  wallet: WalletContextState,
+  validatorPubkey?: PublicKey
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+  if (!wallet.publicKey) throw new Error('Wallet not connected')
+
+  const [capsulePDA] = getCapsulePDA(wallet.publicKey)
+
+  const accounts: {
+    payer: PublicKey
+    owner: PublicKey
+    validator?: PublicKey
+    pda: PublicKey
+  } = {
+    payer: wallet.publicKey,
+    owner: wallet.publicKey,
+    pda: capsulePDA,
+  }
+  if (validatorPubkey) accounts.validator = validatorPubkey
+
+  const tx = await program.methods
+    .delegateCapsule()
+    .accounts(accounts)
+    .rpc()
+
+  return tx
+}
+
+/**
+ * Commit and undelegate capsule from Ephemeral Rollup back to Solana base layer (e.g. after execution)
+ */
+export async function undelegateCapsule(wallet: WalletContextState): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+
+  const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
+  const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+  const magicContext = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
+
+  const tx = await program.methods
+    .undelegateCapsule()
+    .accounts({
+      payer: wallet.publicKey!,
+      owner: wallet.publicKey!,
+      magicContext,
+      magicProgram,
+      capsule: capsulePDA,
+    })
+    .rpc()
+
+  return tx
+}
+
+/**
+ * Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).
+ * Owner must still sign the actual execution when the crank runs.
+ */
+export async function scheduleExecuteIntent(
+  wallet: WalletContextState,
+  args: { taskId: BN; executionIntervalMillis: BN; iterations: BN }
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+
+  const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
+  const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+
+  const tx = await program.methods
+    .scheduleExecuteIntent(args)
+    .accounts({
+      magicProgram,
+      payer: wallet.publicKey!,
+      capsule: capsulePDA,
+      owner: wallet.publicKey!,
+      systemProgram: SystemProgram.programId,
+      executor: wallet.publicKey!,
+    })
+    .rpc()
+
+  return tx
+}
+
+/**
+ * Read SOL/USD (or other) price from Pyth Lazer / ephemeral oracle price feed (requires program built with --features oracle)
+ */
+export async function samplePrice(
+  wallet: WalletContextState,
+  priceUpdateAccount: PublicKey
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+
+  const tx = await program.methods
+    .samplePrice()
+    .accounts({
+      payer: wallet.publicKey!,
+      priceUpdate: priceUpdateAccount,
+    })
     .rpc()
 
   return tx
@@ -416,6 +507,62 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
     console.error('PDA:', capsulePDA.toString())
     // Re-throw error so caller can handle it
     throw error
+  }
+}
+
+/**
+ * Fetch capsule by its PDA (capsule account address).
+ * Used on capsule detail page when URL has /capsules/[address].
+ */
+export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(IntentCapsule & { capsuleAddress: string }) | null> {
+  const connection = getSolanaConnection()
+  try {
+    const accountInfo = await connection.getAccountInfo(capsulePda)
+    if (!accountInfo || !accountInfo.data) return null
+    const data = accountInfo.data
+    if (data.length < 60) return null
+
+    const readI64 = (bytes: Uint8Array, start: number): bigint => {
+      let result = 0n
+      for (let i = 0; i < 8; i++) {
+        result |= BigInt(bytes[start + i]) << BigInt(i * 8)
+      }
+      if (result & (1n << 63n)) result = result - (1n << 64n)
+      return result
+    }
+    const readU32 = (bytes: Uint8Array, start: number): number =>
+      bytes[start] | (bytes[start + 1] << 8) | (bytes[start + 2] << 16) | (bytes[start + 3] << 24)
+
+    let offset = 8
+    const ownerPubkey = new PublicKey(data.slice(offset, offset + 32))
+    offset += 32
+    const inactivityPeriod = Number(readI64(data, offset))
+    offset += 8
+    const lastActivity = Number(readI64(data, offset))
+    offset += 8
+    const intentDataLength = readU32(data, offset)
+    offset += 4
+    const intentDataBytes = data.slice(offset, offset + intentDataLength)
+    offset += intentDataLength
+    const isActive = data[offset] === 1
+    offset += 1
+    let executedAt: number | null = null
+    if (data[offset] === 1) {
+      offset += 1
+      executedAt = Number(readI64(data, offset))
+    }
+
+    return {
+      owner: ownerPubkey,
+      inactivityPeriod,
+      lastActivity,
+      intentData: new Uint8Array(intentDataBytes),
+      isActive,
+      executedAt,
+      capsuleAddress: capsulePda.toBase58(),
+    }
+  } catch {
+    return null
   }
 }
 

@@ -1,27 +1,21 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useWallet } from '@solana/wallet-adapter-react'
-import dynamic from 'next/dynamic'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { usePathname } from 'next/navigation'
 import {
   ChevronDown,
   ChevronUp,
+  Copy,
   Database,
   RefreshCw,
   Signal,
   Sparkles,
+  User,
 } from 'lucide-react'
 import { PublicKey } from '@solana/web3.js'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG } from '@/constants'
-
-const WalletMultiButton = dynamic(
-  async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
-  { ssr: false }
-)
+import { getEnhancedTransactions } from '@/lib/helius'
 
 type CapsuleEvent = {
   signature: string
@@ -84,6 +78,26 @@ const timeAgo = (timestampMs: number | null) => {
 const maskAddress = (address: string) =>
   address.length > 10 ? `${address.slice(0, 4)}...${address.slice(-4)}` : address
 
+const copyToClipboard = (text: string) => {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text)
+  }
+}
+
+function CopyButton({ value, className }: { value: string; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => copyToClipboard(value)}
+      className={`inline-flex shrink-0 items-center justify-center rounded p-1 text-lucid-muted transition-colors hover:bg-lucid-surface/80 hover:text-lucid-accent ${className ?? ''}`}
+      title="Copy"
+      aria-label="Copy to clipboard"
+    >
+      <Copy className="h-4 w-4" />
+    </button>
+  )
+}
+
 const detectInstruction = (logs?: string[] | null) => {
   if (!logs || logs.length === 0) return 'system'
   const text = logs.join(' ')
@@ -118,17 +132,16 @@ const instructionLabel = (instruction: string) => {
 const statusTone = (status: string, kind: CapsuleRow['kind']) => {
   const normalized = status.toLowerCase()
   if (kind === 'event') {
-    if (normalized.includes('executed')) return 'bg-emerald-500/20 text-emerald-200'
-    if (normalized.includes('created')) return 'bg-cyan-500/20 text-cyan-200'
-    if (normalized.includes('updated')) return 'bg-blue-500/20 text-blue-200'
-    if (normalized.includes('deactivated')) return 'bg-rose-500/20 text-rose-200'
-    return 'bg-slate-500/20 text-slate-200'
+    if (normalized.includes('executed')) return 'bg-lucid-accent/20 text-lucid-accent'
+    if (normalized.includes('created')) return 'bg-lucid-accent/20 text-lucid-accent'
+    if (normalized.includes('updated')) return 'bg-lucid-purple/20 text-lucid-purple'
+    if (normalized.includes('deactivated')) return 'bg-red-500/20 text-red-400'
+    return 'bg-lucid-surface text-lucid-muted'
   }
-  if (normalized.includes('active')) return 'bg-emerald-500/20 text-emerald-200'
-  if (normalized.includes('waiting')) return 'bg-amber-500/20 text-amber-200'
-  if (normalized.includes('expired')) return 'bg-rose-500/20 text-rose-200'
-  if (normalized.includes('executed')) return 'bg-cyan-500/20 text-cyan-200'
-  return 'bg-slate-500/20 text-slate-200'
+  if (normalized.includes('active')) return 'bg-lucid-accent/20 text-lucid-accent'
+  if (normalized.includes('expired')) return 'bg-red-500/20 text-red-400'
+  if (normalized.includes('executed')) return 'bg-lucid-accent/20 text-lucid-accent'
+  return 'bg-lucid-surface text-lucid-muted'
 }
 
 const statusFromInstruction = (instruction: string) => {
@@ -238,37 +251,18 @@ const getBlockTimeFromTx = (tx: any) => {
   return typeof timestamp === 'number' ? timestamp : parseInt(String(timestamp), 10)
 }
 
-const fetchEnhancedTransactions = async (
-  address: string,
-  apiKey: string,
-  baseUrl: string,
-  pageSize = 100,
-  maxPages = 120
-) => {
+/** Fetch all enhanced transactions from Helius (paginated). */
+const fetchAllEnhancedTransactions = async (address: string, pageSize = 100, maxPages = 120) => {
   let all: any[] = []
   let before: string | undefined
-
   for (let page = 0; page < maxPages; page += 1) {
-    const url = new URL(`${baseUrl}/addresses/${address}/transactions`)
-    url.searchParams.set('api-key', apiKey)
-    url.searchParams.set('limit', String(pageSize))
-    if (before) url.searchParams.set('before', before)
-
-    const response = await fetch(url.toString())
-    if (!response.ok) break
-    const data = await response.json()
-    const batch = Array.isArray(data)
-      ? data
-      : data?.transactions || data?.result || data?.data || []
-
+    const batch = await getEnhancedTransactions(address, pageSize, before)
     all = all.concat(batch)
-
     if (batch.length < pageSize) break
     const lastSig = getSignatureFromTx(batch[batch.length - 1])
     if (!lastSig) break
     before = lastSig
   }
-
   return all
 }
 
@@ -340,68 +334,42 @@ const getTokenDeltaFromMeta = (meta: any) => {
 }
 
 export default function DashboardPage() {
-  const pathname = usePathname()
-  const wallet = useWallet()
-  const { publicKey, connected, disconnect, select, wallets } = wallet
-  const [showWalletMenu, setShowWalletMenu] = useState(false)
   const [capsules, setCapsules] = useState<CapsuleRow[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [filterMode, setFilterMode] = useState<'all' | 'created' | 'executed' | 'waiting' | 'active' | 'expired'>('all')
+  const [filterMode, setFilterMode] = useState<'all' | 'created' | 'executed' | 'active' | 'expired'>('all')
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   const [zkProofHash, setZkProofHash] = useState<string | null>(null)
   const [zkPublicInputsHash, setZkPublicInputsHash] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [summary, setSummary] = useState({
     total: 0,
     active: 0,
-    waiting: 0,
     executed: 0,
     expired: 0,
     proofs: 0,
     successRate: 0,
   })
 
-  const navLinkClass = (href: string) => {
-    const isActive = pathname === href
-    return [
-      'text-sm transition-colors px-3 py-2 rounded-lg border',
-      isActive
-        ? 'text-white border-blue-500/60 bg-blue-500/10'
-        : 'text-slate-300 hover:text-white border-slate-800/70 hover:border-blue-500/40 bg-slate-900/40',
-    ].join(' ')
-  }
-
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (showWalletMenu && !target.closest('.wallet-menu-container')) {
-        setShowWalletMenu(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showWalletMenu])
-
-  useEffect(() => {
-    if (!connected || !publicKey) {
-      setZkProofHash(null)
-      setZkPublicInputsHash(null)
-      return
-    }
-
-    const proofHashKey = `zk_proof_hash_${publicKey.toString()}`
-    const inputsHashKey = `zk_inputs_hash_${publicKey.toString()}`
-    setZkProofHash(localStorage.getItem(proofHashKey))
-    setZkPublicInputsHash(localStorage.getItem(inputsHashKey))
-  }, [connected, publicKey])
+    // Magicblock ER context / commit (fallback to legacy zk keys)
+    const erContextKey = 'er_context_global'
+    const erCommitKey = 'er_commit_hash_global'
+    const legacyProofKey = 'zk_proof_hash_global'
+    const legacyInputsKey = 'zk_inputs_hash_global'
+    setZkProofHash(localStorage.getItem(erContextKey) || localStorage.getItem(legacyProofKey))
+    setZkPublicInputsHash(localStorage.getItem(erCommitKey) || localStorage.getItem(legacyInputsKey))
+  }, [])
 
   useEffect(() => {
     let isMounted = true
 
     const loadDashboard = async () => {
+      setIsRefreshing(true)
       try {
         const connection = getSolanaConnection()
         const programId = getProgramId()
@@ -434,9 +402,23 @@ export default function DashboardPage() {
         }>
 
         const nowSeconds = Math.floor(Date.now() / 1000)
-        const signatures = await fetchAllSignatures(connection, programId)
+
+        // Collect signatures: RPC first, then add any extra from Helius (Helius does not return raw message/meta needed for parsing)
+        let signatureInfos = await fetchAllSignatures(connection, programId)
+        if (SOLANA_CONFIG.HELIUS_API_KEY) {
+          const enhancedTransactions = await fetchAllEnhancedTransactions(programId.toBase58())
+          const heliusSigs = new Set(signatureInfos.map((s) => s.signature))
+          for (const tx of enhancedTransactions) {
+            const sig = getSignatureFromTx(tx)
+            if (sig && !heliusSigs.has(sig)) {
+              heliusSigs.add(sig)
+              signatureInfos.push({ signature: sig, err: null, blockTime: getBlockTimeFromTx(tx) ?? undefined, memo: null })
+            }
+          }
+        }
+
         const rpcTransactions = await Promise.all(
-          signatures.map(async (signatureInfo) => {
+          signatureInfos.map(async (signatureInfo) => {
             try {
               const tx = await connection.getTransaction(signatureInfo.signature, {
                 commitment: 'confirmed',
@@ -449,23 +431,7 @@ export default function DashboardPage() {
           })
         )
 
-        let enhancedTransactions: any[] = []
-        if (SOLANA_CONFIG.HELIUS_API_KEY) {
-          enhancedTransactions = await fetchEnhancedTransactions(
-            programId.toBase58(),
-            SOLANA_CONFIG.HELIUS_API_KEY,
-            'https://api-devnet.helius-rpc.com/v0'
-          )
-        }
-
         const combinedTxMap = new Map<string, ReturnType<typeof toTxRecordFromRpc>>()
-        enhancedTransactions
-          .map((tx) => toTxRecordFromEnhanced(tx))
-          .filter((record) => record.signature)
-          .forEach((record) => {
-            combinedTxMap.set(record.signature, record as any)
-          })
-
         rpcTransactions
           .map(({ info, tx }) => toTxRecordFromRpc(info, tx))
           .forEach((record) => {
@@ -573,40 +539,45 @@ export default function DashboardPage() {
           })
         })
 
-        const capsuleRows: CapsuleRow[] = decodedCapsules.map((capsule) => {
-          const executedAtMs = capsule.executedAt ? capsule.executedAt * 1000 : null
-          const lastActivityMs = capsule.lastActivity * 1000
-          const isExpired = capsule.executedAt === null && capsule.lastActivity + capsule.inactivityPeriod < nowSeconds
-          const status = capsule.executedAt
-            ? 'Executed'
-            : isExpired
-            ? 'Expired'
-            : capsule.isActive
-            ? 'Active'
-            : 'Waiting'
-          const events = (capsuleEvents.get(capsule.capsuleAddress) || []).sort(
-            (a, b) => (b.blockTime || 0) - (a.blockTime || 0)
-          )
-          const latestSignature = events[0]?.signature || null
+        const capsuleRows: CapsuleRow[] = decodedCapsules
+          .map((capsule) => {
+            const executedAtMs = capsule.executedAt ? capsule.executedAt * 1000 : null
+            const lastActivityMs = capsule.lastActivity * 1000
+            const isExpired = capsule.executedAt === null && capsule.lastActivity + capsule.inactivityPeriod < nowSeconds
+            const status = capsule.executedAt
+              ? 'Executed'
+              : isExpired
+              ? 'Expired'
+              : 'Active'
+            const events = (capsuleEvents.get(capsule.capsuleAddress) || []).sort(
+              (a, b) => (b.blockTime || 0) - (a.blockTime || 0)
+            )
+            const latestSignature = events[0]?.signature || null
 
-          return {
-            id: capsule.capsuleAddress,
-            kind: 'capsule' as const,
-            capsuleAddress: capsule.capsuleAddress,
-            owner: capsule.owner,
-            status,
-            inactivitySeconds: capsule.inactivityPeriod,
-            lastActivityMs,
-            executedAtMs,
-            payloadSize: capsule.intentData.length,
-            signature: latestSignature,
-            isActive: capsule.isActive,
-            events,
-            tokenDelta: null,
-            solDelta: null,
-            proofBytes: null,
-          } as CapsuleRow
-        })
+            return {
+              id: capsule.capsuleAddress,
+              kind: 'capsule' as const,
+              capsuleAddress: capsule.capsuleAddress,
+              owner: capsule.owner,
+              status,
+              inactivitySeconds: capsule.inactivityPeriod,
+              lastActivityMs,
+              executedAtMs,
+              payloadSize: capsule.intentData.length,
+              signature: latestSignature,
+              isActive: capsule.isActive,
+              events,
+              tokenDelta: null,
+              solDelta: null,
+              proofBytes: null,
+            } as CapsuleRow
+          })
+          .filter((row) => {
+            // Exclude waiting state: inactive, not executed, not expired (do not display)
+            if (row.kind !== 'capsule') return true
+            if (row.status === 'Active' && row.isActive === false) return false
+            return true
+          })
 
         const totalEventSignatures = eventRows.length
         const executedEventSignatures = eventRows.filter((row) => row.status === 'Executed').length
@@ -614,7 +585,6 @@ export default function DashboardPage() {
         const activeCapsules = capsuleRows.filter((capsule) => capsule.status === 'Active').length
         const executedCapsules = capsuleRows.filter((capsule) => capsule.status === 'Executed').length
         const expiredCapsules = capsuleRows.filter((capsule) => capsule.status === 'Expired').length
-        const waitingCapsules = Math.max(0, capsuleRows.length - activeCapsules - executedCapsules - expiredCapsules)
         const successRate =
           totalProofsSubmitted > 0 ? (verifiedProofs / totalProofsSubmitted) * 100 : 0
 
@@ -629,7 +599,6 @@ export default function DashboardPage() {
           setSummary({
             total: totalEventSignatures,
             active: activeCapsules,
-            waiting: waitingCapsules,
             executed: executedEventSignatures,
             expired: expiredCapsules,
             proofs: verifiedProofs,
@@ -642,6 +611,8 @@ export default function DashboardPage() {
         if (isMounted) {
           setError('Unable to load on-chain capsule data. Please check RPC connectivity.')
         }
+      } finally {
+        if (isMounted) setIsRefreshing(false)
       }
     }
 
@@ -650,14 +621,13 @@ export default function DashboardPage() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [refreshKey])
 
   const filteredCapsules = useMemo(() => {
     const value = query.trim().toLowerCase()
     const scoped = capsules.filter((capsule) => {
       if (filterMode === 'created' && capsule.status !== 'Created') return false
       if (filterMode === 'executed' && capsule.status !== 'Executed') return false
-      if (filterMode === 'waiting' && capsule.status !== 'Waiting') return false
       if (filterMode === 'active' && capsule.status !== 'Active') return false
       if (filterMode === 'expired' && capsule.status !== 'Expired') return false
       if (!value) return true
@@ -685,180 +655,116 @@ export default function DashboardPage() {
   const pagedCapsules = filteredCapsules.slice(pageStart, pageStart + pageSize)
 
   const statCards = [
-    { label: 'Total Capsules', value: formatNumber(summary.total), tone: 'text-cyan-300' },
-    { label: 'Active Capsules', value: formatNumber(summary.active), tone: 'text-emerald-300' },
-    { label: 'Executed Capsules', value: formatNumber(summary.executed), tone: 'text-indigo-300' },
-    { label: 'Proofs Verified', value: formatNumber(summary.proofs), tone: 'text-blue-300' },
+    { label: 'Total Capsules', value: formatNumber(summary.total), tone: 'text-lucid-accent' },
+    { label: 'Active Capsules', value: formatNumber(summary.active), tone: 'text-lucid-accent' },
+    { label: 'Executed Capsules', value: formatNumber(summary.executed), tone: 'text-lucid-purple' },
+    { label: 'ER Verified', value: formatNumber(summary.proofs), tone: 'text-lucid-accent' },
   ]
 
+  const programIdStr = SOLANA_CONFIG.PROGRAM_ID
+  const rpcLabel = SOLANA_CONFIG.HELIUS_API_KEY ? 'Helius Devnet' : 'Solana Devnet'
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden text-slate-100">
-      <div className="fixed inset-0 w-full h-full z-0">
-        <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
-        <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
-        <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
-        <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
-        <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
-        <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
-      </div>
-
-      <nav className="fixed top-0 w-full z-50 gsap-nav">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="relative w-10 h-10 transition-transform group-hover:rotate-6">
-              <Image src="/logo.png" alt="Lucid Logo" fill className="object-contain" priority />
-            </div>
-            <span className="sr-only">Lucid</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className={navLinkClass('/dashboard')}>
-              Dashboard
-            </Link>
-            <Link href="/create" className={navLinkClass('/create')}>
-              Create
-            </Link>
-            <Link href="/capsules" className={navLinkClass('/capsules')}>
-              Capsules
-            </Link>
-            <div className="relative z-[9999] wallet-menu-container">
-              {connected && publicKey ? (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowWalletMenu(!showWalletMenu)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors gsap-button"
-                  >
-                    <span className="font-mono text-sm">
-                      {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
-                    </span>
-                    {showWalletMenu ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                  {showWalletMenu && (
-                    <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-[#A0ECFF]/25 overflow-hidden z-[10000] gsap-panel">
-                      <button
-                        onClick={async () => {
-                          try {
-                            await disconnect()
-                            setShowWalletMenu(false)
-                          } catch (disconnectError) {
-                            console.error('Error disconnecting wallet:', disconnectError)
-                          }
-                        }}
-                        className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
-                      >
-                        Disconnect
-                      </button>
-                      {wallets && wallets.length > 1 && (
-                        <>
-                          <div className="border-t border-[#A0ECFF]/20" />
-                          <div className="px-2 py-1 text-xs text-slate-300">Switch Wallet</div>
-                          {wallets.map((w: any) => (
-                            <button
-                              key={w.adapter.name}
-                              onClick={async () => {
-                                try {
-                                  await select(w.adapter.name)
-                                  setShowWalletMenu(false)
-                                } catch (switchError) {
-                                  console.error('Error switching wallet:', switchError)
-                                }
-                              }}
-                              className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
-                            >
-                              {w.adapter.name}
-                            </button>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="material-elevation-2 rounded-lg overflow-hidden">
-                  <WalletMultiButton />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="relative z-20 pt-28 pb-16 px-6">
-        <section className="max-w-7xl mx-auto">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between animate-fade-in">
-            <div className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.35em] text-[#A0ECFF] font-medium">Network Dashboard</p>
-              <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#A0ECFF] via-[#C7B8FF] to-[#FFCEEA] bg-clip-text text-transparent">
-                Capsule activity overview
-              </h1>
-              <p className="text-base text-slate-100 max-w-xl">
-                Inspired by Graph Explorer: track capsule status, proofs, and execution cadence in one view.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 text-xs text-slate-200">
-              <span className="rounded-full border border-[#A0ECFF]/30 bg-[#0c1222]/80 px-3 py-1 flex items-center gap-2 backdrop-blur-sm">
-                <Signal className="w-3 h-3 text-[#A0ECFF]" />
-                {SOLANA_CONFIG.NETWORK ? `Solana ${SOLANA_CONFIG.NETWORK}` : 'Solana'}
-              </span>
-              <span className="rounded-full border border-[#A0ECFF]/30 bg-[#0c1222]/80 px-3 py-1 flex items-center gap-2 backdrop-blur-sm">
-                <RefreshCw className="w-3 h-3 text-[#A0ECFF] animate-spin [animation-duration:4s]" />
-                {lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : 'Syncing'}
-              </span>
-            </div>
-          </div>
-
+    <div className="min-h-screen bg-hero text-lucid-white">
+      <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           {error && (
-            <div className="mt-6 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            <div className="mb-6 rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-400">
               {error}
             </div>
           )}
-        </section>
 
-        <section className="max-w-7xl mx-auto mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {statCards.map((card) => (
-            <div
-              key={card.label}
-              className="rounded-2xl border-2 border-[#A0ECFF]/40 bg-[#0c1222]/95 backdrop-blur-sm p-5 transition-all hover:border-[#A0ECFF]/60 shadow-xl"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-200">{card.label}</p>
-                <Sparkles className="w-4 h-4 text-[#A0ECFF]" />
+          {/* Explorer-style: single header card (name + version + stats + Updated) */}
+          <section className="card-lucid p-6 sm:p-8 mb-6">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-baseline gap-4">
+                <h1 className="text-2xl font-bold text-lucid-white sm:text-3xl">
+                  Lucid Capsules
+                </h1>
+                <span className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-2.5 py-1 text-xs font-medium text-lucid-muted">
+                  v1.0
+                </span>
+                <span className="text-lucid-accent font-semibold">
+                  {formatNumber(summary.total)} Capsules
+                </span>
               </div>
-              <div className={`mt-3 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
-              <p className="mt-1 text-xs text-slate-300">Protocol health pulse</p>
-            </div>
-          ))}
-        </section>
-
-        <section className="max-w-7xl mx-auto mt-10">
-          <div className="rounded-3xl border-2 border-[#A0ECFF]/40 bg-[#0c1222]/95 backdrop-blur-sm p-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-[#A0ECFF] font-medium">Capsule telemetry</p>
-                <h2 className="mt-2 text-xl font-semibold text-white">All capsules</h2>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/capsules"
+                  className="inline-flex items-center gap-2 rounded-lg border border-lucid-border bg-lucid-card/80 px-4 py-2 text-sm font-medium text-lucid-muted transition-colors hover:border-lucid-accent/40 hover:text-lucid-accent"
+                >
+                  <User className="h-4 w-4" />
+                  My Capsule
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setRefreshKey((k) => k + 1)}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-3 rounded-lg border border-lucid-border bg-lucid-card/80 px-4 py-2 text-sm text-lucid-muted transition-colors hover:border-lucid-accent/40 hover:text-lucid-accent disabled:opacity-70"
+                >
+                  <RefreshCw className={`h-4 w-4 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Syncing...' : lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : 'Syncing'}
+                </button>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-200">
-                <Database className="w-3 h-3 text-[#A0ECFF]" />
-                {formatNumber(filteredCapsules.length)} records
+            </div>
+            <p className="mt-3 text-sm text-lucid-muted max-w-xl">
+              Track capsule status, ER execution, and verification on Solana Devnet.
+            </p>
+          </section>
+
+          {/* Explorer-style: metadata grid (Network, Program ID, Query URL) */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Network</p>
+              <p className="text-sm font-medium text-lucid-white truncate">
+                {SOLANA_CONFIG.NETWORK ? `Solana ${SOLANA_CONFIG.NETWORK}` : 'Solana Devnet'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Program ID</p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm font-mono text-lucid-white truncate min-w-0" title={programIdStr}>
+                  {maskAddress(programIdStr)}
+                </p>
+                <CopyButton value={programIdStr} />
               </div>
             </div>
-
-            <div className="mt-4">
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search by capsule address, owner, or signature"
-                className="w-full rounded-xl border-2 border-[#A0ECFF]/30 bg-[#0f1629]/80 px-4 py-3 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[#A0ECFF]/60 transition backdrop-blur-sm"
-              />
+            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">RPC</p>
+              <p className="text-sm font-medium text-lucid-white truncate">{rpcLabel}</p>
             </div>
+            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4 sm:col-span-2 lg:col-span-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Index Status</p>
+              <p className="text-sm font-medium text-lucid-accent">Live</p>
+            </div>
+          </section>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2 text-xs">
+          {/* Stats row (Explorer "Signal" style) */}
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+            {statCards.map((card) => (
+              <div
+                key={card.label}
+                className="card-lucid p-5 transition-all hover:border-lucid-accent/30"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wider text-lucid-muted">{card.label}</p>
+                  <Sparkles className="w-4 h-4 text-lucid-accent" />
+                </div>
+                <div className={`mt-3 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
+                <p className="mt-1 text-xs text-lucid-muted">Protocol health</p>
+              </div>
+            ))}
+          </section>
+
+          {/* Explorer-style: tab bar + content */}
+          <section className="card-lucid overflow-hidden">
+            {/* Tab bar - Explorer "Query | Curators" style */}
+            <div className="border-b border-lucid-border">
+              <div className="flex flex-wrap gap-0 overflow-x-auto">
                 {[
                   { key: 'all', label: 'All' },
                   { key: 'created', label: 'Created' },
                   { key: 'executed', label: 'Executed' },
-                  { key: 'waiting', label: 'Waiting' },
                   { key: 'active', label: 'Active' },
                   { key: 'expired', label: 'Expired' },
                 ].map((option) => (
@@ -866,28 +772,44 @@ export default function DashboardPage() {
                     key={option.key}
                     type="button"
                     onClick={() => setFilterMode(option.key as typeof filterMode)}
-                    className={`rounded-full border-2 px-3 py-1 transition ${
+                    className={`min-w-[80px] px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
                       filterMode === option.key
-                        ? 'border-[#A0ECFF] bg-[#A0ECFF]/20 text-[#A0ECFF]'
-                        : 'border-[#A0ECFF]/30 bg-[#0f1629]/80 text-slate-200 hover:border-[#A0ECFF]/50 hover:text-white'
+                        ? 'border-lucid-accent text-lucid-accent'
+                        : 'border-transparent text-lucid-muted hover:text-lucid-white'
                     }`}
                   >
                     {option.label}
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
-                className="rounded-full border-2 border-[#A0ECFF]/30 bg-[#0f1629]/80 px-3 py-1 text-xs text-slate-200 transition hover:border-[#A0ECFF]/50"
-              >
-                {sortOrder === 'newest' ? 'Newest first' : 'Oldest first'}
-              </button>
             </div>
+
+            <div className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                <div className="flex items-center gap-2 text-sm text-lucid-muted">
+                  <Database className="w-4 h-4 text-lucid-accent" />
+                  {formatNumber(filteredCapsules.length)} records
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search by address, owner, or signature"
+                    className="w-full sm:w-72 rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-2 text-sm text-lucid-white placeholder-lucid-muted focus:outline-none focus:border-lucid-accent/50 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
+                    className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-2 text-xs text-lucid-muted whitespace-nowrap transition hover:border-lucid-accent/40 hover:text-lucid-white"
+                  >
+                    {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
+                  </button>
+                </div>
+              </div>
 
             <div className="mt-6 space-y-3">
               {filteredCapsules.length === 0 && (
-                <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-4 py-8 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-lucid-border bg-lucid-surface/50 px-4 py-8 text-center text-sm text-lucid-muted">
                   No capsules found. Try syncing again or adjust the search query.
                 </div>
               )}
@@ -895,48 +817,55 @@ export default function DashboardPage() {
               {pagedCapsules.map((capsule) => (
                 <div
                   key={capsule.id}
-                  className={`rounded-2xl border px-4 py-4 ${
+                  className={`rounded-xl border px-4 py-4 transition-colors ${
                     capsule.kind === 'event'
-                      ? 'border-amber-500/30 bg-amber-500/5'
-                      : 'border-slate-800/70 bg-slate-950/50'
+                      ? 'border-lucid-accent/30 bg-lucid-accent/5'
+                      : 'border-lucid-border bg-lucid-card/50'
                   }`}
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-2">
-                      <div className="flex items-center gap-3 text-sm text-slate-200">
-                        <span className="rounded-full border border-slate-800/70 bg-slate-900/60 px-2 py-1 text-[10px] uppercase tracking-[0.3em] text-slate-300">
+                      <div className="flex items-center gap-3 text-sm text-lucid-muted">
+                        <span className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-lucid-muted">
                           {capsule.kind === 'event' ? 'Event' : 'Capsule'}
                         </span>
                         <span
-                          className={`rounded-full px-2 py-1 text-[11px] uppercase tracking-[0.2em] ${statusTone(
+                          className={`rounded-lg px-2 py-1 text-[11px] font-medium uppercase tracking-wider ${statusTone(
                             capsule.status,
                             capsule.kind
                           )}`}
                         >
                           {capsule.status}
                         </span>
-                        <span className="font-mono text-slate-300 break-all max-w-full">
+                        <span className="font-mono text-lucid-muted break-all max-w-full min-w-0">
                           {capsule.signature ? maskAddress(capsule.signature) : '—'}
                         </span>
+                        {capsule.signature && <CopyButton value={capsule.signature} />}
                       </div>
-                      <div className="grid gap-2 text-xs text-slate-300 md:grid-cols-3">
+                      <div className="grid gap-2 text-xs text-lucid-muted md:grid-cols-3">
                         <div>
-                          <p className="uppercase tracking-[0.2em] text-slate-500 text-[10px]">Capsule</p>
-                          <p className="font-mono text-slate-300 break-all">
-                            {maskAddress(capsule.capsuleAddress)}
-                          </p>
+                          <p className="uppercase tracking-wider text-lucid-muted text-[10px] font-medium">Capsule</p>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <p className="font-mono text-lucid-white break-all truncate">
+                              {maskAddress(capsule.capsuleAddress)}
+                            </p>
+                            <CopyButton value={capsule.capsuleAddress} />
+                          </div>
                         </div>
                         <div>
-                          <p className="uppercase tracking-[0.2em] text-slate-500 text-[10px]">Owner</p>
-                          <p className="font-mono text-slate-300 break-all">
-                            {capsule.owner ? maskAddress(capsule.owner) : '—'}
-                          </p>
+                          <p className="uppercase tracking-wider text-lucid-muted text-[10px] font-medium">Owner</p>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <p className="font-mono text-lucid-white break-all truncate">
+                              {capsule.owner ? maskAddress(capsule.owner) : '—'}
+                            </p>
+                            {capsule.owner && <CopyButton value={capsule.owner} />}
+                          </div>
                         </div>
                         <div>
-                          <p className="uppercase tracking-[0.2em] text-slate-500 text-[10px]">
+                          <p className="uppercase tracking-wider text-lucid-muted text-[10px] font-medium">
                             {capsule.kind === 'event' ? 'Created' : 'Inactivity'}
                           </p>
-                          <p className="text-slate-300">
+                          <p className="text-lucid-white">
                             {capsule.kind === 'event'
                               ? timeAgo(capsule.lastActivityMs)
                               : formatDuration(capsule.inactivitySeconds)}
@@ -944,7 +873,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       {capsule.kind === 'event' && (capsule.tokenDelta != null || capsule.solDelta != null || capsule.proofBytes != null) && (
-                        <div className="flex flex-wrap gap-3 text-[11px] text-slate-400">
+                        <div className="flex flex-wrap gap-3 text-[11px] text-lucid-muted">
                           {capsule.tokenDelta != null && (
                             <span className="font-mono">Token Δ: {capsule.tokenDelta}</span>
                           )}
@@ -952,7 +881,7 @@ export default function DashboardPage() {
                             <span className="font-mono">SOL Δ: {capsule.solDelta.toFixed(4)}</span>
                           )}
                           {capsule.proofBytes != null && (
-                            <span>Noir proof: {capsule.proofBytes} bytes</span>
+                            <span>ER tx: {capsule.proofBytes} bytes</span>
                           )}
                         </div>
                       )}
@@ -960,7 +889,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => setExpandedId(expandedId === capsule.id ? null : capsule.id)}
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-700/70 bg-slate-900/60 px-4 py-2 text-xs text-slate-200 transition hover:border-cyan-500/60"
+                      className="inline-flex items-center gap-2 rounded-lg border border-lucid-border bg-lucid-surface/80 px-4 py-2 text-xs text-lucid-muted transition hover:border-lucid-accent/50 hover:text-lucid-accent"
                     >
                       Details
                       {expandedId === capsule.id ? (
@@ -972,100 +901,118 @@ export default function DashboardPage() {
                   </div>
 
                   {expandedId === capsule.id && (
-                    <div className="mt-4 w-full min-w-0 rounded-xl border border-slate-800/70 bg-slate-900/60 px-4 py-4 text-xs text-slate-300 space-y-4 overflow-hidden">
+                    <div className="mt-4 w-full min-w-0 rounded-xl border border-lucid-border bg-lucid-surface/80 px-4 py-4 text-xs text-lucid-muted space-y-4 overflow-hidden">
                       <div className="grid gap-3 md:grid-cols-2 max-w-full">
                         <div>
-                          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Capsule</p>
-                          <p className="font-mono text-slate-200 break-all">{capsule.capsuleAddress}</p>
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Capsule</p>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <p className="font-mono text-lucid-white break-all truncate">{capsule.capsuleAddress}</p>
+                            <CopyButton value={capsule.capsuleAddress} />
+                          </div>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Owner</p>
-                          <p className="font-mono text-slate-200 break-all">{capsule.owner || '—'}</p>
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Owner</p>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <p className="font-mono text-lucid-white break-all truncate">{capsule.owner || '—'}</p>
+                            {capsule.owner && <CopyButton value={capsule.owner} />}
+                          </div>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Last Activity</p>
-                          <p>{formatDateTime(capsule.lastActivityMs)}</p>
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Last Activity</p>
+                          <p className="text-lucid-white">{formatDateTime(capsule.lastActivityMs)}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Executed At</p>
-                          <p>{formatDateTime(capsule.executedAtMs)}</p>
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Executed At</p>
+                          <p className="text-lucid-white">{formatDateTime(capsule.executedAtMs)}</p>
                         </div>
                         {capsule.kind === 'capsule' ? (
                           <>
                             <div>
-                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Inactivity Seconds</p>
-                              <p>{capsule.inactivitySeconds ?? '—'}</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Inactivity Seconds</p>
+                              <p className="text-lucid-white">{capsule.inactivitySeconds ?? '—'}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Payload Size</p>
-                              <p>{capsule.payloadSize ? `${capsule.payloadSize} bytes` : '—'}</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Payload Size</p>
+                              <p className="text-lucid-white">{capsule.payloadSize ? `${capsule.payloadSize} bytes` : '—'}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Is Active</p>
-                              <p>{capsule.isActive == null ? '—' : capsule.isActive ? 'Yes' : 'No'}</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Is Active</p>
+                              <p className="text-lucid-white">{capsule.isActive == null ? '—' : capsule.isActive ? 'Yes' : 'No'}</p>
                             </div>
                           </>
                         ) : (
                           <>
                             <div>
-                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Token Delta</p>
-                              <p>{capsule.tokenDelta || '—'}</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Token Delta</p>
+                              <p className="text-lucid-white">{capsule.tokenDelta || '—'}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">SOL Delta</p>
-                              <p>{capsule.solDelta == null ? '—' : `${capsule.solDelta.toFixed(4)} SOL`}</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">SOL Delta</p>
+                              <p className="text-lucid-white">{capsule.solDelta == null ? '—' : `${capsule.solDelta.toFixed(4)} SOL`}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Noir Proof Bytes</p>
-                              <p>{capsule.proofBytes ? `${capsule.proofBytes} bytes` : '—'}</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">ER Tx Bytes</p>
+                              <p className="text-lucid-white">{capsule.proofBytes ? `${capsule.proofBytes} bytes` : '—'}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Proof Hash</p>
-                              <p className="font-mono text-slate-200 break-all">{zkProofHash || '—'}</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">ER Context</p>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <p className="font-mono text-lucid-white break-all truncate">{zkProofHash || '—'}</p>
+                                {zkProofHash && <CopyButton value={zkProofHash} />}
+                              </div>
                             </div>
                             <div>
-                              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Public Inputs Hash</p>
-                              <p className="font-mono text-slate-200 break-all">{zkPublicInputsHash || '—'}</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">ER Commit Hash</p>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <p className="font-mono text-lucid-white break-all truncate">{zkPublicInputsHash || '—'}</p>
+                                {zkPublicInputsHash && <CopyButton value={zkPublicInputsHash} />}
+                              </div>
                             </div>
                           </>
                         )}
                         <div>
-                          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Latest Signature</p>
-                          <p className="font-mono text-slate-200 break-all">{capsule.signature || '—'}</p>
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Latest Signature</p>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <p className="font-mono text-lucid-white break-all truncate">{capsule.signature || '—'}</p>
+                            {capsule.signature && <CopyButton value={capsule.signature} />}
+                          </div>
                         </div>
                       </div>
 
                       <div>
-                        <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500 mb-2">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted mb-2">
                           Capsule Events
                         </p>
                         {capsule.events.length === 0 ? (
-                          <p className="text-slate-500">No transaction events found for this capsule.</p>
+                          <p className="text-lucid-muted">No transaction events found for this capsule.</p>
                         ) : (
                           <div className="space-y-2">
                             {capsule.events.map((event) => (
                               <div
                                 key={`${capsule.id}-${event.signature}`}
-                                className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-3"
+                                className="rounded-lg border border-lucid-border bg-lucid-card/80 px-3 py-3"
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="text-slate-200">{event.label}</span>
-                                  <span className="text-[10px] text-slate-500">
+                                  <span className="text-lucid-white">{event.label}</span>
+                                  <span className="text-[10px] text-lucid-muted">
                                     {event.blockTime ? timeAgo(event.blockTime * 1000) : '—'}
                                   </span>
                                 </div>
-                                <div className="mt-2 flex items-start justify-between gap-2 text-[11px] text-slate-300">
-                                  <span className="font-mono break-all">{event.signature}</span>
-                                  <span className={event.status === 'success' ? 'text-emerald-300' : 'text-rose-300'}>
+                                <div className="mt-2 flex items-start justify-between gap-2 text-[11px] text-lucid-muted">
+                                  <div className="flex min-w-0 items-center gap-1">
+                                    <span className="font-mono break-all truncate">{event.signature}</span>
+                                    <CopyButton value={event.signature} className="shrink-0" />
+                                  </div>
+                                  <span className={`shrink-0 ${event.status === 'success' ? 'text-lucid-accent' : 'text-red-400'}`}>
                                     {event.status}
                                   </span>
                                 </div>
                                 {event.logs.length > 0 && (
-                                  <div className="mt-2 max-h-48 overflow-y-auto space-y-1 text-[11px] text-slate-500 font-mono break-all whitespace-pre-wrap overflow-x-hidden">
+                                  <div className="mt-2 max-h-48 overflow-y-auto space-y-1 text-[11px] text-lucid-muted font-mono break-all whitespace-pre-wrap overflow-x-hidden">
                                     {event.logs.map((log, index) => (
                                       <div key={`${event.signature}-${index}`}>{log}</div>
                                     ))}
-                                    <p className="text-[10px] text-slate-600 pt-1">
+                                    <p className="text-[10px] text-lucid-muted pt-1">
                                       {event.logs.length} log{event.logs.length !== 1 ? 's' : ''} total
                                     </p>
                                   </div>
@@ -1082,12 +1029,12 @@ export default function DashboardPage() {
             </div>
 
             {filteredCapsules.length > pageSize && (
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-300">
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-lucid-muted">
                 <button
                   type="button"
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
-                  className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-1 disabled:opacity-40"
+                  className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-lucid-accent/40 transition"
                 >
                   First
                 </button>
@@ -1095,18 +1042,18 @@ export default function DashboardPage() {
                   type="button"
                   onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-1 disabled:opacity-40"
+                  className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-lucid-accent/40 transition"
                 >
                   ‹
                 </button>
-                <span className="rounded-lg border border-slate-800/70 bg-slate-950/40 px-3 py-1">
+                <span className="rounded-lg border border-lucid-border bg-lucid-card/80 px-3 py-1.5 text-lucid-white">
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
                   type="button"
                   onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                   disabled={currentPage >= totalPages}
-                  className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-1 disabled:opacity-40"
+                  className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-lucid-accent/40 transition"
                 >
                   ›
                 </button>
@@ -1114,7 +1061,7 @@ export default function DashboardPage() {
                   type="button"
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage >= totalPages}
-                  className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-3 py-1 disabled:opacity-40"
+                  className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-lucid-accent/40 transition"
                 >
                   Last
                 </button>
@@ -1122,6 +1069,7 @@ export default function DashboardPage() {
             )}
           </div>
         </section>
+        </div>
       </main>
     </div>
   )

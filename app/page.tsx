@@ -1,777 +1,708 @@
 'use client'
 
-import { useWallet } from '@solana/wallet-adapter-react'
-import dynamic from 'next/dynamic'
-import { ArrowRight, Shield, Zap, Eye, Sparkles, Lock, ChevronDown, ChevronUp, Activity, Gavel, Quote, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import WorkflowDemo from '@/components/WorkflowDemo'
-import { SequenceDiagram } from '@/components/SequenceDiagram'
-import { ARCHITECTURE_COMPARISONS } from '@/constants/architecture'
+import { CapsuleMediaBlock } from '@/components/CapsuleMediaBlock'
+import { AsciiCapsule } from '@/components/AsciiCapsule'
+gsap.registerPlugin(ScrollTrigger)
 
-// Dynamic import to prevent hydration errors
-const WalletMultiButton = dynamic(
-  async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
-  { ssr: false }
-)
+function DashedLine({
+  height = 50,
+  segmentIndex,
+  activeWhyIndex,
+}: {
+  height?: number
+  segmentIndex: number
+  activeWhyIndex: number
+}) {
+  const active = activeWhyIndex >= segmentIndex
+  const filled = activeWhyIndex > segmentIndex
+  return (
+    <div className="relative flex justify-center" style={{ height }}>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox={`0 0 2 ${height}`}
+        width={2}
+        height={height}
+        className="shrink-0 text-white why-flow-dashed-line"
+      >
+        <path
+          stroke="currentColor"
+          strokeDasharray="5 5"
+          strokeLinecap="square"
+          strokeOpacity={0.5}
+          strokeWidth={1.5}
+          d={`M1 1v${height - 2}`}
+        />
+      </svg>
+      {filled && (
+        <div
+          className="absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 bg-lucid-accent rounded-full"
+          aria-hidden
+          style={{ height }}
+        />
+      )}
+      {active && !filled && (
+        <div
+          className="why-flow-segment absolute left-1/2 top-0 h-3 w-0.5 -translate-x-1/2 bg-lucid-accent rounded-full"
+          aria-hidden
+        />
+      )}
+    </div>
+  )
+}
 
-export default function Home() {
-  const rootRef = useRef<HTMLDivElement | null>(null)
-  const wallet = useWallet()
-  const { publicKey, connected, disconnect, select, wallets } = wallet
-  const [activeStep, setActiveStep] = useState(1)
-  const [showWalletMenu, setShowWalletMenu] = useState(false)
-  const [activeArchitectureStep, setActiveArchitectureStep] = useState<number | null>(null)
-  const [dormantSeries, setDormantSeries] = useState<number[]>([])
-  const [dormantLabels, setDormantLabels] = useState<string[]>([])
-  const [dormantCount, setDormantCount] = useState<number>(0)
-  const [estimatedAssetsUsd, setEstimatedAssetsUsd] = useState<number>(0)
-  const [estimatedAssetsSol, setEstimatedAssetsSol] = useState<number>(0)
-  const [dormantLoading, setDormantLoading] = useState(true)
-  const [dormantError, setDormantError] = useState<string | null>(null)
+/** Multiple parallel dashed lines (reference: Substreams diagram) */
+function ParallelDashedLines({
+  height = 32,
+  segmentIndex,
+  activeWhyIndex,
+  count = 4,
+}: {
+  height?: number
+  segmentIndex: number
+  activeWhyIndex: number
+  count?: number
+}) {
+  const active = activeWhyIndex >= segmentIndex
+  const filled = activeWhyIndex > segmentIndex
+  const width = Math.max(count * 6, 24)
+  const step = width / (count + 1)
+  return (
+    <div className="relative flex justify-center" style={{ height, width }}>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox={`0 0 ${width} ${height}`}
+        width={width}
+        height={height}
+        className="shrink-0 text-white why-flow-dashed-line"
+      >
+        {Array.from({ length: count }).map((_, i) => (
+          <path
+            key={i}
+            stroke="currentColor"
+            strokeDasharray="4 4"
+            strokeLinecap="square"
+            strokeOpacity={0.5}
+            strokeWidth={1}
+            d={`M${step + i * step} 0v${height}`}
+          />
+        ))}
+      </svg>
+      {filled &&
+        Array.from({ length: count }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute top-0 h-full w-0.5 -translate-x-1/2 bg-lucid-accent rounded-full"
+            style={{ left: `${step + i * step}px`, height }}
+            aria-hidden
+          />
+        ))}
+      {active && !filled && (
+        <div
+          className="why-flow-segment absolute left-1/2 top-0 h-3 w-0.5 -translate-x-1/2 bg-lucid-accent rounded-full"
+          aria-hidden
+        />
+      )}
+    </div>
+  )
+}
 
-  // Close wallet menu when clicking outside
+const features = [
+  {
+    title: 'Zero Latency',
+    description:
+      'Fast execution thanks to Magicblock Ephemeral Rollups. Conditions are checked privately and execution is triggered when silence becomes truth.',
+    icon: '⚡',
+  },
+  {
+    title: 'Zero Trust',
+    description:
+      'No third-party executor. Your capsule lives on Solana; Magicblock ER monitors privately. Execution is automatic when conditions are met.',
+    icon: '🔒',
+  },
+  {
+    title: 'Compliant Privacy',
+    description:
+      'Conditions stay private inside Ephemeral Rollups. Only execution results are committed to Devnet. Built for Solana with Helius & Phantom.',
+    icon: '🛡️',
+  },
+]
+
+/* Why Lucid – benefit-focused cards (non-technical, why you need Lucid) */
+const whyLucidCards = [
+  {
+    title: 'Your intent, executed when it matters',
+    description: 'Leave instructions that run only when the time is right. No one can execute early. Your conditions stay yours until the moment you chose.',
+    image: '/why-lucid-1.png',
+    href: '/create',
+  },
+  {
+    title: 'Privacy by design',
+    description: 'Your conditions stay private. Only the outcome is visible on-chain. No third party sees your rules. Just the result when silence becomes truth.',
+    image: '/why-lucid-2.png',
+    href: '/dashboard',
+  },
+  {
+    title: 'Set it once. It runs when you’re silent.',
+    description: 'Define your intent once. No bridges, no middlemen. When your conditions are met, execution happens automatically, the way you wanted.',
+    image: '/why-lucid-3.png',
+    href: '/create',
+  },
+]
+
+export default function HomePage() {
+  const heroRef = useRef<HTMLDivElement>(null)
+  const whySectionRef = useRef<HTMLElement>(null)
+  const whyTitleRef = useRef<HTMLHeadingElement>(null)
+  const whyLeftRef = useRef<HTMLDivElement>(null)
+  const whyVisualMainRef = useRef<HTMLDivElement>(null)
+  const howTitleRef = useRef<HTMLHeadingElement>(null)
+  const stepsRef = useRef<HTMLDivElement>(null)
+  const partnersSectionRef = useRef<HTMLElement>(null)
+  const unleashRef = useRef<HTMLElement>(null)
+  const [activeWhyIndex, setActiveWhyIndex] = useState(0)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (showWalletMenu && !target.closest('.wallet-menu-container')) {
-        setShowWalletMenu(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showWalletMenu])
-
-  useEffect(() => {
-    gsap.registerPlugin(ScrollTrigger)
     const ctx = gsap.context(() => {
-      const heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } })
-      heroTl.fromTo(
-        '.gsap-hero',
-        { y: 24, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.9 }
-      ).fromTo(
-        '.gsap-hero-sub',
-        { y: 18, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.7, stagger: 0.08 },
-        '-=0.5'
-      )
-      heroTl.timeScale(1.1)
-
-      gsap.from('.gsap-card', {
-        y: 30,
+      gsap.from(heroRef.current?.querySelector('h1') ?? {}, {
         opacity: 0,
-        duration: 0.9,
-        stagger: 0.12,
-        ease: 'power2.out',
-        delay: 0.2,
-      })
-
-      gsap.from('.gsap-step', {
-        y: 20,
-        opacity: 0,
+        y: 40,
         duration: 0.8,
-        stagger: 0.08,
-        ease: 'power2.out',
-        delay: 0.4,
+        ease: 'power3.out',
       })
-
-      gsap.to('.gsap-orb', {
-        y: -18,
-        duration: 6,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: -1,
-        stagger: 0.6,
-      })
-
-      const chartLine = document.querySelector('.gsap-chart-line') as SVGPathElement | null
-      const chartArea = document.querySelector('.gsap-chart-area') as SVGPathElement | null
-      if (chartLine) {
-        const length = chartLine.getTotalLength()
-        gsap.set(chartLine, { strokeDasharray: length, strokeDashoffset: length })
-        gsap.to(chartLine, { strokeDashoffset: 0, duration: 1.6, ease: 'power2.out', delay: 0.4 })
-      }
-      if (chartArea) {
-        gsap.fromTo(chartArea, { opacity: 0 }, { opacity: 1, duration: 1.1, delay: 0.6 })
-      }
-
-      gsap.from('.gsap-stat', {
-        y: 16,
+      gsap.from(heroRef.current?.querySelector('[data-hero-ascii]') ?? {}, {
         opacity: 0,
+        y: 24,
         duration: 0.9,
-        stagger: 0.15,
-        ease: 'power2.out',
-        delay: 0.7,
+        delay: 0.3,
+        ease: 'power3.out',
       })
-
-      gsap.utils.toArray<HTMLElement>('.gsap-reveal').forEach((el) => {
+      gsap.from(heroRef.current?.querySelector('[data-hero-below-capsule]') ?? {}, {
+        opacity: 0,
+        y: 20,
+        duration: 0.8,
+        delay: 0.6,
+        ease: 'power3.out',
+      })
+      // Why Build – Your development environment: same scroll animations as The Graph subgraphs
+      if (whySectionRef.current) {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: whySectionRef.current,
+            start: 'top 82%',
+            end: 'top 20%',
+            once: true,
+          },
+        })
+        if (whyTitleRef.current) {
+          tl.from(whyTitleRef.current, { opacity: 0, y: 28, duration: 0.65, ease: 'power3.out' })
+        }
+        const whyHeading = whySectionRef.current.querySelector('[data-why-heading]')
+        if (whyHeading) {
+          tl.from(whyHeading, { opacity: 0, y: 20, duration: 0.5, ease: 'power3.out' }, '-=0.4')
+        }
+        if (whyLeftRef.current) {
+          const cards = whyLeftRef.current.querySelectorAll('[data-gsap-why-card]')
+          tl.fromTo(cards, { y: 32, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, stagger: 0.12, ease: 'power3.out' }, '-=0.35')
+        }
+        if (whyVisualMainRef.current) {
+          tl.from(whyVisualMainRef.current, { x: 48, opacity: 0, duration: 0.7, ease: 'power3.out' }, '-=0.45')
+        }
+      }
+      if (howTitleRef.current) {
+        ScrollTrigger.create({
+          trigger: howTitleRef.current,
+          start: 'top 85%',
+          onEnter: () => {
+            gsap.from(howTitleRef.current, { opacity: 0, y: 30, duration: 0.7, ease: 'power3.out' })
+          },
+          once: true,
+        })
+      }
+      if (stepsRef.current) {
+        const stepEls = stepsRef.current.querySelectorAll('[data-gsap-step]')
         gsap.fromTo(
-          el,
-          { y: 32, opacity: 0 },
+          stepEls,
+          { y: 32 },
           {
             y: 0,
-            opacity: 1,
-            duration: 0.9,
-            ease: 'power2.out',
-            scrollTrigger: {
-              trigger: el,
-              start: 'top 85%',
-            },
+            scrollTrigger: { trigger: stepsRef.current, start: 'top 88%', once: true },
+            stagger: 0.12,
+            duration: 0.5,
+            ease: 'power3.out',
           }
         )
-      })
-
-      gsap.utils.toArray<HTMLElement>('.gsap-reveal-stagger').forEach((wrap) => {
-        const items = wrap.querySelectorAll('.gsap-reveal-item')
-        gsap.fromTo(
-          items,
-          { y: 24, opacity: 0 },
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.8,
-            stagger: 0.08,
-            ease: 'power2.out',
-            scrollTrigger: {
-              trigger: wrap,
-              start: 'top 85%',
-            },
-          }
-        )
-      })
-    }, rootRef)
-
+      }
+      if (partnersSectionRef.current) {
+        gsap.from(partnersSectionRef.current.querySelector('h2'), {
+          scrollTrigger: { trigger: partnersSectionRef.current, start: 'top 85%', once: true },
+          opacity: 0,
+          y: 30,
+          duration: 0.7,
+          ease: 'power3.out',
+        })
+      }
+      if (unleashRef.current) {
+        const left = unleashRef.current.querySelector('[data-gsap-unleash-text]')
+        const right = unleashRef.current.querySelector('[data-gsap-unleash-3d]')
+        gsap.from(left, {
+          scrollTrigger: { trigger: unleashRef.current, start: 'top 80%', once: true },
+          opacity: 0,
+          x: -50,
+          duration: 0.9,
+          ease: 'power3.out',
+        })
+        gsap.from(right, {
+          scrollTrigger: { trigger: unleashRef.current, start: 'top 80%', once: true },
+          opacity: 0,
+          x: 50,
+          duration: 0.9,
+          delay: 0.2,
+          ease: 'power3.out',
+        })
+      }
+    })
     return () => ctx.revert()
   }, [])
 
-  useEffect(() => {
-    let isMounted = true
-    const loadDormantStats = async () => {
-      setDormantLoading(true)
-      setDormantError(null)
-      try {
-        const response = await fetch('/api/dormant-wallets', { cache: 'no-store' })
-        const data = await response.json()
-        if (!isMounted) return
-        if (!response.ok) {
-          setDormantError(data?.error || 'Failed to load')
-          setDormantSeries([])
-          setDormantLabels([])
-          return
-        }
-        if (Array.isArray(data.series)) setDormantSeries(data.series)
-        if (Array.isArray(data.labels)) setDormantLabels(data.labels)
-        if (typeof data.dormantCount === 'number') setDormantCount(data.dormantCount)
-        if (typeof data.estimatedAssetsUsd === 'number') setEstimatedAssetsUsd(data.estimatedAssetsUsd)
-        if (typeof data.estimatedAssetsSol === 'number') setEstimatedAssetsSol(data.estimatedAssetsSol)
-      } catch (error) {
-        if (isMounted) {
-          setDormantError('Failed to load')
-          setDormantSeries([])
-          setDormantLabels([])
-        }
-        console.error('Failed to load dormant wallet stats:', error)
-      } finally {
-        if (isMounted) setDormantLoading(false)
-      }
-    }
-    loadDormantStats()
-    const interval = setInterval(loadDormantStats, 5 * 60 * 1000)
-    return () => {
-      isMounted = false
-      clearInterval(interval)
-    }
-  }, [])
-
-  const chartPath = useMemo(() => {
-    const values = dormantSeries.length ? dormantSeries : [0]
-    const width = 600
-    const height = 220
-    const top = 40
-    const bottom = 200
-    const min = Math.min(...values)
-    const max = Math.max(...values, min + 1)
-    const range = Math.max(max - min, 1)
-    const stepX = values.length > 1 ? width / (values.length - 1) : width
-    const points = values.map((value, index) => {
-      const normalized = (value - min) / range
-      const y = bottom - normalized * (bottom - top)
-      const x = stepX * index
-      return { x, y }
-    })
-    const line = points
-      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-      .join(' ')
-    const area = `${line} L ${width} ${height} L 0 ${height} Z`
-    return { line, area }
-  }, [dormantSeries])
-
-  const formattedAssetsUsd = useMemo(() => {
-    if (!estimatedAssetsUsd || estimatedAssetsUsd <= 0) return '~$0'
-    const value = estimatedAssetsUsd >= 1e9
-      ? `~$${(estimatedAssetsUsd / 1e9).toFixed(2)}B`
-      : `~$${(estimatedAssetsUsd / 1e6).toFixed(2)}M`
-    return value
-  }, [estimatedAssetsUsd])
-
-  const steps = [
-    {
-      step: 1,
-      number: '01',
-      title: 'Create Memory Capsule',
-      description: 'Define your intent in natural language. Specify what should happen, when, and to whom.',
-      icon: Sparkles,
-    },
-    {
-      step: 2,
-      number: '02',
-      title: 'Set Trigger Conditions',
-      description: 'Configure time-based, event-based, or social triggers. Set inactivity periods and guardian confirmations.',
-      icon: Lock,
-    },
-    {
-      step: 3,
-      number: '03',
-      title: 'Simulate Execution',
-      description: 'Preview what happens if your capsule triggers today. See all possible outcomes and failure scenarios.',
-      icon: Eye,
-    },
-    {
-      step: 4,
-      number: '04',
-      title: 'Automatic Execution',
-      description: 'When conditions are met, your intentions execute automatically on-chain. No manual intervention needed.',
-      icon: Zap,
-    },
-  ]
-
   return (
-    <div
-      ref={rootRef}
-      className="min-h-screen bg-gradient-to-b from-[#0f1629] via-[#162038] to-[#1a2540] relative overflow-hidden"
-    >
-      {/* 3D Hero Background - lighter overlay for brighter feel */}
-      <div className="fixed inset-0 w-full h-full z-0">
-        <div className="absolute inset-0 dream-bg opacity-70 z-[2]" />
-        <div className="absolute inset-0 dream-glow opacity-60 z-[3]" />
-        <div className="absolute inset-0 gsap-grid opacity-25 z-[4]" />
-        <div className="absolute -top-24 -left-24 w-[520px] h-[520px] gsap-orb opacity-50 z-[5]" />
-        <div className="absolute top-1/3 -right-32 w-[620px] h-[620px] gsap-orb opacity-35 z-[5]" />
-        <div className="absolute inset-0 gsap-aurora opacity-35 z-[6]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0f1629]/20 via-[#162038]/15 to-[#1a2540]/20 z-[7]" />
-        <div className="absolute left-12 top-24 w-24 h-24 dream-bubble z-[8] opacity-60" />
-        <div className="absolute right-20 top-40 w-16 h-16 dream-bubble z-[8] opacity-60 [animation-duration:10s]" />
-        <div className="absolute left-1/2 bottom-24 w-20 h-20 dream-bubble z-[8] opacity-60 [animation-duration:14s]" />
-      </div>
-
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 gsap-nav">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="relative w-9 h-9 md:w-10 md:h-10 transition-transform group-hover:rotate-6">
-              <Image
-                src="/logo.png"
-                alt="Lucid"
-                fill
-                className="object-contain drop-shadow-[0_8px_18px_rgba(255,255,255,0.25)]"
-                priority
-              />
-            </div>
-            <span className="sr-only">Lucid</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <div className="relative z-[9999] wallet-menu-container">
-            {connected && publicKey ? (
-              <div className="relative">
-                <button
-                  onClick={() => setShowWalletMenu(!showWalletMenu)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors gsap-button"
-                >
-                  <span className="font-mono text-sm">
-                    {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
-                  </span>
-                  {showWalletMenu ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </button>
-                {showWalletMenu && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-[#00FF99]/25 overflow-hidden z-[10000] gsap-panel">
-                    <button
-                      onClick={async () => {
-                        try {
-                          await disconnect()
-                          setShowWalletMenu(false)
-                        } catch (err) {
-                          console.error('Error disconnecting wallet:', err)
-                        }
-                      }}
-                      className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
-                    >
-                      Disconnect
-                    </button>
-                    {wallets && wallets.length > 1 && (
-                      <>
-                        <div className="border-t border-[#00FF99]/20"></div>
-                        <div className="px-2 py-1 text-xs text-slate-400">Switch Wallet</div>
-                        {wallets.map((w: any) => (
-                          <button
-                            key={w.adapter.name}
-                            onClick={async () => {
-                              try {
-                                await select(w.adapter.name)
-                                setShowWalletMenu(false)
-                              } catch (err) {
-                                console.error('Error switching wallet:', err)
-                              }
-                            }}
-                            className="w-full text-left px-4 py-2 text-white hover:bg-[#0F1B2A] transition-colors"
-                          >
-                            {w.adapter.name}
-                          </button>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-          <div className="material-elevation-2 rounded-lg overflow-hidden">
-            <WalletMultiButton />
-              </div>
-            )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* ========== HERO (Timeline Block 0) ========== */}
-      <section className="relative pt-24 pb-8 px-6 min-h-screen flex items-center z-20">
-        <div className="max-w-6xl mx-auto text-center relative z-20">
-          <p className="gsap-hero text-xs uppercase tracking-[0.35em] text-[#A0ECFF] mb-4 font-medium">Intent Inheritance Protocol</p>
-          <h1 className="gsap-hero text-5xl md:text-7xl font-black mb-6 bg-gradient-to-r from-[#A0ECFF] via-[#C7B8FF] to-[#FFCEEA] bg-clip-text text-transparent leading-tight tracking-tight">
-            People disappear.<br />Intent should not.
-          </h1>
-          <p className="gsap-hero-sub text-lg md:text-xl text-slate-100 mb-10 max-w-2xl mx-auto leading-relaxed font-medium">
-            Lucid allows you to securely record, simulate, and automatically execute your intentions on-chain when you are no longer able to act.
+    <div className="bg-hero">
+      {/* Hero */}
+      <section
+        ref={heroRef}
+        className="relative overflow-hidden px-4 pt-32 pb-28 sm:px-6 sm:pt-40 sm:pb-36 lg:px-8"
+      >
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="mb-4 text-sm font-medium uppercase tracking-wider text-lucid-accent">
+            Privacy-Preserving Capsule Protocol
           </p>
-          <div className="flex justify-center">
-            <Link href="/dashboard">
-              <button className="gsap-hero-sub material-button material-elevation-4 hover:material-elevation-8 px-10 py-4 rounded-xl font-semibold text-base flex items-center gap-2 mx-auto transition-all group gsap-button">
-                Get Started
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ========== PARTNERS (Timeline Block) ========== */}
-      <section className="relative pt-8 pb-16 px-6 z-20 overflow-hidden gsap-reveal">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-300 mb-6 text-center font-medium">Trusted Partners</p>
-          <div className="relative rounded-3xl border-2 border-[#A0ECFF]/40 px-6 py-5 overflow-hidden bg-[#0c1222]/95 shadow-xl backdrop-blur-sm">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#A0ECFF]/15 via-[#C7B8FF]/08 to-[#FFCEEA]/15 rounded-3xl" />
-            <div className="relative z-10 flex gap-12 animate-scroll-left">
-              {[
-                { name: 'Solana', src: '/logos/solana.png' },
-                { name: 'Helius', src: '/logos/helius.png' },
-                { name: 'Phantom', src: '/logos/phantom.png' },
-                { name: 'Backpack', src: '/logos/backpack.png' },
-                { name: 'Noir', src: '/logos/noir.png' },
-                { name: 'Aztec', src: '/logos/aztec.png' },
-              ].map((logo, index) => (
-                <div key={`first-${index}`} className="flex-shrink-0 flex items-center justify-center opacity-95 hover:opacity-100 transition-opacity duration-300">
-                  <div className="relative w-32 h-16 brightness-110 contrast-110">
-                    <Image src={logo.src} alt={logo.name} fill className="object-contain" />
-                  </div>
-                </div>
-              ))}
-              {[
-                { name: 'Solana', src: '/logos/solana.png' },
-                { name: 'Helius', src: '/logos/helius.png' },
-                { name: 'Phantom', src: '/logos/phantom.png' },
-                { name: 'Backpack', src: '/logos/backpack.png' },
-                { name: 'Noir', src: '/logos/noir.png' },
-                { name: 'Aztec', src: '/logos/aztec.png' },
-              ].map((logo, index) => (
-                <div key={`second-${index}`} className="flex-shrink-0 flex items-center justify-center opacity-95 hover:opacity-100 transition-opacity duration-300">
-                  <div className="relative w-32 h-16 brightness-110 contrast-110">
-                    <Image src={logo.src} alt={logo.name} fill className="object-contain" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========== TIMELINE BLOCK 1: On-Chain Data ========== */}
-      <section className="relative py-20 md:py-28 px-6 z-20 gsap-reveal">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-start">
-            <div className="lg:col-span-4 space-y-4">
-              <p className="text-xs uppercase tracking-[0.35em] text-[#A0ECFF] font-medium">On-Chain</p>
-              <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
-                Dormant Solana Wallets
-              </h2>
-              <p className="text-slate-100 leading-relaxed">
-                On-chain sample from Lucid program wallets inactive 12+ months. Estimated assets locked in long-dormant wallets.
-              </p>
-            </div>
-            <div className="lg:col-span-8 grid lg:grid-cols-[1.2fr_0.8fr] gap-8 items-stretch">
-              <div className="rounded-3xl border border-[#A0ECFF]/40 p-8 relative overflow-hidden bg-white/[0.12] backdrop-blur-xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#A0ECFF]/15 via-transparent to-[#FFCEEA]/10 rounded-3xl" />
-                <div className="relative z-10">
-                  <div className="flex justify-between mb-4">
-                    <span className="text-xs uppercase tracking-widest text-slate-200">Last 12 Months</span>
-                  </div>
-                  <div className="relative h-56">
-                    {dormantLoading ? (
-                      <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">Loading on-chain data…</div>
-                    ) : dormantError ? (
-                      <div className="absolute inset-0 flex items-center justify-center text-rose-300 text-sm">{dormantError}</div>
-                    ) : (
-                      <>
-                        <svg viewBox="0 0 600 220" className="w-full h-full">
-                          <defs>
-                            <linearGradient id="walletFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="rgba(160,236,255,0.45)" />
-                              <stop offset="100%" stopColor="rgba(199,184,255,0.05)" />
-                            </linearGradient>
-                            <linearGradient id="walletStroke" x1="0" y1="0" x2="1" y2="0">
-                              <stop offset="0%" stopColor="rgba(160,236,255,1)" />
-                              <stop offset="100%" stopColor="rgba(255,206,234,0.9)" />
-                            </linearGradient>
-                          </defs>
-                          <path className="gsap-chart-area" d={chartPath.area} fill="url(#walletFill)" />
-                          <path className="gsap-chart-line" d={chartPath.line} fill="none" stroke="url(#walletStroke)" strokeWidth="4" strokeLinecap="round" />
-                        </svg>
-                        <div className="absolute inset-x-0 bottom-2 flex justify-between text-[10px] text-slate-200 uppercase tracking-widest">
-                          {dormantLabels.length > 0 ? dormantLabels.map((label, index) => (
-                            <span key={`${label}-${index}`}>{label}</span>
-                          )) : ['—', '—', '—', '—', '—', '—'].map((_, i) => <span key={i}>—</span>)}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-[#C7B8FF]/45 p-8 flex flex-col justify-between bg-white/[0.1] backdrop-blur-xl">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-slate-200">Estimated Assets</p>
-                  {dormantLoading ? (
-                    <p className="gsap-stat text-3xl md:text-4xl font-black text-white mt-2">…</p>
-                  ) : dormantError ? (
-                    <p className="gsap-stat text-lg font-semibold text-rose-300 mt-2">{dormantError}</p>
-                  ) : (
-                    <>
-                      <p className="gsap-stat text-3xl md:text-4xl font-black text-white mt-2">{formattedAssetsUsd}</p>
-                      <p className="text-slate-100 mt-4 text-sm">Total locked in long-dormant wallets</p>
-                      <p className="text-xs text-slate-200 mt-1">≈ {estimatedAssetsSol.toFixed(2)} SOL</p>
-                    </>
-                  )}
-                </div>
-                <div className="mt-6">
-                  <p className="text-xs uppercase tracking-widest text-slate-200">Dormant Wallets</p>
-                  {dormantLoading ? (
-                    <p className="gsap-stat text-2xl md:text-3xl font-black text-white mt-2">…</p>
-                  ) : dormantError ? (
-                    <p className="gsap-stat text-lg font-semibold text-rose-300 mt-2">—</p>
-                  ) : (
-                    <p className="gsap-stat text-2xl md:text-3xl font-black text-white mt-2">{dormantCount.toLocaleString()}</p>
-                  )}
-                  <p className="text-slate-200 text-sm mt-2">No on-chain activity 12+ months</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========== TIMELINE BLOCK 2: Philosophy + Cards ========== */}
-      <section className="relative py-20 md:py-28 px-6 z-20 gsap-reveal">
-        <div className="max-w-7xl mx-auto">
-          <div className="max-w-2xl mb-14">
-            <p className="text-xs uppercase tracking-[0.35em] text-[#C7B8FF] mb-4 font-medium">Philosophy</p>
-            <h2 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight">
-              Not About Assets.<br />About Decisions.
-            </h2>
-            <p className="text-lg md:text-xl text-slate-100 leading-relaxed">
-              Lucid doesn&apos;t preserve assets. It preserves decisions, intent, and responsibility.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8 gsap-reveal-stagger">
-            {[
-              { icon: Shield, title: 'Secure & Trustless', description: 'All intentions are stored on-chain with cryptographic guarantees. No intermediaries, no single point of failure.' },
-              { icon: Zap, title: 'Automatic Execution', description: 'When conditions are met, your intentions execute automatically. No manual intervention required.' },
-              { icon: Eye, title: 'Simulation Mode', description: 'Preview what happens if your capsule triggers today. Visual execution preview with failure scenarios.' },
-            ].map((feature, index) => {
-              const Icon = feature.icon
-              return (
-                <div key={index} className="gsap-card gsap-reveal-item p-8 group relative overflow-hidden transition-all duration-500 rounded-2xl border border-[#A0ECFF]/30 bg-white/[0.12] backdrop-blur-xl hover:bg-white/[0.18] hover:border-[#A0ECFF]/50 shadow-lg">
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#A0ECFF]/0 to-[#C7B8FF]/0 group-hover:from-[#A0ECFF]/15 group-hover:to-[#FFCEEA]/12 transition-all duration-500 rounded-2xl" />
-                  <div className="relative z-10">
-                    <div className="w-14 h-14 bg-gradient-to-br from-[#A0ECFF]/30 to-[#C7B8FF]/30 rounded-2xl flex items-center justify-center mb-5 group-hover:from-[#A0ECFF]/40 group-hover:to-[#FFCEEA]/35 transition-all">
-                      <Icon className="w-7 h-7 text-[#A0ECFF]" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-3 tracking-tight">{feature.title}</h3>
-                    <p className="text-sm text-slate-100 leading-[1.6]">{feature.description}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ========== TIMELINE BLOCK 3: How It Works + Demo Flow ========== */}
-      <section className="relative py-20 md:py-28 px-6 z-20 gsap-reveal">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-14">
-            <p className="text-xs uppercase tracking-[0.35em] text-[#A0ECFF] mb-4 font-medium">How It Works</p>
-            <h2 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight">
-              Create Memory Capsules
-            </h2>
-            <p className="text-lg md:text-xl text-slate-100 max-w-2xl leading-relaxed">
-              Define your intentions, conditions, and actions. See the demo flow below.
-            </p>
-          </div>
-          <div className="grid lg:grid-cols-2 gap-12 items-stretch gsap-reveal-stagger">
-            <div className="relative order-2 lg:order-1 gsap-reveal-item lg:min-w-0 overflow-hidden flex flex-col">
-              <div className="relative w-full min-h-[520px] flex-1 flex flex-col">
-                <WorkflowDemo activeStep={activeStep} />
-              </div>
-            </div>
-            <div className="relative z-[100] order-1 lg:order-2 gsap-reveal-item w-full lg:w-auto lg:min-w-[400px] lg:min-h-[520px] p-5 rounded-2xl border-2 border-[#A0ECFF]/50 shadow-2xl bg-[#0c1222] overflow-visible flex flex-col">
-              <div className="flex flex-col gap-4 flex-1">
-                {steps.map((item) => {
-                  const Icon = item.icon
-                  const isActive = activeStep === item.step
-                  return (
-                    <div
-                      key={item.step}
-                      className={`gsap-step p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 min-h-[100px] ${
-                        isActive
-                          ? 'border-[#A0ECFF] bg-[#A0ECFF]/20 shadow-lg shadow-[#A0ECFF]/25'
-                          : 'border-[#A0ECFF]/40 bg-[#0f1629] hover:border-[#A0ECFF]/60 hover:bg-[#A0ECFF]/10'
-                      }`}
-                      onMouseEnter={() => setActiveStep(item.step)}
-                      onClick={() => setActiveStep(item.step)}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 flex items-center gap-2">
-                          <span className={`text-xl font-black ${isActive ? 'text-[#A0ECFF]' : 'text-slate-200'}`}>
-                            {item.number}
-                          </span>
-                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-[#A0ECFF]/30' : 'bg-[#A0ECFF]/10'}`}>
-                            <Icon className={`w-4 h-4 ${isActive ? 'text-[#C7B8FF]' : 'text-slate-200'}`} />
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-base font-bold mb-1 text-white leading-tight">{item.title}</h3>
-                          <p className="text-sm leading-relaxed text-slate-100 line-clamp-2">{item.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========== TIMELINE BLOCK 4: Architecture ========== */}
-      <section className="relative py-20 md:py-28 px-6 z-20 gsap-reveal">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-14">
-            <p className="text-xs uppercase tracking-[0.35em] text-[#C7B8FF] mb-4 font-medium">Architecture</p>
-            <h2 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight">
-              Verifiable Silence
-            </h2>
-            <p className="text-lg md:text-xl text-slate-100 max-w-2xl leading-relaxed">
-              Nothing happens on-chain until inactivity is proven via Noir ZK.
-            </p>
-          </div>
-
-          {/* Side-by-Side Content Area - no dark section bg */}
-          <div className="flex flex-col lg:flex-row gap-8 items-start mb-16">
-            {/* Main Diagram Section (Left) */}
-            <section className="w-full lg:w-[62%]">
-              <div className="flex items-center justify-between mb-6 px-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-[#A0ECFF]/15 rounded-lg">
-                    <Activity size={16} className="text-[#A0ECFF]" />
-                  </div>
-                  <h3 className="text-lg font-black tracking-tight uppercase text-white">Execution Pipeline</h3>
-                </div>
-                <div className="text-[9px] font-mono text-slate-200 tracking-widest uppercase flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#A0ECFF] animate-pulse" />
-                  Interactive Protocol
-                </div>
-              </div>
-
-              <SequenceDiagram 
-                activeStep={activeArchitectureStep} 
-                onStepHover={setActiveArchitectureStep} 
-              />
-            </section>
-
-            {/* Table Section (Right) */}
-            <section className="w-full lg:w-[38%] sticky top-8 space-y-6">
-              <div>
-                <div className="mb-4 px-2">
-                  <h3 className="text-lg font-black text-white uppercase tracking-tight mb-1">Protocol Milestones</h3>
-                  <div className="h-0.5 w-12 bg-[#C7B8FF]/40 rounded-full" />
-                </div>
-
-                <div className="rounded-2xl overflow-hidden border-2 border-[#A0ECFF]/40 bg-[#0c1222]/95 backdrop-blur-sm shadow-lg transition-all mb-3">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-[#A0ECFF]/15 border-b border-[#A0ECFF]/30">
-                        <th className="px-4 py-4 text-[9px] font-black uppercase tracking-[0.3em] text-[#A0ECFF]">Lucid Sequence</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#A0ECFF]/15">
-                      {ARCHITECTURE_COMPARISONS.map((row, i) => {
-                        const isHighlighted = activeArchitectureStep !== null && row.relatedStepIds?.includes(activeArchitectureStep)
-                        return (
-                          <tr 
-                            key={i} 
-                            className={`transition-all duration-500 group cursor-default relative
-                              ${isHighlighted ? 'bg-[#A0ECFF]/20' : 'hover:bg-white/[0.08]'}
-                            `}
-                            onMouseEnter={() => {
-                              if (row.relatedStepIds?.length) setActiveArchitectureStep(row.relatedStepIds[0])
-                            }}
-                            onMouseLeave={() => setActiveArchitectureStep(null)}
-                          >
-                            <td className="px-4 py-3 relative overflow-hidden">
-                              {/* Highlight Indicator Bar */}
-                              <div className={`absolute left-0 top-0 bottom-0 w-1 transition-all duration-500 ${isHighlighted ? 'bg-[#A0ECFF] opacity-100 scale-y-100' : 'bg-[#A0ECFF]/0 opacity-0 scale-y-0'}`} />
-                              
-                              <div className="flex items-center gap-2.5">
-                                <Zap size={11} className={`transition-all duration-500 ${isHighlighted ? 'text-[#A0ECFF] scale-125 glow-blue' : 'text-[#A0ECFF]/40 group-hover:text-[#A0ECFF]/70'}`} />
-                                <span className={`text-[13px] font-bold transition-all duration-300 ${isHighlighted ? 'text-white translate-x-1' : 'text-slate-200 group-hover:text-white'}`}>
-                                  {row.lucid}
-                                </span>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="px-2 text-[10px] font-mono text-slate-200 leading-relaxed uppercase tracking-widest">
-                  * Hover milestones to highlight steps
-                </p>
-              </div>
-
-              {/* Role of Noir ZK Section */}
-              <div className="rounded-2xl p-6 border-2 border-[#C7B8FF]/40 bg-[#0c1222]/95 backdrop-blur-sm shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-                  <Gavel size={80} className="text-[#C7B8FF]" />
-                </div>
-                
-                <div className="flex items-center gap-2 mb-4 relative z-10">
-                  <div className="p-1.5 bg-[#C7B8FF]/25 rounded-lg">
-                    <Gavel size={16} className="text-[#C7B8FF]" />
-                  </div>
-                  <h3 className="text-sm font-black text-white uppercase tracking-widest">The Role of Noir ZK</h3>
-                </div>
-
-                <div className="space-y-4 relative z-10">
-                  <p className="text-sm font-medium text-slate-100 leading-relaxed">
-                    In Lucid, Noir acts as a <span className="text-[#C7B8FF] font-bold">Judge</span>, not a mediator.
-                  </p>
-
-                  <ul className="space-y-3">
-                  {[
-                    "Was there true silence?",
-                    "Are conditions fully met?",
-                    "Is execution still valid?"
-                  ].map((q, idx) => (
-                    <li key={idx} className="flex items-start gap-3">
-                      <div className="mt-1">
-                        <CheckCircle2 size={12} className="text-[#A0ECFF]" />
-                      </div>
-                      <span className="text-xs text-slate-200 italic font-light">"{q}"</span>
-                    </li>
-                  ))}
-                </ul>
-
-                  <div className="pt-4 border-t border-[#C7B8FF]/20">
-                  <p className="text-[11px] text-slate-200 leading-relaxed">
-                      Noir answers these questions with a binary <span className="text-white font-bold">Yes / No</span>, 
-                    providing absolute verification <span className="text-[#C7B8FF]/90 underline decoration-[#C7B8FF]/40 underline-offset-4">without revealing any raw data</span>.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Core Philosophy Caption */}
-              <div className="rounded-2xl px-6 py-5 border-2 border-[#A0ECFF]/40 bg-[#0c1222]/90 backdrop-blur-sm relative group overflow-hidden text-center">
-                <div className="absolute inset-0 bg-[#A0ECFF]/[0.06] group-hover:bg-[#C7B8FF]/[0.1] transition-colors rounded-2xl" />
-                <Quote className="absolute -top-2 -left-2 text-[#A0ECFF]/20" size={40} />
-                <p className="text-base md:text-lg font-light italic text-slate-100 relative z-10 leading-relaxed">
-                  "Lucid replaces <span className="text-[#A0ECFF] font-bold">payment</span> with <span className="text-[#A0ECFF] font-bold">silence</span>,
-                  and verifies it with <span className="text-white font-semibold">Noir ZK</span>."
-                </p>
-              </div>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      {/* ========== TIMELINE BLOCK 5: CTA ========== */}
-      <section className="relative py-20 md:py-28 px-6 z-20 gsap-reveal">
-        <div className="max-w-4xl mx-auto text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-[#A0ECFF] mb-4 font-medium">Get Started</p>
-          <h2 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight">
-            Ready to Preserve Your Intent?
-          </h2>
-          <p className="text-lg md:text-xl text-slate-100 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Create your first Memory Capsule and ensure your decisions live on, even when you can&apos;t.
-          </p>
-          <Link href="/dashboard">
-            <button className="material-button material-elevation-4 hover:material-elevation-8 px-10 py-5 rounded-xl font-bold text-lg inline-flex items-center gap-3 transition-all group gsap-button">
-              Get Started
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer - 다크 네이비, 미니멀, 큰 Lucid 하단 짤림 */}
-      <footer className="relative z-20 overflow-hidden bg-[#0c1222] border-t border-slate-700/40">
-        <div className="relative max-w-7xl mx-auto px-6 pt-20 md:pt-28 pb-0 text-center">
-          <p className="text-sm text-slate-500">
-            © 2026 Lucid. All Rights Reserved.
-          </p>
-          {/* 큰 Lucid - 뮤트 그레이블루 + 은은한 텍스처, 하단 짤림 */}
-          <div className="mt-12 md:mt-16 flex justify-center overflow-hidden" style={{ height: 'clamp(140px, 24vw, 220px)' }}>
-            <span
-              className="font-black tracking-tighter leading-none select-none whitespace-nowrap"
-              style={{
-                fontSize: 'clamp(4.5rem, 22vw, 15rem)',
-                color: 'transparent',
-                background: 'repeating-linear-gradient(105deg, rgba(148,163,184,0.5) 0px, rgba(148,163,184,0.5) 1px, rgba(100,116,139,0.6) 1px, rgba(100,116,139,0.6) 3px)',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-              }}
-            >
-              Lucid
+          <h1 className="text-4xl font-bold tracking-tight text-lucid-white sm:text-5xl lg:text-6xl">
+            Your intent. Your rules.{' '}
+            <span className="bg-gradient-to-r from-lucid-cyan to-lucid-purple bg-clip-text text-transparent">
+              Executed when you’re silent.
             </span>
+          </h1>
+          {/* ASCII capsule animation – capsule-shaped ASCII art */}
+          <div className="mt-10 sm:mt-12" data-hero-ascii>
+            <AsciiCapsule />
+          </div>
+          {/* 캡슐 아래 문구 + Get Started 버튼 */}
+          <div className="mt-10 sm:mt-12 text-center" data-hero-below-capsule>
+            <p className="mx-auto max-w-2xl text-base sm:text-lg text-lucid-muted leading-relaxed">
+              Define once. Delegate to Magicblock ER. Execution runs on Solana when conditions are met. No bridges, no third party.
+            </p>
+            <div className="mt-8 flex justify-center">
+              <Link
+                href="/create"
+                className="btn-primary min-w-[160px] shrink-0 rounded-full py-3.5 text-center shadow-[0_0_24px_rgba(34,211,238,0.3)]"
+              >
+                Get Started
+              </Link>
+            </div>
           </div>
         </div>
-      </footer>
+      </section>
+
+      {/* Why Build With Lucid – Your development environment (layout + scroll like The Graph subgraphs) */}
+      <section ref={whySectionRef} className="why-build-section py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 ref={whyTitleRef} className="text-center text-3xl font-bold text-white sm:text-4xl">
+            Why Build With Lucid?
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted hidden">
+            Capsules on Solana, private logic in Magicblock ER, execution when you’re silent.
+          </p>
+
+          <div data-why-heading className="mx-auto mt-3 max-w-2xl text-center">
+            <p className="why-build-subtitle text-lg font-medium">Your development environment</p>
+            <p className="why-build-desc mt-2">Everything you need to build privacy-preserving capsules on Solana.</p>
+          </div>
+
+          <div className="mt-16 grid gap-10 lg:grid-cols-2 lg:gap-16 lg:items-center">
+            {/* Left: Why Lucid steps – vertical list with left border (Firehose-style) */}
+            <div ref={whyLeftRef} className="why-left-cards flex flex-col">
+              {whyLucidCards.map((card, i) => {
+                const isActive = activeWhyIndex === i
+                return (
+                  <div
+                    key={card.title}
+                    role="button"
+                    tabIndex={0}
+                    data-gsap-why-card
+                    data-active={isActive}
+                    onClick={() => setActiveWhyIndex(i)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveWhyIndex(i) } }}
+                    className={`flex cursor-pointer flex-col py-6 transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-50 hover:opacity-80'}`}
+                  >
+                    <div
+                      className={`relative flex items-start transition-all duration-300 ${isActive ? 'pl-4' : 'pl-0'}`}
+                      style={{
+                        borderLeft: isActive ? '1px solid rgba(34, 211, 238, 0.3)' : '1px solid transparent',
+                      }}
+                    >
+                      {isActive && (
+                        <div
+                          key={`step-bar-${i}`}
+                          className="why-build-step-bar absolute left-0 top-0 w-0.5 bg-lucid-accent"
+                          aria-hidden
+                          onAnimationEnd={() => setActiveWhyIndex((prev) => (prev + 1) % whyLucidCards.length)}
+                        />
+                      )}
+                      <div>
+                        <div className="mb-1 font-mono text-[13px] text-white/40">
+                          Step {i + 1}
+                        </div>
+                        <h3 className="mb-4 text-[18px] font-medium text-white">
+                          {card.title}
+                        </h3>
+                        <p className="text-white/60">
+                          {card.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {/* Right: Lucid flow diagram – no outer box, widened to the right (reference image) */}
+            <div ref={whyVisualMainRef} className="relative w-full md:min-w-0 md:flex-1 lg:max-w-[900px]">
+              <div className="why-build-flow-wrap relative flex flex-col md:flex-row md:items-stretch md:gap-0 md:pl-2 md:pr-4">
+                {/* Left flow only: Solana Devnet → … → MONITORING → Helius RPC → Execution */}
+                <div className="relative mt-4 flex w-full flex-col items-center text-white md:mt-0 md:w-full md:scale-100">
+                  {/* 1. Solana Devnet */}
+                  <div
+                    className="z-10 flex w-full justify-center"
+                    style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transform: activeWhyIndex >= 0 ? 'scale(1)' : 'scale(0.98)', transition: 'opacity 0.3s, transform 0.3s' }}
+                  >
+                    <div className="rounded-lg border border-white/10 bg-[#242236] p-3 text-center md:p-4 w-[164px]">
+                      <div className="flex items-center justify-center gap-2 font-mono text-[13px] md:text-base text-white whitespace-nowrap">
+                        <Image src="/logos/solana.svg" alt="Solana" width={24} height={24} className="shrink-0" />
+                        <span>Solana Devnet</span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Ref: single dashed line + absolute blue segment (h-6, 1.5px) */}
+                  <div className="relative flex justify-center" style={{ opacity: 1 }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 2 50" width={2} height={50} className="shrink-0 text-white">
+                      <path stroke="currentColor" strokeDasharray="5 5" strokeLinecap="square" strokeOpacity={0.5} strokeWidth={1.5} d="M1 1v48" />
+                    </svg>
+                    {activeWhyIndex > 0 && (
+                      <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-lucid-accent rounded-full" aria-hidden style={{ height: 50 }} />
+                    )}
+                    {activeWhyIndex === 0 && (
+                      <div className="why-flow-segment absolute left-1/2 h-6 w-[1.5px] -translate-x-1/2 rounded-full bg-lucid-accent" aria-hidden style={{ top: 0 }} />
+                    )}
+                  </div>
+                  {/* 2. Lucid Capsules */}
+                  <div
+                    className="z-10 flex w-full justify-center"
+                    style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transform: activeWhyIndex >= 0 ? 'scale(1)' : 'scale(0.98)', transition: 'opacity 0.3s, transform 0.3s' }}
+                  >
+                    <div className="rounded-md w-[164px] border border-white/10 bg-[#242236] p-3 text-center md:p-4">
+                      <div className="font-mono text-[13px] md:text-base text-white">Lucid Capsules</div>
+                    </div>
+                  </div>
+                  {/* Ref: 5 separate parallel dashed lines (each 2×30) */}
+                  <div className="relative -z-10 flex w-full justify-center gap-2 md:gap-6" style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transition: 'opacity 0.3s' }}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div key={i} className="relative flex justify-center" style={{ opacity: 1 }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 2 30" width={2} height={30} className="shrink-0 text-white">
+                          <path stroke="currentColor" strokeDasharray="5 5" strokeLinecap="square" strokeOpacity={0.5} strokeWidth={1.5} d="M1 1v28" />
+                        </svg>
+                        {activeWhyIndex > 1 && <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-lucid-accent rounded-full" style={{ height: 30 }} aria-hidden />}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Tokens or NFTs (middle label) */}
+                  <div
+                    className="z-20 flex w-full justify-center"
+                    style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transform: activeWhyIndex >= 0 ? 'scale(1)' : 'scale(0.95)', transition: 'opacity 0.3s, transform 0.3s' }}
+                  >
+                    <div className="rounded-md w-[140px] whitespace-nowrap border border-white/10 bg-[#242236] px-1.5 py-1 text-center font-mono text-[11px] uppercase leading-none text-white/60">
+                      Tokens or NFTs
+                    </div>
+                  </div>
+                  {/* Ref: 5 parallel dashed lines again */}
+                  <div className="relative -z-10 flex w-full justify-center gap-2 md:gap-6" style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transition: 'opacity 0.3s' }}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div key={i} className="relative flex justify-center" style={{ opacity: 1 }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 2 30" width={2} height={30} className="shrink-0 text-white">
+                          <path stroke="currentColor" strokeDasharray="5 5" strokeLinecap="square" strokeOpacity={0.5} strokeWidth={1.5} d="M1 1v28" />
+                        </svg>
+                        {activeWhyIndex > 1 && <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-lucid-accent rounded-full" style={{ height: 30 }} aria-hidden />}
+                      </div>
+                    ))}
+                  </div>
+                  {/* 3. Magicblock ER (with PRIVACY below) */}
+                  <div
+                    className="relative z-20 flex w-full justify-center"
+                    style={{ opacity: activeWhyIndex >= 1 ? 1 : 0.4, transform: activeWhyIndex >= 1 ? 'scale(1)' : 'scale(0.95)', transition: 'opacity 0.3s, transform 0.3s' }}
+                  >
+                    <div className="flex flex-col items-center gap-1 rounded-md border border-white/10 bg-[#242236] px-3 py-2 leading-none md:px-4 md:py-2.5 w-[164px]">
+                      <div className="flex items-center gap-2 justify-center">
+                        <Image src="/logos/magicblock.svg" alt="Magicblock" width={20} height={20} className="shrink-0" />
+                        <span className="font-mono text-[11px] uppercase text-white/60">Magicblock ER</span>
+                      </div>
+                      <span className="font-mono text-[9px] uppercase text-white/40">Privacy</span>
+                    </div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <DashedLine height={30} segmentIndex={2} activeWhyIndex={activeWhyIndex} />
+                  </div>
+                  {/* 4. Monitoring (with Helius RPC inside) */}
+                  <div
+                    className="z-10 flex w-full justify-center"
+                    style={{ opacity: activeWhyIndex >= 1 ? 1 : 0.4, transform: activeWhyIndex >= 1 ? 'scale(1)' : 'scale(0.98)', transition: 'opacity 0.3s, transform 0.3s' }}
+                  >
+                    <div className="flex flex-col items-center gap-1 rounded-md border border-white/10 bg-[#242236] px-3 py-2 leading-none md:px-4 md:py-2.5 w-[164px]">
+                      <div className="flex items-center gap-2 justify-center leading-none">
+                        <Image src="/logos/helius.svg" alt="Helius" width={18} height={18} className="shrink-0" />
+                        <span className="font-mono text-[11px] uppercase text-white/60">Monitoring</span>
+                      </div>
+                      <span className="font-mono text-[10px] uppercase text-white/50 leading-none">Helius RPC</span>
+                    </div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <DashedLine height={28} segmentIndex={2} activeWhyIndex={activeWhyIndex} />
+                  </div>
+                  {/* 5. Execution – blue fill by STEP 1/2/3 (activeWhyIndex 0/1/2) */}
+                  <div
+                    className="z-10 flex w-full justify-center"
+                    style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transform: activeWhyIndex >= 0 ? 'scale(1)' : 'scale(0.98)', transition: 'opacity 0.3s, transform 0.3s' }}
+                  >
+                    <div className="relative overflow-hidden rounded-lg border border-lucid-accent/30 bg-[#242236] p-3.5 text-center w-[220px] min-w-[220px]">
+                      {/* Blue fill: STEP 1 → 33%, STEP 2 → 66%, STEP 3 → 100% */}
+                      <div
+                        className="absolute inset-0 rounded-lg bg-lucid-accent/25 transition-all duration-500 ease-out"
+                        style={{ width: `${((activeWhyIndex + 1) / 3) * 100}%` }}
+                        aria-hidden
+                      />
+                      <div className="relative z-10">
+                        <div className="font-mono text-[13px] font-medium text-white">Execution</div>
+                        <div className="mt-1.5 whitespace-nowrap font-mono text-[10px] uppercase tracking-wide text-white/60">Auto execute to Devnet</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How it works – 3-step cards (Discover / Query / Serve style) */}
+      <section className="border-y border-lucid-border/30 bg-lucid-surface/30 py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 ref={howTitleRef} className="text-center text-3xl font-bold text-lucid-white sm:text-4xl">
+            How It Works
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted">
+            With Lucid, define your intent once on Solana. Magicblock ER monitors privately; execution runs on Devnet when conditions are met.
+          </p>
+          <div ref={stepsRef} className="mt-16 grid gap-8 lg:grid-cols-3 lg:items-stretch">
+            {/* STEP 1 Create – capsule/create page card */}
+            <div data-gsap-step className="card-lucid flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-lucid-accent/40 sm:min-h-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-lucid-accent">Step 1</p>
+              <h3 className="mt-1 text-xl font-bold text-lucid-white">Create</h3>
+              <p className="mt-3 text-sm text-lucid-muted">
+                Create a capsule to define beneficiaries, amounts, and inactivity period on Solana Devnet.
+              </p>
+              <div className="mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-lucid-border/50 bg-lucid-card/80 sm:min-h-[180px]">
+                <div className="relative h-full min-h-[180px] w-full">
+                  <Image
+                    src="/how-it-works-step1.png"
+                    alt="Create Capsule – intent, beneficiaries, asset type"
+                    fill
+                    className="object-cover object-top"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                  />
+                </div>
+              </div>
+              <Link href="/create" className="mt-4 text-sm font-medium text-lucid-accent hover:underline">
+                View the create page →
+              </Link>
+            </div>
+
+            {/* STEP 2 Delegate – real code from lib/solana.ts */}
+            <div data-gsap-step className="card-lucid flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-lucid-accent/40 sm:min-h-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-lucid-accent">Step 2</p>
+              <h3 className="mt-1 text-xl font-bold text-lucid-white">Delegate</h3>
+              <p className="mt-3 text-sm text-lucid-muted">
+                Create and delegate your capsule with Anchor. Capsule PDA is derived from owner; Magicblock ER monitors privately.
+              </p>
+              <div className="how-it-works-code mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-lucid-border/50 bg-[#0d1117] p-3 font-mono text-xs leading-relaxed sm:min-h-[180px]">
+                <pre className="whitespace-pre-wrap break-words text-[11px] sm:text-xs">
+                  <code>
+                    <span className="text-slate-400">const tx = await program.methods</span>{'\n'}
+                    <span className="text-slate-400">  .createCapsule(</span>{'\n'}
+                    <span className="text-slate-400">    new BN(inactivityPeriodSeconds),</span>{'\n'}
+                    <span className="text-slate-400">    intentDataBuffer</span>{'\n'}
+                    <span className="text-slate-400">  )</span>{'\n'}
+                    <span className="text-slate-400">  .accounts(</span>{'\n'}
+                    <span className="text-cyan-300">    capsule</span>: capsulePDA,{'\n'}
+                    <span className="text-cyan-300">    owner</span>: wallet.publicKey,{'\n'}
+                    <span className="text-cyan-300">    systemProgram</span>: SystemProgram.programId{'\n'}
+                    <span className="text-slate-400">  )</span>{'\n'}
+                    <span className="text-slate-400">  .rpc()</span>
+                  </code>
+                </pre>
+              </div>
+              <Link href="/create" className="mt-4 text-sm font-medium text-lucid-accent hover:underline">
+                View the code (lib/solana.ts) →
+              </Link>
+            </div>
+
+            {/* STEP 3 Serve – dashboard preview */}
+            <div data-gsap-step className="card-lucid flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-lucid-accent/40 sm:min-h-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-lucid-accent">Step 3</p>
+              <h3 className="mt-1 text-xl font-bold text-lucid-white">Serve</h3>
+              <p className="mt-3 text-sm text-lucid-muted">
+                View and manage your capsules. Execution runs on Devnet when inactivity is met. No third party.
+              </p>
+              <div className="mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-lucid-border/50 bg-lucid-card/80 sm:min-h-[180px]">
+                <div className="relative h-full min-h-[180px] w-full">
+                  <Image
+                    src="/how-it-works-step3.png"
+                    alt="Lucid Capsules dashboard – status, ER execution, verification"
+                    fill
+                    className="object-cover object-top"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                  />
+                </div>
+              </div>
+              <Link href="/dashboard" className="mt-4 text-sm font-medium text-lucid-accent hover:underline">
+                View the dashboard →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Unleash the Power of Lucid - capsule image + project copy */}
+      <section ref={unleashRef} className="relative overflow-hidden py-24 sm:py-32">
+        <div className="absolute inset-0 bg-black/40" />
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+            <div data-gsap-unleash-text className="max-w-xl">
+              <h2 className="text-3xl font-bold leading-tight text-lucid-white sm:text-4xl lg:text-5xl">
+                Unleash the Power of Lucid
+              </h2>
+              <p className="mt-6 text-lg leading-relaxed text-slate-300">
+                Define your intent once: beneficiaries, amounts, inactivity period. Your capsule lives on Solana; Magicblock ER monitors privately. When silence becomes truth, execution runs on Devnet. No third party, no bridges.
+              </p>
+              <Link href="/create" className="mt-8 inline-block rounded-xl bg-gradient-to-r from-lucid-cyan to-lucid-purple px-8 py-4 font-semibold text-lucid-bg shadow-glow-cyan transition-opacity hover:opacity-90">
+                Create Your Capsule
+              </Link>
+            </div>
+            <div
+              data-gsap-unleash-3d
+              data-poster-url="/lucid-capsule-hero.png"
+              data-video-urls=""
+              data-autoplay="true"
+              data-loop="true"
+              className="background-video w-background-video relative aspect-video max-w-lg overflow-hidden rounded-2xl border border-lucid-border/50 bg-lucid-surface/80 shadow-xl"
+            >
+              <CapsuleMediaBlock
+                posterSrc="/lucid-capsule-hero.png"
+                alt="Lucid capsule – privacy-preserving intent on Solana"
+                objectFit="cover"
+                withMotion
+                className="absolute inset-0 h-full w-full"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Partners – The Possibilities Are Limitless + orbit + partner logos grid */}
+      <section ref={partnersSectionRef} className="partners-section relative border-y border-lucid-border/30 bg-lucid-surface/30 py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-center text-3xl font-bold text-lucid-white sm:text-4xl">
+            The Possibilities Are Limitless, All On Solana
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted">
+            Lucid uses Solana for persistence, Magicblock ER for private execution, Helius for RPC, Phantom and Backpack for wallets.
+          </p>
+        </div>
+        <div className="partners-content relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="partners-orbit relative flex min-h-[420px] sm:min-h-[520px] items-center justify-center overflow-hidden">
+            {/* Faint orbit paths – elliptical: wider left-right, shorter top-bottom */}
+            <div className="partners-orbit-rings absolute inset-0 flex items-center justify-center" aria-hidden>
+              <div className="absolute h-[320px] w-[480px] rounded-full border border-white/[0.06]" />
+              <div className="absolute h-[440px] w-[660px] rounded-full border border-white/[0.06]" />
+              <div className="absolute h-[560px] w-[840px] rounded-full border border-white/[0.06]" />
+            </div>
+            {/* Orbiting logos – elliptical path (radiusX > radiusY) + spin animation */}
+            {[
+              { radiusX: 240, radiusY: 160, count: 4, duration: 22, reverse: false },
+              { radiusX: 330, radiusY: 220, count: 8, duration: 28, reverse: true },
+              { radiusX: 420, radiusY: 280, count: 12, duration: 35, reverse: false },
+            ].map((ring, ringIdx) => (
+              <div
+                key={ringIdx}
+                className="partners-orbit-ring absolute left-1/2 top-1/2 h-0 w-0 origin-center"
+                style={{
+                  animation: `orbitSpin ${ring.duration}s linear infinite`,
+                  animationDirection: ring.reverse ? 'reverse' : 'normal',
+                } as React.CSSProperties}
+              >
+                {(() => {
+                  const partners = [
+                    { name: 'Solana', href: 'https://solana.com', color: '#9945FF', logo: '/logos/solana.svg' },
+                    { name: 'Phantom', href: 'https://phantom.app', color: '#ab9ff2', logo: '/logos/phantom.svg' },
+                    { name: 'Helius', href: 'https://helius.dev', color: '#f97316', logo: '/logos/helius.svg' },
+                    { name: 'Backpack', href: 'https://backpack.app', color: '#E33E3F', logo: '/logos/backpack.svg' },
+                    { name: 'Magicblock', href: 'https://www.magicblock.xyz', color: '#22d3ee', logo: '/logos/magicblock.svg' },
+                  ]
+                  const items = Array.from({ length: ring.count }, (_, i) => partners[i % partners.length])
+                  return items.map((p, i) => {
+                    const angleDeg = (360 / ring.count) * i
+                    const angleRad = (angleDeg * Math.PI) / 180
+                    const x = ring.radiusX * Math.sin(angleRad)
+                    const y = -ring.radiusY * Math.cos(angleRad)
+                    return (
+                      <a
+                        key={`${ringIdx}-${i}`}
+                        href={p.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="partners-orbit-item absolute left-0 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-xl border bg-lucid-surface/80 backdrop-blur-sm transition-all hover:scale-110 hover:border-lucid-accent/50 hover:bg-lucid-card"
+                        style={{
+                          transform: `translate(${x}px, ${y}px) rotate(${-angleDeg}deg)`,
+                          borderColor: `${p.color}50`,
+                        }}
+                      >
+                        <Image
+                          src={p.logo}
+                          alt={p.name}
+                          width={36}
+                          height={36}
+                          className="h-full w-full object-contain p-0.5"
+                        />
+                      </a>
+                    )
+                  })
+                })()}
+              </div>
+            ))}
+            {/* Central content – higher contrast font */}
+            <div className="relative z-10 max-w-lg text-center">
+              <h2 className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
+                4+
+              </h2>
+              <h3 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+                Powered by
+              </h3>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
   )
 }

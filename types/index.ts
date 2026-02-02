@@ -28,19 +28,3 @@ export interface WalletActivity {
   lastActivityTimestamp: number
   transactionCount: number
 }
-
-// Architecture visualization types
-export interface Step {
-  id: number
-  label: string
-  description: string
-  from: string
-  to: string
-  sideEffect?: string
-}
-
-export interface ComparisonRow {
-  x402?: string
-  lucid: string
-  relatedStepIds?: number[]
-}

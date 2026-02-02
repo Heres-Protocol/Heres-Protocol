@@ -8,33 +8,55 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
-        },
-        dark: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
+        lucid: {
+          bg: '#030712',
+          surface: '#0a0f1a',
+          card: '#111827',
+          border: 'rgba(34, 211, 238, 0.2)',
+          accent: '#22d3ee',
+          accentDim: 'rgba(34, 211, 238, 0.15)',
+          purple: '#a78bfa',
+          purpleDim: 'rgba(167, 139, 250, 0.2)',
+          cyan: '#22d3ee',
+          muted: '#6b7280',
+          white: '#f9fafb',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+      },
+      animation: {
+        'fade-in-up': 'fadeInUp 0.7s ease-out forwards',
+        'fade-in': 'fadeIn 0.6s ease-out forwards',
+        'float': 'float 6s ease-in-out infinite',
+        'glow-pulse': 'glowPulse 3s ease-in-out infinite',
+      },
+      keyframes: {
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(32px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-16px)' },
+        },
+        glowPulse: {
+          '0%, 100%': { opacity: '0.5' },
+          '50%': { opacity: '1' },
+        },
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'hero-glow': 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(34, 211, 238, 0.15), transparent 50%), radial-gradient(ellipse 60% 40% at 80% 50%, rgba(167, 139, 250, 0.12), transparent 50%)',
+      },
+      boxShadow: {
+        'glow-cyan': '0 0 40px rgba(34, 211, 238, 0.25)',
+        'glow-purple': '0 0 40px rgba(167, 139, 250, 0.25)',
+        'card-hover': '0 24px 48px -12px rgba(0, 0, 0, 0.5)',
       },
     },
   },

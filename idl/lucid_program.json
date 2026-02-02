@@ -1,5 +1,5 @@
 {
-  "address": "D6ZiV1bkZ6m27iHUsgsrZKV8WVa7bAHaFhC61CtXc5qA",
+  "address": "BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms",
   "metadata": {
     "name": "lucid_program",
     "version": "0.1.0",
@@ -130,9 +130,188 @@
       "args": []
     },
     {
+      "name": "delegate_capsule",
+      "docs": [
+        "Delegate capsule PDA to Magicblock ER for private monitoring (conditions checked in ER)"
+      ],
+      "discriminator": [
+        127,
+        232,
+        253,
+        109,
+        16,
+        100,
+        1,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "validator",
+          "optional": true
+        },
+        {
+          "name": "buffer_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                159,
+                32,
+                13,
+                210,
+                214,
+                157,
+                41,
+                216,
+                248,
+                145,
+                74,
+                32,
+                80,
+                182,
+                240,
+                140,
+                20,
+                84,
+                93,
+                96,
+                178,
+                63,
+                191,
+                223,
+                174,
+                211,
+                51,
+                195,
+                236,
+                154,
+                111,
+                254
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "pda",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "execute_intent",
       "docs": [
-        "Execute the intent when inactivity is proven with ZK proof"
+        "Execute the intent when inactivity period is met (Magicblock ER private monitoring triggers via Magic Action)"
       ],
       "discriminator": [
         53,
@@ -197,14 +376,42 @@
           "signer": true
         }
       ],
-      "args": [
+      "args": []
+    },
+    {
+      "name": "process_undelegation",
+      "discriminator": [
+        196,
+        28,
+        41,
+        206,
+        48,
+        37,
+        51,
+        167
+      ],
+      "accounts": [
         {
-          "name": "inactivity_proof",
-          "type": "bytes"
+          "name": "base_account",
+          "writable": true
         },
         {
-          "name": "proof_public_inputs",
-          "type": "bytes"
+          "name": "buffer"
+        },
+        {
+          "name": "payer",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_seeds",
+          "type": {
+            "vec": "bytes"
+          }
         }
       ]
     },
@@ -270,6 +477,183 @@
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "sample_price",
+      "docs": [
+        "Read and log SOL/USD (or other) price from Pyth Lazer / ephemeral oracle price feed (for gating or monitoring).",
+        "Enable feature \"oracle\" and pass a Pyth Lazer price feed account (e.g. SOL/USD on Magicblock devnet)."
+      ],
+      "discriminator": [
+        15,
+        172,
+        110,
+        234,
+        15,
+        105,
+        46,
+        55
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "price_update"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "schedule_execute_intent",
+      "docs": [
+        "Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).",
+        "Owner must still sign the actual execution tx when the crank runs; this only registers the task."
+      ],
+      "discriminator": [
+        88,
+        30,
+        30,
+        42,
+        9,
+        75,
+        31,
+        189
+      ],
+      "accounts": [
+        {
+          "name": "magic_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  116,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "executor",
+          "docs": [
+            "Executor (must be owner when crank runs execute_intent)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ScheduleExecuteIntentArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "undelegate_capsule",
+      "docs": [
+        "Commit and undelegate capsule from Ephemeral Rollup back to Solana base layer (e.g. after execution)"
+      ],
+      "discriminator": [
+        93,
+        184,
+        89,
+        72,
+        183,
+        93,
+        123,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "magic_context"
+        },
+        {
+          "name": "magic_program"
+        },
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  116,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
     },
     {
       "name": "update_activity",
@@ -443,18 +827,23 @@
     },
     {
       "code": 6005,
-      "name": "InvalidProof",
-      "msg": "Invalid ZK proof: Proof verification failed"
-    },
-    {
-      "code": 6006,
       "name": "InvalidIntentData",
       "msg": "Invalid intent data format"
     },
     {
-      "code": 6007,
+      "code": 6006,
       "name": "InvalidBeneficiaryAddress",
       "msg": "Invalid beneficiary address"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidInstructionData",
+      "msg": "Invalid instruction data for crank"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidPriceFeed",
+      "msg": "Invalid or stale price feed"
     }
   ],
   "types": [
@@ -512,6 +901,26 @@
           {
             "name": "executed_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScheduleExecuteIntentArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "type": "u64"
+          },
+          {
+            "name": "execution_interval_millis",
+            "type": "u64"
+          },
+          {
+            "name": "iterations",
+            "type": "u64"
           }
         ]
       }

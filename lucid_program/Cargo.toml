@@ -4,6 +4,13 @@ members = [
 ]
 resolver = "2"
 
+# Cargo 1.84 (Solana/Anchor toolchain) does not support edition2024.
+# constant_time_eq 0.4.2 and blake3 1.8.3 require edition2024; patch to older versions.
+[patch.crates-io]
+constant_time_eq = { git = "https://github.com/cesarb/constant_time_eq.git", tag = "0.3.1" }
+# blake3 1.8.3 uses edition2024; use 1.8.2 from git (edition2021).
+blake3 = { git = "https://github.com/BLAKE3-team/BLAKE3.git", tag = "1.8.2" }
+
 [profile.release]
 overflow-checks = true
 lto = "fat"

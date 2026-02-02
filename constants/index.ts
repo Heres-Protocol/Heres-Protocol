@@ -4,9 +4,9 @@
 
 // Solana Configuration
 export const SOLANA_CONFIG = {
-  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'D6ZiV1bkZ6m27iHUsgsrZKV8WVa7bAHaFhC61CtXc5qA',
+  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms',
   NETWORK: process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet',
-  HELIUS_API_KEY: process.env.NEXT_PUBLIC_HELIUS_API_KEY || 'a393269c-0295-485d-ba5f-0c8ffc828d0d',
+  HELIUS_API_KEY: process.env.NEXT_PUBLIC_HELIUS_API_KEY || '',
 } as const
 
 // Helius API Configuration
@@ -25,6 +25,21 @@ export const HELIUS_CONFIG = {
 export const DEFAULT_VALUES = {
   INACTIVITY_DAYS: '365',
   DELAY_DAYS: '30',
+} as const
+
+// Magicblock ER (Ephemeral Rollup) - Devnet validators
+export const MAGICBLOCK_ER = {
+  DELEGATION_PROGRAM_ID: 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh',
+  /** Magic program ID for crank ScheduleTask CPI (see ephemeral_rollups_sdk consts) */
+  MAGIC_PROGRAM_ID: process.env.NEXT_PUBLIC_MAGIC_PROGRAM_ID || 'MPUxHCpNUy3K1CSVhebAmTbcTCKVxfk9YMDcUP2ZnEA',
+  /** Magic context PDA for commit/undelegate CPI; override via env if different on your cluster */
+  MAGIC_CONTEXT: process.env.NEXT_PUBLIC_MAGIC_CONTEXT || 'MPUxHCpNUy3K1CSVhebAmTbcTCKVxfk9YMDcUP2ZnEA',
+  ROUTER_DEVNET: 'https://devnet-router.magicblock.app',
+  ROUTER_WS: 'wss://devnet-router.magicblock.app',
+  VALIDATOR_ASIA: 'MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57',
+  VALIDATOR_EU: 'MEUGGrYPxKk17hCr7wpT6s8dtNokZj5U2L57vjYMS8e',
+  VALIDATOR_US: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
+  VALIDATOR_TEE: 'FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA',
 } as const
 
 // Local Storage Keys

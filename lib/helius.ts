@@ -286,3 +286,93 @@ export function isWalletInactive(
   const timeSinceActivity = (now - lastActivityTimestamp) / 1000 // Convert to seconds
   return timeSinceActivity >= inactivityPeriodSeconds
 }
+
+/** Normalized NFT item from Helius DAS */
+export interface HeliusNftItem {
+  mint: string
+  name?: string
+  symbol?: string
+  imageUri?: string
+}
+
+/**
+ * Get NFTs (and other digital assets) by owner via Helius DAS getAssetsByOwner.
+ * Use when HELIUS_API_KEY is set for full metadata (name, image).
+ * @see https://docs.helius.dev/compression-and-das-api/digital-asset-standard-das-api/get-assets-by-owner
+ */
+export async function getAssetsByOwner(ownerAddress: string): Promise<HeliusNftItem[]> {
+  if (!SOLANA_CONFIG.HELIUS_API_KEY) return []
+  const rpcUrl = HELIUS_CONFIG.RPC_URL
+  if (!rpcUrl) return []
+
+  try {
+    const response = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getAssetsByOwner',
+        params: { ownerAddress },
+      }),
+    })
+    if (!response.ok) return []
+
+    const data = await response.json()
+    const result = data.result
+    if (!result || !Array.isArray(result.items)) return []
+
+    const items: HeliusNftItem[] = result.items
+      .filter((item: any) => item?.interface === 'V1_NFT' || item?.id)
+      .map((item: any) => {
+        const content = item?.content || {}
+        const files = content?.files || []
+        const metadata = content?.metadata || {}
+        const imageUri = files[0]?.cdn_uri || files[0]?.uri
+        return {
+          mint: item.id || '',
+          name: metadata?.name ?? undefined,
+          symbol: metadata?.symbol ?? undefined,
+          imageUri: imageUri ?? undefined,
+        }
+      })
+    return items
+  } catch (e) {
+    console.error('Helius getAssetsByOwner error:', e)
+    return []
+  }
+}
+
+/**
+ * Get NFTs by owner (alias for getAssetsByOwner).
+ * Use when HELIUS_API_KEY is set for full metadata (name, image).
+ */
+export async function getNftsByOwner(ownerAddress: string): Promise<HeliusNftItem[]> {
+  return getAssetsByOwner(ownerAddress)
+}
+
+/**
+ * Get transactions for a program/address from Helius Enhanced Transactions API.
+ * Use as primary source when HELIUS_API_KEY is set.
+ */
+export async function getEnhancedTransactions(
+  address: string,
+  limit = 100,
+  before?: string
+): Promise<any[]> {
+  if (!SOLANA_CONFIG.HELIUS_API_KEY) return []
+  try {
+    const url = new URL(`${HELIUS_CONFIG.BASE_URL}/addresses/${address}/transactions`)
+    url.searchParams.set('api-key', SOLANA_CONFIG.HELIUS_API_KEY)
+    url.searchParams.set('limit', String(limit))
+    if (before) url.searchParams.set('before', before)
+    const response = await fetch(url.toString())
+    if (!response.ok) return []
+    const data = await response.json()
+    const list = Array.isArray(data) ? data : data?.transactions ?? data?.data ?? data?.result ?? []
+    return Array.isArray(list) ? list : []
+  } catch (e) {
+    console.error('Helius getEnhancedTransactions error:', e)
+    return []
+  }
+}

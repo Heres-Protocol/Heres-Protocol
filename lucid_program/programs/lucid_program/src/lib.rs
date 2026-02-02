@@ -1,8 +1,23 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
+use anchor_lang::solana_program::{
+    instruction::{AccountMeta, Instruction},
+    program::invoke_signed,
+};
+use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
+use ephemeral_rollups_sdk::cpi::DelegateConfig;
+use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
+use ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID;
+use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
+#[cfg(feature = "oracle")]
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-declare_id!("D6ZiV1bkZ6m27iHUsgsrZKV8WVa7bAHaFhC61CtXc5qA");
+declare_id!("BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms");
 
+/// Discriminator for execute_intent (no args) — from IDL
+const EXECUTE_INTENT_DISCRIMINATOR: [u8; 8] = [53, 130, 47, 154, 227, 220, 122, 212];
+
+#[ephemeral]
 #[program]
 pub mod lucid_program {
     use super::*;
@@ -41,11 +56,9 @@ pub mod lucid_program {
         Ok(())
     }
 
-    /// Execute the intent when inactivity is proven with ZK proof
+    /// Execute the intent when inactivity period is met (Magicblock ER private monitoring triggers via Magic Action)
     pub fn execute_intent<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteIntent<'info>>,
-        inactivity_proof: Vec<u8>, // Noir ZK proof data
-        proof_public_inputs: Vec<u8>, // Public inputs for proof verification
     ) -> Result<()> {
         let capsule = &mut ctx.accounts.capsule;
         require!(capsule.is_active, ErrorCode::CapsuleInactive);
@@ -64,24 +77,7 @@ pub mod lucid_program {
             ErrorCode::InactivityPeriodNotMet
         );
         
-        // Verify Noir ZK proof
-        // The proof should demonstrate that:
-        // 1. The inactivity period has been met
-        // 2. No activity has occurred during the period
-        // 3. The proof is valid for this specific capsule
-        
-        // Verify Noir ZK proof
-        require!(
-            verify_noir_proof(
-                &inactivity_proof,
-                &proof_public_inputs,
-                capsule.last_activity,
-                capsule.inactivity_period,
-                current_time,
-                &capsule.owner
-            )?,
-            ErrorCode::InvalidProof
-        );
+        // Conditions verified (privately in Magicblock ER; execution triggered via Magic Action on Devnet)
         
         // Parse intent data to extract beneficiaries and amounts
         // Intent data is stored as JSON: {"intent": "...", "beneficiaries": [...], "totalAmount": "..."}
@@ -163,7 +159,6 @@ pub mod lucid_program {
         
         msg!("Intent executed for capsule: {:?}", capsule.key());
         msg!("Time since last activity: {} seconds", time_since_activity);
-        msg!("ZK proof verified successfully");
         
         // Emit event for off-chain monitoring
         emit!(IntentExecuted {
@@ -198,6 +193,118 @@ pub mod lucid_program {
         Ok(())
     }
 
+    /// Delegate capsule PDA to Magicblock ER for private monitoring (conditions checked in ER)
+    pub fn delegate_capsule(ctx: Context<DelegateCapsuleInput>) -> Result<()> {
+        let owner_key = ctx.accounts.owner.key();
+        let pda_seeds: &[&[u8]] = &[b"intent_capsule", owner_key.as_ref()];
+        ctx.accounts.delegate_pda(
+            &ctx.accounts.payer,
+            pda_seeds,
+            DelegateConfig {
+                validator: ctx.accounts.validator.as_ref().map(|a| a.key()),
+                ..Default::default()
+            },
+        )?;
+        msg!("Capsule delegated to Ephemeral Rollup: {:?}", ctx.accounts.pda.key());
+        Ok(())
+    }
+
+    /// Commit and undelegate capsule from Ephemeral Rollup back to Solana base layer (e.g. after execution)
+    pub fn undelegate_capsule(ctx: Context<UndelegateCapsuleInput>) -> Result<()> {
+        commit_and_undelegate_accounts(
+            &ctx.accounts.payer,
+            vec![&ctx.accounts.capsule.to_account_info()],
+            &ctx.accounts.magic_context,
+            &ctx.accounts.magic_program,
+        )?;
+        msg!("Capsule undelegated from Ephemeral Rollup: {:?}", ctx.accounts.capsule.key());
+        Ok(())
+    }
+
+    /// Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).
+    /// Owner must still sign the actual execution tx when the crank runs; this only registers the task.
+    pub fn schedule_execute_intent(
+        ctx: Context<ScheduleExecuteIntent>,
+        args: ScheduleExecuteIntentArgs,
+    ) -> Result<()> {
+        let execute_ix = Instruction {
+            program_id: crate::ID,
+            accounts: vec![
+                AccountMeta::new(ctx.accounts.capsule.key(), false),
+                AccountMeta::new(ctx.accounts.owner.key(), true),
+                AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.executor.key(), false),
+            ],
+            data: EXECUTE_INTENT_DISCRIMINATOR.to_vec(),
+        };
+
+        let ix_data = bincode::serialize(&MagicBlockInstruction::ScheduleTask(ScheduleTaskArgs {
+            task_id: args.task_id,
+            execution_interval_millis: args.execution_interval_millis,
+            iterations: args.iterations,
+            instructions: vec![execute_ix],
+        }))
+        .map_err(|e| {
+            msg!("ERROR: failed to serialize ScheduleTask args: {:?}", e);
+            ErrorCode::InvalidInstructionData
+        })?;
+
+        let schedule_ix = Instruction::new_with_bytes(
+            MAGIC_PROGRAM_ID,
+            &ix_data,
+            vec![
+                AccountMeta::new(ctx.accounts.payer.key(), true),
+                AccountMeta::new(ctx.accounts.capsule.key(), false),
+            ],
+        );
+
+        invoke_signed(
+            &schedule_ix,
+            &[
+                ctx.accounts.payer.to_account_info(),
+                ctx.accounts.capsule.to_account_info(),
+            ],
+            &[],
+        )?;
+
+        msg!("Scheduled execute_intent crank: task_id={}", args.task_id);
+        Ok(())
+    }
+
+    /// Read and log SOL/USD (or other) price from Pyth Lazer / ephemeral oracle price feed (for gating or monitoring).
+    /// Enable feature "oracle" and pass a Pyth Lazer price feed account (e.g. SOL/USD on Magicblock devnet).
+    pub fn sample_price(ctx: Context<SamplePrice>) -> Result<()> {
+        #[cfg(feature = "oracle")]
+        {
+            let data_ref = ctx.accounts.price_update.data.borrow();
+            let price_update = PriceUpdateV2::try_deserialize_unchecked(&mut data_ref.as_ref())
+                .map_err(|_| ErrorCode::InvalidPriceFeed)?;
+
+            let maximum_age_secs: u64 = 60;
+            let feed_id: [u8; 32] = ctx.accounts.price_update.key().to_bytes();
+            let price = price_update
+                .get_price_no_older_than(&Clock::get()?, maximum_age_secs, &feed_id)
+                .map_err(|_| ErrorCode::InvalidPriceFeed)?;
+
+            msg!(
+                "Price ({} ± {}) * 10^-{}",
+                price.price,
+                price.conf,
+                price.exponent
+            );
+            msg!(
+                "Price value: {}",
+                price.price as f64 * 10_f64.powi(-price.exponent)
+            );
+        }
+        #[cfg(not(feature = "oracle"))]
+        {
+            let _ = ctx;
+            msg!("Oracle feature disabled; enable with --features oracle and pass Pyth Lazer price feed account.");
+        }
+        Ok(())
+    }
+
     /// Recreate a capsule from executed state (allows creating new capsule after execution)
     pub fn recreate_capsule(
         ctx: Context<RecreateCapsule>,
@@ -219,6 +326,63 @@ pub mod lucid_program {
         msg!("Capsule recreated from executed state: {:?}", capsule.key());
         Ok(())
     }
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct ScheduleExecuteIntentArgs {
+    pub task_id: u64,
+    pub execution_interval_millis: u64,
+    pub iterations: u64,
+}
+
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateCapsuleInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub owner: Signer<'info>,
+    /// CHECK: Checked by the delegation program
+    pub validator: Option<AccountInfo<'info>>,
+    /// CHECK: PDA to delegate (capsule); #[delegate] expects field name "pda"
+    #[account(mut, del)]
+    pub pda: AccountInfo<'info>,
+}
+
+#[commit]
+#[derive(Accounts)]
+pub struct UndelegateCapsuleInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub owner: Signer<'info>,
+    /// CHECK: used for CPI
+    pub magic_context: AccountInfo<'info>,
+    /// CHECK: Magic program
+    pub magic_program: AccountInfo<'info>,
+    #[account(mut, seeds = [b"intent_capsule", owner.key().as_ref()], bump = capsule.bump)]
+    pub capsule: Account<'info, IntentCapsule>,
+}
+
+#[derive(Accounts)]
+pub struct ScheduleExecuteIntent<'info> {
+    /// CHECK: Magic program for CPI
+    pub magic_program: AccountInfo<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"intent_capsule", owner.key().as_ref()], bump = capsule.bump)]
+    pub capsule: Account<'info, IntentCapsule>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    /// Executor (must be owner when crank runs execute_intent)
+    pub executor: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SamplePrice<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: Pyth Lazer / ephemeral oracle price feed account
+    pub price_update: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -345,116 +509,14 @@ pub enum ErrorCode {
     CapsuleNotExecuted,
     #[msg("Inactivity period has not been met")]
     InactivityPeriodNotMet,
-    #[msg("Invalid ZK proof: Proof verification failed")]
-    InvalidProof,
     #[msg("Invalid intent data format")]
     InvalidIntentData,
     #[msg("Invalid beneficiary address")]
     InvalidBeneficiaryAddress,
-}
-
-/// Verify Noir ZK proof of inactivity
-/// This function verifies that the proof demonstrates:
-/// - The inactivity period has been met
-/// - No activity occurred during the period
-/// - The proof is valid for this capsule
-fn verify_noir_proof(
-    proof: &[u8],
-    public_inputs: &[u8],
-    last_activity: i64,
-    inactivity_period: i64,
-    current_time: i64,
-    owner: &Pubkey,
-) -> anchor_lang::Result<bool> {
-    use anchor_lang::prelude::Pubkey;
-    
-    // Basic proof structure validation
-    if proof.is_empty() {
-        return Err(ErrorCode::InvalidProof.into());
-    }
-    if public_inputs.is_empty() {
-        return Err(ErrorCode::InvalidProof.into());
-    }
-    
-    // Verify proof format (Noir proof is typically structured as bytes)
-    // In production, this would use a Noir verifier contract or library
-    // For now, we validate the proof structure and public inputs
-    
-    // Parse public inputs (expected format: owner_pubkey(32) + last_activity(8) + inactivity_period(8) + current_time(8))
-    if public_inputs.len() < 56 {
-        return Err(ErrorCode::InvalidProof.into());
-    }
-    
-    // Verify owner matches
-    let proof_owner = Pubkey::try_from(&public_inputs[0..32])
-        .map_err(|_| ErrorCode::InvalidProof)?;
-    if proof_owner != *owner {
-        return Err(ErrorCode::InvalidProof.into());
-    }
-    
-    // Verify last_activity matches
-    let proof_last_activity = i64::from_le_bytes(
-        public_inputs[32..40].try_into().map_err(|_| ErrorCode::InvalidProof)?
-    );
-    if proof_last_activity != last_activity {
-        return Err(ErrorCode::InvalidProof.into());
-    }
-    
-    // Verify inactivity_period matches
-    let proof_inactivity_period = i64::from_le_bytes(
-        public_inputs[40..48].try_into().map_err(|_| ErrorCode::InvalidProof)?
-    );
-    if proof_inactivity_period != inactivity_period {
-        return Err(ErrorCode::InvalidProof.into());
-    }
-    
-    // Verify current_time matches (within reasonable bounds)
-    let proof_current_time = i64::from_le_bytes(
-        public_inputs[48..56].try_into().map_err(|_| ErrorCode::InvalidProof)?
-    );
-    let time_diff = (proof_current_time - current_time).abs();
-    if time_diff > 300 {
-        return Err(ErrorCode::InvalidProof.into()); // Allow 5 minute tolerance
-    }
-    
-    // Verify proof signature/format (simplified verification)
-    // In production, this would verify the actual Noir proof using a verifier
-    // For now, we check that the proof has a valid structure
-    if proof.len() < 64 {
-        return Err(ErrorCode::InvalidProof.into()); // Minimum proof size
-    }
-    
-    // Additional verification: Check proof hash matches expected format
-    // This is a placeholder - actual Noir verification would be more complex
-    let proof_valid = verify_proof_signature(proof, public_inputs)?;
-    
-    Ok(proof_valid)
-}
-
-/// Verify proof signature (simplified - in production use actual Noir verifier)
-fn verify_proof_signature(proof: &[u8], _public_inputs: &[u8]) -> anchor_lang::Result<bool> {
-    
-    // Placeholder for actual Noir proof verification
-    // In production, this would:
-    // 1. Deserialize the Noir proof
-    // 2. Verify the proof against the verification key
-    // 3. Check that public inputs match
-    
-    // For now, we do basic validation
-    // A valid Noir proof should have certain characteristics
-    if proof.len() < 64 {
-        return Err(ErrorCode::InvalidProof.into());
-    }
-    
-    // Check that proof is not all zeros (basic sanity check)
-    let all_zeros = proof.iter().all(|&b| b == 0);
-    if all_zeros {
-        return Err(ErrorCode::InvalidProof.into());
-    }
-    
-    // In production, replace this with actual Noir proof verification
-    // For development, we accept proofs that pass structural validation
-    Ok(true)
+    #[msg("Invalid instruction data for crank")]
+    InvalidInstructionData,
+    #[msg("Invalid or stale price feed")]
+    InvalidPriceFeed,
 }
 
 /// Parse SOL amount string to lamports
