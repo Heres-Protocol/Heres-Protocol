@@ -412,7 +412,13 @@ export default function DashboardPage() {
             const sig = getSignatureFromTx(tx)
             if (sig && !heliusSigs.has(sig)) {
               heliusSigs.add(sig)
-              signatureInfos.push({ signature: sig, err: null, blockTime: getBlockTimeFromTx(tx) ?? undefined, memo: null })
+              signatureInfos.push({
+                signature: sig,
+                err: null,
+                blockTime: getBlockTimeFromTx(tx) ?? undefined,
+                memo: null,
+                slot: (tx?.slot ?? tx?.transaction?.slot ?? 0) as number,
+              })
             }
           }
         }

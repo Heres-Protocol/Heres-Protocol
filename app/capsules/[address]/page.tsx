@@ -308,7 +308,7 @@ export default function CapsuleDetailPage() {
                     <Tooltip
                       contentStyle={{ backgroundColor: 'var(--lucid-card)', border: '1px solid var(--lucid-border)' }}
                       labelStyle={{ color: 'var(--lucid-white)' }}
-                      formatter={(value: number) => [`$${value.toFixed(2)}`, 'USD']}
+                      formatter={(value: number | undefined) => [value != null ? `$${Number(value).toFixed(2)}` : '$0.00', 'USD']}
                     />
                     <Area
                       type="monotone"
