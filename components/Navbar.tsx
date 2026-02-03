@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Menu, X } from 'lucide-react'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
 const WalletMultiButton = dynamic(
@@ -29,6 +29,7 @@ const NETWORKS = [
 export function Navbar() {
   const pathname = usePathname()
   const [networkOpen, setNetworkOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [selectedNetwork, setSelectedNetwork] = useState<(typeof NETWORKS)[number]>(NETWORKS[0])
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -42,15 +43,29 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
   return (
     <header className="nav-glass">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo-white.png" alt="Heres" width={52} height={52} className="h-[52px] w-auto" priority />
-          <span className="text-xl font-bold tracking-tight text-lucid-white">
-            Heres
-          </span>
-        </Link>
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
+          <Link href="/" className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <Image src="/logo-white.png" alt="Heres" width={52} height={52} className="h-9 w-auto sm:h-[52px]" priority />
+            <span className="truncate text-lg font-bold tracking-tight text-lucid-white sm:text-xl">Heres</span>
+          </Link>
+          {/* Mobile: hamburger */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-lucid-border bg-lucid-surface text-lucid-white md:hidden"
+            aria-expanded={mobileOpen}
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
 
         <nav className="hidden items-center gap-8 md:flex">
           {navLinks.map((link) => (
@@ -68,8 +83,8 @@ export function Navbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
-          <div className="relative" ref={dropdownRef}>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="relative hidden sm:block" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setNetworkOpen((v) => !v)}
@@ -93,7 +108,6 @@ export function Navbar() {
                       onClick={() => {
                         setSelectedNetwork(net)
                         setNetworkOpen(false)
-                        // TODO: switch RPC/network (e.g. update env or context)
                       }}
                       className={`flex w-full items-center px-4 py-2.5 text-left text-sm transition-colors ${
                         selectedNetwork.id === net.id
@@ -108,9 +122,52 @@ export function Navbar() {
               </ul>
             )}
           </div>
-          <WalletMultiButton className="!rounded-xl !bg-lucid-surface !px-4 !py-2 !text-sm !font-medium !text-lucid-white hover:!bg-lucid-card [&>.wallet-adapter-button-trigger]:!rounded-xl" />
+          <div className="wallet-nav-trigger [&_.wallet-adapter-button]:!min-w-0 [&_.wallet-adapter-button]:!px-3 [&_.wallet-adapter-button]:!text-xs sm:[&_.wallet-adapter-button]:!px-4 sm:[&_.wallet-adapter-button]:!text-sm">
+            <WalletMultiButton className="!rounded-xl !bg-lucid-surface !py-2 !font-medium !text-lucid-white hover:!bg-lucid-card [&>.wallet-adapter-button-trigger]:!rounded-xl" />
+          </div>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="border-t border-lucid-border/50 bg-lucid-bg/95 backdrop-blur-xl md:hidden">
+          <nav className="mx-auto max-w-7xl px-3 py-4 sm:px-6">
+            <ul className="flex flex-col gap-1">
+              {navLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className={`block rounded-lg px-4 py-3 text-base font-medium transition-colors ${
+                      pathname === link.href
+                        ? 'bg-lucid-accent/20 text-lucid-accent'
+                        : 'text-lucid-white hover:bg-lucid-surface'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 border-t border-lucid-border/50 pt-4">
+              <p className="px-4 py-2 text-xs font-medium uppercase tracking-wider text-lucid-muted">Network</p>
+              <div className="space-y-0.5">
+                {NETWORKS.map((net) => (
+                  <button
+                    key={net.id}
+                    type="button"
+                    onClick={() => setSelectedNetwork(net)}
+                    className={`flex w-full items-center rounded-lg px-4 py-3 text-left text-sm ${
+                      selectedNetwork.id === net.id ? 'bg-lucid-accent/20 text-lucid-accent' : 'text-lucid-white hover:bg-lucid-surface'
+                    }`}
+                  >
+                    {net.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </nav>
+        </div>
+      )}
     </header>
   )
 }
