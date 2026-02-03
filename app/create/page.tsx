@@ -14,7 +14,7 @@ const WalletMultiButton = dynamic(
 import Link from 'next/link'
 import { createCapsule, getCapsule } from '@/lib/solana'
 import { Beneficiary } from '@/types'
-import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG } from '@/constants'
+import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
 import { getNftsByOwner } from '@/lib/helius'
 import { encodeIntentData, daysToSeconds } from '@/utils/intent'
 import {
@@ -528,7 +528,10 @@ export default function CreatePage() {
               Create Capsule
             </h1>
             <p className="mt-2 max-w-2xl text-lucid-muted">
-              Define your intent, set beneficiaries and conditions. Your capsule lives on Solana; Magicblock ER monitors privately.
+              Define your intent, set beneficiaries and conditions. Your capsule lives on Solana; delegate to Magicblock ER or PER (TEE) for private monitoring.
+            </p>
+            <p className="mt-1 text-xs text-lucid-muted/80">
+              Delegation defaults to TEE (Private Ephemeral Rollup) for confidential conditions.
             </p>
           </header>
 
@@ -980,16 +983,20 @@ export default function CreatePage() {
             )}
 
             {capsuleType !== null && (
-            <div className="flex flex-col sm:flex-row gap-4">
-              <button
-                onClick={simulateExecution}
-                className="btn-secondary flex-1 flex items-center justify-center gap-2 py-3.5"
-              >
-                <Eye className="w-5 h-5" />
-                Simulate Execution
-              </button>
-              <button
-                onClick={handleCreate}
+            <>
+              <p className="text-xs text-lucid-muted">
+                Platform fee: {PLATFORM_FEE.CREATION_FEE_SOL} SOL (creation) + {PLATFORM_FEE.EXECUTION_FEE_BPS / 100}% (on execution)
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={simulateExecution}
+                  className="btn-secondary flex-1 flex items-center justify-center gap-2 py-3.5"
+                >
+                  <Eye className="w-5 h-5" />
+                  Simulate Execution
+                </button>
+                <button
+                  onClick={handleCreate}
                 disabled={
                   isPending ||
                   !intent ||
@@ -1001,8 +1008,9 @@ export default function CreatePage() {
                 className="btn-primary flex-1 py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPending ? 'Creating...' : 'Create Capsule'}
-              </button>
-            </div>
+                </button>
+              </div>
+            </>
             )}
 
             {error && (

@@ -117,19 +117,19 @@ const features = [
   {
     title: 'Zero Latency',
     description:
-      'Fast execution thanks to Magicblock Ephemeral Rollups. Conditions are checked privately and execution is triggered when silence becomes truth.',
+      'Fast execution thanks to Magicblock PER (TEE) / Ephemeral Rollups. Conditions are checked privately in TEE and execution is triggered when silence becomes truth.',
     icon: '⚡',
   },
   {
     title: 'Zero Trust',
     description:
-      'No third-party executor. Your capsule lives on Solana; Magicblock ER monitors privately. Execution is automatic when conditions are met.',
+      'No third-party executor. Your capsule lives on Solana; Magicblock PER (TEE) monitors privately. Execution is automatic when conditions are met.',
     icon: '🔒',
   },
   {
     title: 'Compliant Privacy',
     description:
-      'Conditions stay private inside Ephemeral Rollups. Only execution results are committed to Devnet. Built for Solana with Helius & Phantom.',
+      'Conditions stay private inside PER (TEE) / Private Ephemeral Rollups. Only execution results are committed to Devnet. Built for Solana with Helius & Phantom.',
     icon: '🛡️',
   },
 ]
@@ -294,7 +294,7 @@ export default function HomePage() {
           {/* 캡슐 아래 문구 + Get Started 버튼 */}
           <div className="mt-10 sm:mt-12 text-center" data-hero-below-capsule>
             <p className="mx-auto max-w-2xl text-base sm:text-lg text-lucid-muted leading-relaxed">
-              Define once. Delegate to Magicblock ER. Execution runs on Solana when conditions are met. No bridges, no third party.
+              Define once. Delegate to Magicblock PER (TEE). Execution runs on Solana when conditions are met. No bridges, no third party.
             </p>
             <div className="mt-8 flex justify-center">
               <Link
@@ -315,7 +315,7 @@ export default function HomePage() {
             Why Build With Lucid?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted hidden">
-            Capsules on Solana, private logic in Magicblock ER, execution when you’re silent.
+            Capsules on Solana, private logic in Magicblock PER (TEE), execution when you’re silent.
           </p>
 
           <div data-why-heading className="mx-auto mt-3 max-w-2xl text-center">
@@ -438,15 +438,15 @@ export default function HomePage() {
                       </div>
                     ))}
                   </div>
-                  {/* 3. Magicblock ER (with PRIVACY below) */}
+                  {/* 3. Magicblock PER (TEE) (with PRIVACY below) */}
                   <div
                     className="relative z-20 flex w-full justify-center"
                     style={{ opacity: activeWhyIndex >= 1 ? 1 : 0.4, transform: activeWhyIndex >= 1 ? 'scale(1)' : 'scale(0.95)', transition: 'opacity 0.3s, transform 0.3s' }}
                   >
-                    <div className="flex flex-col items-center gap-1 rounded-md border border-white/10 bg-[#242236] px-3 py-2 leading-none md:px-4 md:py-2.5 w-[164px]">
-                      <div className="flex items-center gap-2 justify-center">
+                    <div className="flex flex-col items-center gap-1 rounded-md border border-white/10 bg-[#242236] px-3 py-2 leading-none md:px-4 md:py-2.5 min-w-[220px] w-[220px]">
+                      <div className="flex items-center gap-2 justify-center whitespace-nowrap">
                         <Image src="/logos/magicblock.svg" alt="Magicblock" width={20} height={20} className="shrink-0" />
-                        <span className="font-mono text-[11px] uppercase text-white/60">Magicblock ER</span>
+                        <span className="font-mono text-[11px] uppercase text-white/60">Magicblock PER (TEE)</span>
                       </div>
                       <span className="font-mono text-[9px] uppercase text-white/40">Privacy</span>
                     </div>
@@ -502,7 +502,7 @@ export default function HomePage() {
             How It Works
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted">
-            With Lucid, define your intent once on Solana. Magicblock ER monitors privately; execution runs on Devnet when conditions are met.
+            With Lucid, define your intent once on Solana. Magicblock PER (TEE) monitors privately; execution runs on Devnet when conditions are met.
           </p>
           <div ref={stepsRef} className="mt-16 grid gap-8 lg:grid-cols-3 lg:items-stretch">
             {/* STEP 1 Create – capsule/create page card */}
@@ -533,7 +533,7 @@ export default function HomePage() {
               <p className="text-xs font-medium uppercase tracking-wider text-lucid-accent">Step 2</p>
               <h3 className="mt-1 text-xl font-bold text-lucid-white">Delegate</h3>
               <p className="mt-3 text-sm text-lucid-muted">
-                Create and delegate your capsule with Anchor. Capsule PDA is derived from owner; Magicblock ER monitors privately.
+                Create and delegate your capsule with Anchor. Capsule PDA is derived from owner; delegate to Magicblock PER (TEE) for private monitoring.
               </p>
               <div className="how-it-works-code mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-lucid-border/50 bg-[#0d1117] p-3 font-mono text-xs leading-relaxed sm:min-h-[180px]">
                 <pre className="whitespace-pre-wrap break-words text-[11px] sm:text-xs">
@@ -568,7 +568,7 @@ export default function HomePage() {
                 <div className="relative h-full min-h-[180px] w-full">
                   <Image
                     src="/how-it-works-step3.png"
-                    alt="Lucid Capsules dashboard – status, ER execution, verification"
+                    alt="Lucid Capsules dashboard – status, PER (TEE) execution, verification"
                     fill
                     className="object-cover object-top"
                     sizes="(max-width: 768px) 100vw, 33vw"
@@ -593,7 +593,7 @@ export default function HomePage() {
                 Unleash the Power of Lucid
               </h2>
               <p className="mt-6 text-lg leading-relaxed text-slate-300">
-                Define your intent once: beneficiaries, amounts, inactivity period. Your capsule lives on Solana; Magicblock ER monitors privately. When silence becomes truth, execution runs on Devnet. No third party, no bridges.
+                Define your intent once: beneficiaries, amounts, inactivity period. Your capsule lives on Solana; Magicblock PER (TEE) monitors privately. When silence becomes truth, execution runs on Devnet. No third party, no bridges.
               </p>
               <Link href="/create" className="mt-8 inline-block rounded-xl bg-gradient-to-r from-lucid-cyan to-lucid-purple px-8 py-4 font-semibold text-lucid-bg shadow-glow-cyan transition-opacity hover:opacity-90">
                 Create Your Capsule
@@ -626,7 +626,7 @@ export default function HomePage() {
             The Possibilities Are Limitless, All On Solana
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted">
-            Lucid uses Solana for persistence, Magicblock ER for private execution, Helius for RPC, Phantom and Backpack for wallets.
+            Lucid uses Solana for persistence, Magicblock PER (TEE) for private execution, Helius for RPC, Phantom and Backpack for wallets.
           </p>
         </div>
         <div className="partners-content relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

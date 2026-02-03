@@ -10,7 +10,8 @@
     {
       "name": "create_capsule",
       "docs": [
-        "Initialize a new Intent Capsule"
+        "Initialize a new Intent Capsule (SOL locked in vault; anyone can execute when conditions are met).",
+        "PER: To restrict intent_data access to TEE only, add CPI to Magicblock Permission Program (CreatePermissionGroup / CreatePermission) when available."
       ],
       "discriminator": [
         195,
@@ -55,9 +56,69 @@
           }
         },
         {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
           "name": "owner",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "fee_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_fee_recipient",
+          "docs": [
+            "Platform fee recipient (must match fee_config.fee_recipient when creation_fee_lamports > 0)"
+          ],
+          "writable": true,
+          "optional": true
         },
         {
           "name": "system_program",
@@ -132,7 +193,7 @@
     {
       "name": "delegate_capsule",
       "docs": [
-        "Delegate capsule PDA to Magicblock ER for private monitoring (conditions checked in ER)"
+        "Delegate capsule PDA to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER)."
       ],
       "discriminator": [
         127,
@@ -311,7 +372,8 @@
     {
       "name": "execute_intent",
       "docs": [
-        "Execute the intent when inactivity period is met (Magicblock ER private monitoring triggers via Magic Action)"
+        "Execute the intent when inactivity period is met. Anyone can call (no owner signature required).",
+        "SOL is transferred from the capsule vault to platform (fee) and beneficiaries."
       ],
       "discriminator": [
         53,
@@ -357,26 +419,136 @@
           }
         },
         {
-          "name": "owner",
-          "docs": [
-            "Owner's account (must be mut and signer for SOL transfers)"
-          ],
+          "name": "vault",
           "writable": true,
-          "signer": true
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.owner",
+                "account": "IntentCapsule"
+              }
+            ]
+          }
         },
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "executor",
+          "name": "fee_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_fee_recipient",
           "docs": [
-            "Executor must be the owner (for SOL transfers, owner must sign)"
+            "Platform fee recipient (must match fee_config.fee_recipient when execution_fee_bps > 0)"
           ],
-          "signer": true
+          "writable": true,
+          "optional": true
         }
       ],
       "args": []
+    },
+    {
+      "name": "init_fee_config",
+      "docs": [
+        "Initialize platform fee config (call once after deploy; only authority can update later)"
+      ],
+      "discriminator": [
+        212,
+        138,
+        200,
+        114,
+        73,
+        176,
+        7,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "fee_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "creation_fee_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "execution_fee_bps",
+          "type": "u16"
+        }
+      ]
     },
     {
       "name": "process_undelegation",
@@ -418,7 +590,7 @@
     {
       "name": "recreate_capsule",
       "docs": [
-        "Recreate a capsule from executed state (allows creating new capsule after execution)"
+        "Recreate a capsule from executed state (owner locks new SOL in vault)"
       ],
       "discriminator": [
         178,
@@ -463,8 +635,43 @@
           }
         },
         {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
           "name": "owner",
+          "writable": true,
           "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -510,7 +717,7 @@
       "name": "schedule_execute_intent",
       "docs": [
         "Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).",
-        "Owner must still sign the actual execution tx when the crank runs; this only registers the task."
+        "Anyone can execute when conditions are met; this registers the task for the crank."
       ],
       "discriminator": [
         88,
@@ -563,6 +770,36 @@
           }
         },
         {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
           "name": "owner",
           "writable": true,
           "signer": true
@@ -572,11 +809,30 @@
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "executor",
-          "docs": [
-            "Executor (must be owner when crank runs execute_intent)"
-          ],
-          "signer": true
+          "name": "fee_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_fee_recipient",
+          "writable": true
         }
       ],
       "args": [
@@ -710,6 +966,61 @@
       "args": []
     },
     {
+      "name": "update_fee_config",
+      "docs": [
+        "Update platform fee config (authority only)"
+      ],
+      "discriminator": [
+        104,
+        184,
+        103,
+        242,
+        88,
+        151,
+        107,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "fee_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "creation_fee_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "execution_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "update_intent",
       "docs": [
         "Update the intent data of an existing capsule"
@@ -770,6 +1081,32 @@
     }
   ],
   "accounts": [
+    {
+      "name": "CapsuleVault",
+      "discriminator": [
+        225,
+        9,
+        59,
+        4,
+        93,
+        88,
+        13,
+        247
+      ]
+    },
+    {
+      "name": "FeeConfig",
+      "discriminator": [
+        143,
+        52,
+        146,
+        187,
+        219,
+        123,
+        76,
+        155
+      ]
+    },
     {
       "name": "IntentCapsule",
       "discriminator": [
@@ -844,9 +1181,53 @@
       "code": 6008,
       "name": "InvalidPriceFeed",
       "msg": "Invalid or stale price feed"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidFeeConfig",
+      "msg": "Invalid fee config or fee recipient"
     }
   ],
   "types": [
+    {
+      "name": "CapsuleVault",
+      "docs": [
+        "Vault PDA holds SOL locked at capsule creation; anyone can trigger execute when conditions are met."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dummy",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "creation_fee_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "execution_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
     {
       "name": "IntentCapsule",
       "type": {
@@ -880,6 +1261,10 @@
           },
           {
             "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
             "type": "u8"
           }
         ]

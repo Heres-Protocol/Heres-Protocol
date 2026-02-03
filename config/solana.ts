@@ -3,7 +3,7 @@
  */
 
 import { Connection, PublicKey } from '@solana/web3.js'
-import { SOLANA_CONFIG, HELIUS_CONFIG } from '@/constants'
+import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE } from '@/constants'
 
 /**
  * Get Solana connection with Helius RPC
@@ -55,4 +55,16 @@ export function isValidSolanaAddress(address: string): boolean {
   } catch {
     return false
   }
+}
+
+/**
+ * TEE RPC connection for Private Ephemeral Rollup (PER).
+ * Use after getTeeAuthToken; pass token so PER state can be queried.
+ */
+export function getTeeConnection(authToken: string): Connection {
+  const url = `${PER_TEE.RPC_URL}?token=${encodeURIComponent(authToken)}`
+  return new Connection(url, {
+    commitment: 'confirmed',
+    confirmTransactionInitialTimeout: 120000,
+  })
 }

@@ -7,7 +7,8 @@ import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor'
 import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/lucid_program.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
-import { getCapsulePDA } from './program'
+import { getCapsulePDA, getFeeConfigPDA, getCapsuleVaultPDA } from './program'
+import { SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
 import { MAGICBLOCK_ER } from '@/constants'
 import type { IntentCapsule } from '@/types'
 
@@ -74,15 +75,33 @@ export async function createCapsule(
   const maxRetries = 5
   let lastError: any
 
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
+  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
+    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
+    : null
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
+      const accounts: {
+        capsule: PublicKey
+        vault: PublicKey
+        owner: PublicKey
+        feeConfig: PublicKey
+        platformFeeRecipient?: PublicKey
+        systemProgram: PublicKey
+      } = {
+        capsule: capsulePDA,
+        vault: vaultPDA,
+        owner: wallet.publicKey!,
+        feeConfig: feeConfigPDA,
+        systemProgram: SystemProgram.programId,
+      }
+      if (platformFeeRecipient) accounts.platformFeeRecipient = platformFeeRecipient
+
       const tx = await program.methods
         .createCapsule(new BN(inactivityPeriodSeconds), intentDataBuffer)
-        .accounts({
-          capsule: capsulePDA,
-          owner: wallet.publicKey!,
-          systemProgram: SystemProgram.programId,
-        })
+        .accounts(accounts)
         .rpc()
 
       return tx
@@ -153,7 +172,8 @@ export async function updateIntent(
 }
 
 /**
- * Execute intent when inactivity period is met (Magicblock ER private monitoring → Magic Action on Devnet)
+ * Execute intent when inactivity period is met. Anyone can call (no owner signature required).
+ * Caller pays tx fee; SOL is transferred from capsule vault to platform (fee) and beneficiaries.
  */
 export async function executeIntent(
   wallet: WalletContextState,
@@ -163,19 +183,26 @@ export async function executeIntent(
   const program = getProgram(wallet)
   if (!program) throw new Error('Wallet not connected')
 
-  // Owner must be the executor (signer) for SOL transfers
-  if (!wallet.publicKey || !wallet.publicKey.equals(ownerPublicKey)) {
-    throw new Error('Owner must be the executor to transfer SOL')
-  }
-
   const [capsulePDA] = getCapsulePDA(ownerPublicKey)
+  const [vaultPDA] = getCapsuleVaultPDA(ownerPublicKey)
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
+    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
+    : null
 
-  const accounts = {
+  const accounts: {
+    capsule: PublicKey
+    vault: PublicKey
+    systemProgram: PublicKey
+    feeConfig: PublicKey
+    platformFeeRecipient?: PublicKey
+  } = {
     capsule: capsulePDA,
-    owner: ownerPublicKey,
+    vault: vaultPDA,
     systemProgram: SystemProgram.programId,
-    executor: wallet.publicKey!,
+    feeConfig: feeConfigPDA,
   }
+  if (platformFeeRecipient) accounts.platformFeeRecipient = platformFeeRecipient
 
   const remainingAccounts = beneficiaries?.map(b => ({
     pubkey: new PublicKey(b.address),
@@ -193,8 +220,8 @@ export async function executeIntent(
 }
 
 /**
- * Delegate capsule PDA to Magicblock ER for private monitoring (conditions checked in ER).
- * Pass validatorPubkey (e.g. MAGICBLOCK_ER.VALIDATOR_ASIA) to target a specific ER validator.
+ * Delegate capsule PDA to Magicblock ER/PER. When validator is omitted, program defaults to TEE (PER) for privacy.
+ * Pass validatorPubkey (e.g. MAGICBLOCK_ER.VALIDATOR_ASIA) to target a specific ER validator; omit for PER.
  */
 export async function delegateCapsule(
   wallet: WalletContextState,
@@ -253,7 +280,7 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
 
 /**
  * Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).
- * Owner must still sign the actual execution when the crank runs.
+ * When conditions are met, anyone (including crank) can call execute_intent without owner signature.
  */
 export async function scheduleExecuteIntent(
   wallet: WalletContextState,
@@ -263,6 +290,12 @@ export async function scheduleExecuteIntent(
   if (!program) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
+    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
+    : feeConfigPDA // placeholder if not set
+
   const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
 
   const tx = await program.methods
@@ -271,12 +304,62 @@ export async function scheduleExecuteIntent(
       magicProgram,
       payer: wallet.publicKey!,
       capsule: capsulePDA,
+      vault: vaultPDA,
       owner: wallet.publicKey!,
       systemProgram: SystemProgram.programId,
-      executor: wallet.publicKey!,
+      feeConfig: feeConfigPDA,
+      platformFeeRecipient,
     })
     .rpc()
 
+  return tx
+}
+
+/**
+ * Initialize platform fee config (call once after program deploy; authority can update later via updateFeeConfig).
+ * 기본 수수료: 생성 0.05 SOL, 실행 3% → PLATFORM_FEE.CREATION_FEE_LAMPORTS, PLATFORM_FEE.EXECUTION_FEE_BPS 사용.
+ * @param creationFeeLamports - SOL lamports charged per capsule creation (0 to disable)
+ * @param executionFeeBps - Execution fee in basis points (10000 = 100%; 300 = 3%)
+ */
+export async function initFeeConfig(
+  wallet: WalletContextState,
+  feeRecipient: PublicKey,
+  creationFeeLamports: number = PLATFORM_FEE.CREATION_FEE_LAMPORTS,
+  executionFeeBps: number = PLATFORM_FEE.EXECUTION_FEE_BPS
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const tx = await program.methods
+    .initFeeConfig(feeRecipient, new BN(creationFeeLamports), executionFeeBps)
+    .accounts({
+      feeConfig: feeConfigPDA,
+      authority: wallet.publicKey!,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc()
+  return tx
+}
+
+/**
+ * Update platform fee config (authority only).
+ */
+export async function updateFeeConfig(
+  wallet: WalletContextState,
+  creationFeeLamports: number,
+  executionFeeBps: number
+): Promise<string> {
+  if (executionFeeBps > 10000) throw new Error('executionFeeBps must be <= 10000')
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const tx = await program.methods
+    .updateFeeConfig(new BN(creationFeeLamports), executionFeeBps)
+    .accounts({
+      feeConfig: feeConfigPDA,
+      authority: wallet.publicKey!,
+    })
+    .rpc()
   return tx
 }
 
@@ -353,6 +436,7 @@ export async function recreateCapsule(
   if (!program) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
 
   // Convert Uint8Array to Buffer for Anchor (required by Blob.encode)
   let intentDataBuffer: Buffer | number[]
@@ -367,7 +451,9 @@ export async function recreateCapsule(
     .recreateCapsule(new BN(inactivityPeriodSeconds), intentDataBuffer)
     .accounts({
       capsule: capsulePDA,
+      vault: vaultPDA,
       owner: wallet.publicKey!,
+      systemProgram: SystemProgram.programId,
     })
     .rpc()
 

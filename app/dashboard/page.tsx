@@ -8,14 +8,18 @@ import {
   Copy,
   Database,
   RefreshCw,
+  Settings,
   Signal,
   Sparkles,
   User,
 } from 'lucide-react'
 import { PublicKey } from '@solana/web3.js'
+import { useWallet } from '@solana/wallet-adapter-react'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
-import { SOLANA_CONFIG } from '@/constants'
+import { SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
 import { getEnhancedTransactions } from '@/lib/helius'
+import { initFeeConfig } from '@/lib/solana'
+import { getFeeConfigPDA } from '@/lib/program'
 
 type CapsuleEvent = {
   signature: string
@@ -334,6 +338,7 @@ const getTokenDeltaFromMeta = (meta: any) => {
 }
 
 export default function DashboardPage() {
+  const wallet = useWallet()
   const [capsules, setCapsules] = useState<CapsuleRow[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -346,6 +351,10 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [refreshKey, setRefreshKey] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [feeConfigExists, setFeeConfigExists] = useState<boolean | null>(null)
+  const [initFeePending, setInitFeePending] = useState(false)
+  const [initFeeTx, setInitFeeTx] = useState<string | null>(null)
+  const [initFeeError, setInitFeeError] = useState<string | null>(null)
   const [summary, setSummary] = useState({
     total: 0,
     active: 0,
@@ -356,7 +365,7 @@ export default function DashboardPage() {
   })
 
   useEffect(() => {
-    // Magicblock ER context / commit (fallback to legacy zk keys)
+    // Magicblock PER (TEE) context / commit (fallback to legacy zk keys)
     const erContextKey = 'er_context_global'
     const erCommitKey = 'er_commit_hash_global'
     const legacyProofKey = 'zk_proof_hash_global'
@@ -364,6 +373,46 @@ export default function DashboardPage() {
     setZkProofHash(localStorage.getItem(erContextKey) || localStorage.getItem(legacyProofKey))
     setZkPublicInputsHash(localStorage.getItem(erCommitKey) || localStorage.getItem(legacyInputsKey))
   }, [])
+
+  // Check if fee_config PDA exists (배포 후 1회 초기화 여부)
+  useEffect(() => {
+    let cancelled = false
+    const check = async () => {
+      try {
+        const connection = getSolanaConnection()
+        const [feeConfigPDA] = getFeeConfigPDA()
+        const account = await connection.getAccountInfo(feeConfigPDA)
+        if (!cancelled) setFeeConfigExists(account != null)
+      } catch {
+        if (!cancelled) setFeeConfigExists(null)
+      }
+    }
+    check()
+    return () => { cancelled = true }
+  }, [refreshKey])
+
+  const handleInitFeeConfig = useCallback(async () => {
+    if (!wallet.publicKey || !SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT) return
+    setInitFeePending(true)
+    setInitFeeError(null)
+    setInitFeeTx(null)
+    try {
+      const recipient = new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
+      const tx = await initFeeConfig(wallet, recipient, PLATFORM_FEE.CREATION_FEE_LAMPORTS, PLATFORM_FEE.EXECUTION_FEE_BPS)
+      setInitFeeTx(tx)
+      setFeeConfigExists(true)
+    } catch (e: any) {
+      const msg = e?.message || String(e)
+      if (/already in use|AccountDidNotSerialize|0x0/i.test(msg)) {
+        setInitFeeError('이미 초기화됨 (Fee config already initialized).')
+        setFeeConfigExists(true)
+      } else {
+        setInitFeeError(msg)
+      }
+    } finally {
+      setInitFeePending(false)
+    }
+  }, [wallet])
 
   useEffect(() => {
     let isMounted = true
@@ -664,7 +713,7 @@ export default function DashboardPage() {
     { label: 'Total Capsules', value: formatNumber(summary.total), tone: 'text-lucid-accent' },
     { label: 'Active Capsules', value: formatNumber(summary.active), tone: 'text-lucid-accent' },
     { label: 'Executed Capsules', value: formatNumber(summary.executed), tone: 'text-lucid-purple' },
-    { label: 'ER Verified', value: formatNumber(summary.proofs), tone: 'text-lucid-accent' },
+    { label: 'PER (TEE) Verified', value: formatNumber(summary.proofs), tone: 'text-lucid-accent' },
   ]
 
   const programIdStr = SOLANA_CONFIG.PROGRAM_ID
@@ -714,9 +763,52 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="mt-3 text-sm text-lucid-muted max-w-xl">
-              Track capsule status, ER execution, and verification on Solana Devnet.
+              Track capsule status, PER (TEE) execution, and verification on Solana Devnet.
             </p>
           </section>
+
+          {/* 수수료 설정 초기화: Fee config가 없을 때만 표시 (배포 후 1회만 필요) */}
+          {wallet.connected && feeConfigExists === false && (
+            <section className="card-lucid p-6 mb-6 border-lucid-accent/30">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-lucid-accent/10 border border-lucid-accent/40 flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-lucid-accent" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-lucid-white">수수료 설정 (배포 후 1회)</h2>
+                    <p className="text-sm text-lucid-muted mt-0.5">
+                      Fee config가 없으면 한 번만 실행하세요. 생성 0.05 SOL, 실행 3%.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleInitFeeConfig}
+                  disabled={initFeePending}
+                  className="rounded-lg border border-lucid-accent bg-lucid-accent/20 px-4 py-2 text-sm font-medium text-lucid-accent transition hover:bg-lucid-accent/30 disabled:opacity-60"
+                >
+                  {initFeePending ? '처리 중...' : 'Initialize Fee Config'}
+                </button>
+              </div>
+              {initFeeTx && (
+                <p className="mt-3 text-sm text-lucid-accent">
+                  성공:{' '}
+                  <a
+                    href={`https://explorer.solana.com/tx/${initFeeTx}?cluster=devnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    트랜잭션 보기
+                  </a>
+                </p>
+              )}
+              {initFeeError && (
+                <p className="mt-3 text-sm text-amber-400">{initFeeError}</p>
+              )}
+            </section>
+          )}
 
           {/* Explorer-style: metadata grid (Network, Program ID, Query URL) */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -887,7 +979,7 @@ export default function DashboardPage() {
                             <span className="font-mono">SOL Δ: {capsule.solDelta.toFixed(4)}</span>
                           )}
                           {capsule.proofBytes != null && (
-                            <span>ER tx: {capsule.proofBytes} bytes</span>
+                            <span>PER (TEE) tx: {capsule.proofBytes} bytes</span>
                           )}
                         </div>
                       )}
@@ -957,18 +1049,18 @@ export default function DashboardPage() {
                               <p className="text-lucid-white">{capsule.solDelta == null ? '—' : `${capsule.solDelta.toFixed(4)} SOL`}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">ER Tx Bytes</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">PER (TEE) Tx Bytes</p>
                               <p className="text-lucid-white">{capsule.proofBytes ? `${capsule.proofBytes} bytes` : '—'}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">ER Context</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">PER (TEE) Context</p>
                               <div className="flex items-center gap-1 min-w-0">
                                 <p className="font-mono text-lucid-white break-all truncate">{zkProofHash || '—'}</p>
                                 {zkProofHash && <CopyButton value={zkProofHash} />}
                               </div>
                             </div>
                             <div>
-                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">ER Commit Hash</p>
+                              <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">PER (TEE) Commit Hash</p>
                               <div className="flex items-center gap-1 min-w-0">
                                 <p className="font-mono text-lucid-white break-all truncate">{zkPublicInputsHash || '—'}</p>
                                 {zkPublicInputsHash && <CopyButton value={zkPublicInputsHash} />}

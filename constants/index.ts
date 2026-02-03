@@ -7,6 +7,8 @@ export const SOLANA_CONFIG = {
   PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms',
   NETWORK: process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet',
   HELIUS_API_KEY: process.env.NEXT_PUBLIC_HELIUS_API_KEY || '',
+  /** Platform wallet for creation/execution fees (수수료 수령 지갑) */
+  PLATFORM_FEE_RECIPIENT: process.env.NEXT_PUBLIC_PLATFORM_FEE_RECIPIENT || 'Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb',
 } as const
 
 // Helius API Configuration
@@ -27,6 +29,15 @@ export const DEFAULT_VALUES = {
   DELAY_DAYS: '30',
 } as const
 
+/** Platform fee: creation = 0.05 SOL, execution = 3% of transferred amount (init_fee_config 시 사용) */
+export const PLATFORM_FEE = {
+  /** 캡슐 생성 수수료: 0.05 SOL (lamports) */
+  CREATION_FEE_SOL: 0.05,
+  CREATION_FEE_LAMPORTS: 50_000_000, // 0.05 * 1e9
+  /** 실행 수수료: 3% (basis points, 10000 = 100%) */
+  EXECUTION_FEE_BPS: 300, // 3%
+} as const
+
 // Magicblock ER (Ephemeral Rollup) - Devnet validators
 export const MAGICBLOCK_ER = {
   DELEGATION_PROGRAM_ID: 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh',
@@ -39,7 +50,16 @@ export const MAGICBLOCK_ER = {
   VALIDATOR_ASIA: 'MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57',
   VALIDATOR_EU: 'MEUGGrYPxKk17hCr7wpT6s8dtNokZj5U2L57vjYMS8e',
   VALIDATOR_US: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
+  /** TEE validator for Private Ephemeral Rollup (PER); used by default when delegating for privacy */
   VALIDATOR_TEE: 'FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA',
+} as const
+
+/** Private Ephemeral Rollup (PER) - TEE RPC for confidential state; use getAuthToken + ?token= for access */
+export const PER_TEE = {
+  /** TEE RPC base URL (devnet). Attach token: `${url}?token=${authToken}` */
+  RPC_URL: process.env.NEXT_PUBLIC_TEE_RPC_URL || 'https://tee.magicblock.app',
+  /** Docs page (clickable link; RPC URL is API-only and shows "Not found" in browser) */
+  DOCS_URL: 'https://docs.magicblock.gg/pages/tools/tee/introduction',
 } as const
 
 // Local Storage Keys
