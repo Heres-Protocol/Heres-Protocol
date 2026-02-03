@@ -656,7 +656,7 @@ export default function HomePage() {
                     { name: 'Solana', href: 'https://solana.com', color: '#9945FF', logo: '/logos/solana.svg' },
                     { name: 'Phantom', href: 'https://phantom.app', color: '#ab9ff2', logo: '/logos/phantom.svg' },
                     { name: 'Helius', href: 'https://helius.dev', color: '#f97316', logo: '/logos/helius.svg' },
-                    { name: 'Backpack', href: 'https://backpack.app', color: '#E33E3F', logo: '/logos/backpack.svg' },
+                    { name: 'Backpack', href: 'https://backpack.app', color: '#E33E3F', logo: '/logos/backpack.png' },
                     { name: 'Magicblock', href: 'https://www.magicblock.xyz', color: '#22d3ee', logo: '/logos/magicblock.svg' },
                   ]
                   const items = Array.from({ length: ring.count }, (_, i) => partners[i % partners.length])

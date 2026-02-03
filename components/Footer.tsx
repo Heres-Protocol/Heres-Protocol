@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Zap } from 'lucide-react'
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -32,7 +31,6 @@ export function Footer() {
             <div className="flex items-center gap-2">
               <Image src="/logo-white.png" alt="Heres" width={44} height={44} className="h-11 w-auto" />
               <span className="text-xl font-bold text-lucid-white">Heres</span>
-              <Zap className="h-5 w-5 text-lucid-accent" aria-hidden />
             </div>
             <div className="flex gap-2">
               {socialLinks.map((item) => (
@@ -77,7 +75,7 @@ export function Footer() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-lg border border-lucid-border bg-lucid-card/80 px-4 py-2 text-sm text-lucid-white transition-colors hover:border-lucid-accent/40"
             >
-              <Zap className="h-4 w-4 text-lucid-accent shrink-0" />
+              <Image src="/logos/solana.svg" alt="Solana" width={20} height={20} className="h-5 w-5 shrink-0" />
               <span className="font-medium">Powered by Solana</span>
             </a>
           </div>
