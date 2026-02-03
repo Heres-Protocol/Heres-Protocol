@@ -49,21 +49,21 @@ export function Navbar() {
 
   return (
     <header className="nav-glass">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-2 px-3 sm:px-6 lg:px-8">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
           <Link href="/" className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <Image src="/logo-white.png" alt="Heres" width={52} height={52} className="h-9 w-auto sm:h-[52px]" priority />
+            <Image src="/logo-white.png" alt="Heres" width={52} height={52} className="h-9 w-auto sm:h-[52px]" priority unoptimized />
             <span className="truncate text-lg font-bold tracking-tight text-lucid-white sm:text-xl">Heres</span>
           </Link>
           {/* Mobile: hamburger */}
           <button
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
-            className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-lucid-border bg-lucid-surface text-lucid-white md:hidden"
+            className="ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-lucid-border bg-lucid-surface text-lucid-white md:hidden"
             aria-expanded={mobileOpen}
             aria-label="Toggle menu"
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
@@ -72,11 +72,10 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm font-medium transition-colors ${
-                pathname === link.href
-                  ? 'text-lucid-accent'
-                  : 'text-lucid-muted hover:text-lucid-white'
-              }`}
+              className={`text-sm font-medium transition-colors ${pathname === link.href
+                ? 'text-lucid-accent'
+                : 'text-lucid-muted hover:text-lucid-white'
+                }`}
             >
               {link.label}
             </Link>
@@ -109,11 +108,10 @@ export function Navbar() {
                         setSelectedNetwork(net)
                         setNetworkOpen(false)
                       }}
-                      className={`flex w-full items-center px-4 py-2.5 text-left text-sm transition-colors ${
-                        selectedNetwork.id === net.id
-                          ? 'bg-lucid-accent/20 text-lucid-accent'
-                          : 'text-lucid-white hover:bg-lucid-surface'
-                      }`}
+                      className={`flex w-full items-center px-4 py-2.5 text-left text-sm transition-colors ${selectedNetwork.id === net.id
+                        ? 'bg-lucid-accent/20 text-lucid-accent'
+                        : 'text-lucid-white hover:bg-lucid-surface'
+                        }`}
                     >
                       {net.label}
                     </button>
@@ -122,8 +120,8 @@ export function Navbar() {
               </ul>
             )}
           </div>
-          <div className="wallet-nav-trigger [&_.wallet-adapter-button]:!min-w-0 [&_.wallet-adapter-button]:!px-3 [&_.wallet-adapter-button]:!text-xs sm:[&_.wallet-adapter-button]:!px-4 sm:[&_.wallet-adapter-button]:!text-sm">
-            <WalletMultiButton className="!rounded-xl !bg-lucid-surface !py-2 !font-medium !text-lucid-white hover:!bg-lucid-card [&>.wallet-adapter-button-trigger]:!rounded-xl" />
+          <div className="relative z-50 flex items-center wallet-nav-trigger">
+            <WalletMultiButton className="!h-10 !rounded-xl !bg-lucid-surface !px-4 !py-0 !text-sm !font-medium !text-lucid-white transition-opacity hover:!bg-lucid-card active:scale-95" />
           </div>
         </div>
       </div>
@@ -137,11 +135,10 @@ export function Navbar() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className={`block rounded-lg px-4 py-3 text-base font-medium transition-colors ${
-                      pathname === link.href
-                        ? 'bg-lucid-accent/20 text-lucid-accent'
-                        : 'text-lucid-white hover:bg-lucid-surface'
-                    }`}
+                    className={`block rounded-lg px-4 py-3 text-base font-medium transition-colors ${pathname === link.href
+                      ? 'bg-lucid-accent/20 text-lucid-accent'
+                      : 'text-lucid-white hover:bg-lucid-surface'
+                      }`}
                   >
                     {link.label}
                   </Link>
@@ -156,9 +153,8 @@ export function Navbar() {
                     key={net.id}
                     type="button"
                     onClick={() => setSelectedNetwork(net)}
-                    className={`flex w-full items-center rounded-lg px-4 py-3 text-left text-sm ${
-                      selectedNetwork.id === net.id ? 'bg-lucid-accent/20 text-lucid-accent' : 'text-lucid-white hover:bg-lucid-surface'
-                    }`}
+                    className={`flex w-full items-center rounded-lg px-4 py-3 text-left text-sm ${selectedNetwork.id === net.id ? 'bg-lucid-accent/20 text-lucid-accent' : 'text-lucid-white hover:bg-lucid-surface'
+                      }`}
                   >
                     {net.label}
                   </button>

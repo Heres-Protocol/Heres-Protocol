@@ -20,6 +20,7 @@ module.exports = {
           cyan: '#22d3ee',
           muted: '#6b7280',
           white: '#f9fafb',
+          brand: '#1E90FF',
         },
       },
       fontFamily: {

@@ -1,0 +1,29 @@
+{
+    "name": "Heres",
+    "short_name": "Heres",
+    "description": "A privacy-preserving capsule protocol on Solana. Assets stay delegated, conditions stay private inside Magicblock ER, execution happens automatically when silence becomes truth.",
+    "categories": [
+        "finance",
+        "productivity",
+        "utilities"
+    ],
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#1E90FF",
+    "theme_color": "#1E90FF",
+    "icons": [
+        {
+            "src": "/logo-white.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/logo-white.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "orientation": "portrait-primary"
+}

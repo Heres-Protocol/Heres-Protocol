@@ -381,7 +381,7 @@ export default function HomePage() {
                   >
                     <div className="rounded-lg border border-white/10 bg-[#242236] p-3 text-center md:p-4 w-[164px]">
                       <div className="flex items-center justify-center gap-2 font-mono text-[13px] md:text-base text-white whitespace-nowrap">
-                        <Image src="/logos/solana.svg" alt="Solana" width={24} height={24} className="shrink-0" />
+                        <Image src="/logos/solana.svg" alt="Solana" width={24} height={24} className="shrink-0" unoptimized />
                         <span>Solana Devnet</span>
                       </div>
                     </div>
@@ -445,7 +445,7 @@ export default function HomePage() {
                   >
                     <div className="flex flex-col items-center gap-1 rounded-md border border-white/10 bg-[#242236] px-3 py-2 leading-none md:px-4 md:py-2.5 min-w-[220px] w-[220px]">
                       <div className="flex items-center gap-2 justify-center whitespace-nowrap">
-                        <Image src="/logos/magicblock.svg" alt="Magicblock" width={20} height={20} className="shrink-0" />
+                        <Image src="/logos/magicblock.svg" alt="Magicblock" width={20} height={20} className="shrink-0" unoptimized />
                         <span className="font-mono text-[11px] uppercase text-white/60">Magicblock PER (TEE)</span>
                       </div>
                       <span className="font-mono text-[9px] uppercase text-white/40">Privacy</span>
@@ -461,7 +461,7 @@ export default function HomePage() {
                   >
                     <div className="flex flex-col items-center gap-1 rounded-md border border-white/10 bg-[#242236] px-3 py-2 leading-none md:px-4 md:py-2.5 w-[164px]">
                       <div className="flex items-center gap-2 justify-center leading-none">
-                        <Image src="/logos/helius.svg" alt="Helius" width={18} height={18} className="shrink-0" />
+                        <Image src="/logos/helius.svg" alt="Helius" width={18} height={18} className="shrink-0" unoptimized />
                         <span className="font-mono text-[11px] uppercase text-white/60">Monitoring</span>
                       </div>
                       <span className="font-mono text-[10px] uppercase text-white/50 leading-none">Helius RPC</span>
@@ -683,6 +683,7 @@ export default function HomePage() {
                           width={36}
                           height={36}
                           className="h-full w-full object-contain p-0.5"
+                          unoptimized
                         />
                       </a>
                     )
