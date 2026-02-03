@@ -468,10 +468,10 @@ export default function CreatePage() {
 
   return (
     <div className="min-h-screen bg-hero pt-24 pb-16">
-      {/* Mobile: Lucid nav as horizontal strip */}
+      {/* Mobile: Heres nav as horizontal strip */}
       <div className="lg:hidden border-b border-lucid-border/50 bg-lucid-card/50 mb-6 -mt-2">
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-lucid-muted mr-2">Lucid</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-lucid-muted mr-2">Heres</span>
           <Link href="/create" className="rounded-lg px-3 py-1.5 text-sm font-medium bg-lucid-accent/20 text-lucid-accent border border-lucid-accent/40">
             Create Capsule
           </Link>
@@ -489,7 +489,7 @@ export default function CreatePage() {
         {/* Left sidebar */}
         <aside className="hidden lg:block w-56 shrink-0 pt-2">
           <nav className="sticky top-24 space-y-1 rounded-2xl border border-lucid-border bg-lucid-card/80 backdrop-blur-xl p-3">
-            <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-lucid-muted">Lucid</p>
+            <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-lucid-muted">Heres</p>
             <Link
               href="/create"
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-lucid-accent bg-lucid-accent/10 border border-lucid-accent/30"

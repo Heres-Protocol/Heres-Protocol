@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Zap } from 'lucide-react'
 
 const navLinks = [
@@ -10,7 +11,7 @@ const navLinks = [
 ]
 
 const socialLinks = [
-  { href: 'https://x.com/Luciddream_app', label: 'X (Twitter)', icon: 'x' },
+  { href: 'https://x.com/Heres_app', label: 'X (Twitter)', icon: 'x' },
 ]
 
 function XIcon({ className }: { className?: string }) {
@@ -29,7 +30,8 @@ export function Footer() {
         <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-lucid-white">Lucid</span>
+              <Image src="/logo-white.png" alt="Heres" width={44} height={44} className="h-11 w-auto" />
+              <span className="text-xl font-bold text-lucid-white">Heres</span>
               <Zap className="h-5 w-5 text-lucid-accent" aria-hidden />
             </div>
             <div className="flex gap-2">
@@ -66,7 +68,7 @@ export function Footer() {
         {/* Bottom section: copyright | powered by (no Privacy / Terms) */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-lucid-muted">
-            © {new Date().getFullYear()} Lucid. All rights reserved.
+            © {new Date().getFullYear()} Heres. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <a

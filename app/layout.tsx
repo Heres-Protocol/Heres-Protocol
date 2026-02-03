@@ -12,11 +12,11 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Lucid - Privacy-Preserving Capsule Protocol on Solana',
+  title: 'Heres - Privacy-Preserving Capsule Protocol on Solana',
   description:
     'A privacy-preserving capsule protocol on Solana. Assets stay delegated, conditions stay private inside Magicblock ER, execution happens automatically when silence becomes truth. Powered by Helius & Phantom.',
   icons: {
-    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    icon: [{ url: '/logo-white.png', type: 'image/png' }],
   },
 }
 

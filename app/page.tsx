@@ -134,8 +134,8 @@ const features = [
   },
 ]
 
-/* Why Lucid – benefit-focused cards (non-technical, why you need Lucid) */
-const whyLucidCards = [
+/* Why Heres – benefit-focused cards (non-technical, why you need Heres) */
+const whyHeresCards = [
   {
     title: 'Your intent, executed when it matters',
     description: 'Leave instructions that run only when the time is right. No one can execute early. Your conditions stay yours until the moment you chose.',
@@ -308,11 +308,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Why Build With Lucid – Your development environment (layout + scroll like The Graph subgraphs) */}
+      {/* Why Build With Heres – Your development environment (layout + scroll like The Graph subgraphs) */}
       <section ref={whySectionRef} className="why-build-section py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 ref={whyTitleRef} className="text-center text-3xl font-bold text-white sm:text-4xl">
-            Why Build With Lucid?
+            Why Build With Heres?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted hidden">
             Capsules on Solana, private logic in Magicblock PER (TEE), execution when you’re silent.
@@ -324,9 +324,9 @@ export default function HomePage() {
           </div>
 
           <div className="mt-16 grid gap-10 lg:grid-cols-2 lg:gap-16 lg:items-center">
-            {/* Left: Why Lucid steps – vertical list with left border (Firehose-style) */}
+            {/* Left: Why Heres steps – vertical list with left border (Firehose-style) */}
             <div ref={whyLeftRef} className="why-left-cards flex flex-col">
-              {whyLucidCards.map((card, i) => {
+              {whyHeresCards.map((card, i) => {
                 const isActive = activeWhyIndex === i
                 return (
                   <div
@@ -350,7 +350,7 @@ export default function HomePage() {
                           key={`step-bar-${i}`}
                           className="why-build-step-bar absolute left-0 top-0 w-0.5 bg-lucid-accent"
                           aria-hidden
-                          onAnimationEnd={() => setActiveWhyIndex((prev) => (prev + 1) % whyLucidCards.length)}
+                          onAnimationEnd={() => setActiveWhyIndex((prev) => (prev + 1) % whyHeresCards.length)}
                         />
                       )}
                       <div>
@@ -369,7 +369,7 @@ export default function HomePage() {
                 )
               })}
             </div>
-            {/* Right: Lucid flow diagram – no outer box, widened to the right (reference image) */}
+            {/* Right: Heres flow diagram – no outer box, widened to the right (reference image) */}
             <div ref={whyVisualMainRef} className="relative w-full md:min-w-0 md:flex-1 lg:max-w-[900px]">
               <div className="why-build-flow-wrap relative flex flex-col md:flex-row md:items-stretch md:gap-0 md:pl-2 md:pr-4">
                 {/* Left flow only: Solana Devnet → … → MONITORING → Helius RPC → Execution */}
@@ -398,13 +398,13 @@ export default function HomePage() {
                       <div className="why-flow-segment absolute left-1/2 h-6 w-[1.5px] -translate-x-1/2 rounded-full bg-lucid-accent" aria-hidden style={{ top: 0 }} />
                     )}
                   </div>
-                  {/* 2. Lucid Capsules */}
+                  {/* 2. Heres Capsules */}
                   <div
                     className="z-10 flex w-full justify-center"
                     style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transform: activeWhyIndex >= 0 ? 'scale(1)' : 'scale(0.98)', transition: 'opacity 0.3s, transform 0.3s' }}
                   >
                     <div className="rounded-md w-[164px] border border-white/10 bg-[#242236] p-3 text-center md:p-4">
-                      <div className="font-mono text-[13px] md:text-base text-white">Lucid Capsules</div>
+                      <div className="font-mono text-[13px] md:text-base text-white">Heres Capsules</div>
                     </div>
                   </div>
                   {/* Ref: 5 separate parallel dashed lines (each 2×30) */}
@@ -502,7 +502,7 @@ export default function HomePage() {
             How It Works
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted">
-            With Lucid, define your intent once on Solana. Magicblock PER (TEE) monitors privately; execution runs on Devnet when conditions are met.
+            With Heres, define your intent once on Solana. Magicblock PER (TEE) monitors privately; execution runs on Devnet when conditions are met.
           </p>
           <div ref={stepsRef} className="mt-16 grid gap-8 lg:grid-cols-3 lg:items-stretch">
             {/* STEP 1 Create – capsule/create page card */}
@@ -568,7 +568,7 @@ export default function HomePage() {
                 <div className="relative h-full min-h-[180px] w-full">
                   <Image
                     src="/how-it-works-step3.png"
-                    alt="Lucid Capsules dashboard – status, PER (TEE) execution, verification"
+                    alt="Heres Capsules dashboard – status, PER (TEE) execution, verification"
                     fill
                     className="object-cover object-top"
                     sizes="(max-width: 768px) 100vw, 33vw"
@@ -583,14 +583,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Unleash the Power of Lucid - capsule image + project copy */}
+      {/* Unleash the Power of Heres - capsule image + project copy */}
       <section ref={unleashRef} className="relative overflow-hidden py-24 sm:py-32">
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
             <div data-gsap-unleash-text className="max-w-xl">
               <h2 className="text-3xl font-bold leading-tight text-lucid-white sm:text-4xl lg:text-5xl">
-                Unleash the Power of Lucid
+                Unleash the Power of Heres
               </h2>
               <p className="mt-6 text-lg leading-relaxed text-slate-300">
                 Define your intent once: beneficiaries, amounts, inactivity period. Your capsule lives on Solana; Magicblock PER (TEE) monitors privately. When silence becomes truth, execution runs on Devnet. No third party, no bridges.

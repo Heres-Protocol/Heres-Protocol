@@ -1,14 +1,14 @@
-# Lucid - Privacy-Preserving Capsule Protocol on Solana
+# Heres - Privacy-Preserving Capsule Protocol on Solana
 
 > **People disappear. Intent should not.**
 
-Lucid is a **privacy-preserving capsule protocol on Solana Devnet**, where assets remain delegated, conditions stay private inside **Magicblock Ephemeral Rollup (ER)** or **Private Ephemeral Rollup (PER / TEE)**, and execution happens automatically when silence becomes truth.
+Heres is a **privacy-preserving capsule protocol on Solana Devnet**, where assets remain delegated, conditions stay private inside **Magicblock Ephemeral Rollup (ER)** or **Private Ephemeral Rollup (PER / TEE)**, and execution happens automatically when silence becomes truth.
 
 ---
 
 ## Background
 
-As digital asset ownership grows, a critical gap has emerged: **what happens to your crypto and your intentions when you can no longer manage them?** Traditional estate planning rarely covers bearer assets controlled by private keys. Wills and executors often lack both the technical means and legal clarity to access wallets, and leaving keys in a safe or with a lawyer creates security and privacy risks. At the same time, **confidential computing** (keeping data private during computation) has become a major focus in crypto infrastructure, enabling sensitive logic to run without exposing conditions or beneficiaries on a public ledger. Lucid sits at the intersection: it uses **time-locked intent capsules** on Solana with **private execution** via Magicblock’s Ephemeral Rollups (ER) and Private Ephemeral Rollups (PER / TEE), so your “if I go silent” instructions are enforced automatically and privately.
+As digital asset ownership grows, a critical gap has emerged: **what happens to your crypto and your intentions when you can no longer manage them?** Traditional estate planning rarely covers bearer assets controlled by private keys. Wills and executors often lack both the technical means and legal clarity to access wallets, and leaving keys in a safe or with a lawyer creates security and privacy risks. At the same time, **confidential computing** (keeping data private during computation) has become a major focus in crypto infrastructure, enabling sensitive logic to run without exposing conditions or beneficiaries on a public ledger. Heres sits at the intersection: it uses **time-locked intent capsules** on Solana with **private execution** via Magicblock’s Ephemeral Rollups (ER) and Private Ephemeral Rollups (PER / TEE), so your “if I go silent” instructions are enforced automatically and privately.
 
 ---
 
@@ -20,24 +20,24 @@ Our design and positioning are informed by published research and ecosystem repo
 
 - **Scale of the problem:** Nearly 20% of all bitcoin is estimated to be lost or stranded, often due to lost keys or owners dying without succession plans. With digital asset market cap exceeding $3T and 14–17% of U.S. adults holding crypto, unplanned wealth transfer is a growing issue ([CoinDesk](https://www.coindesk.com/opinion/2024/12/18/crypto-s-estate-planning-problem-a-wake-up-call), [CNBC/Wealth Management](https://www.wealthmanagement.com/estate-planning/bitcoin-after-death-2025-estate-guide)).
 - **Planning gaps:** Only about 24% of Americans have wills, and most wills do not address digital assets or authorize executors to access them. Cryptocurrencies are bearer assets: without proper documentation and access design, heirs cannot recover holdings ([Fidelity](https://www.fidelity.com/learning-center/wealth-management-insights/crypto-and-estate-planning), [BDO](https://www.bdo.com/insights/tax/dont-let-volatile-digital-assets-blow-up-a-clients-estate-plan)).
-- **Implication for Lucid:** We focus on **programmatic intent**: define conditions (e.g. inactivity period, beneficiaries) once; execution is automatic when conditions are met, without relying on heirs to discover keys or courts to interpret documents.
+- **Implication for Heres:** We focus on **programmatic intent**: define conditions (e.g. inactivity period, beneficiaries) once; execution is automatic when conditions are met, without relying on heirs to discover keys or courts to interpret documents.
 
 ### Decentralized confidential computing (DeCC) & TEEs
 
 - **Investment and momentum:** Over **$1 billion** has been invested into Decentralized Confidential Computing (DeCC) projects. The space is converging around ZKPs, MPC, FHE, and **Trusted Execution Environments (TEEs)** as core primitives for private computation on public chains ([Messari – The Privacy Layer: DeCC](https://messari.io/report/the-privacy-layer-understanding-the-inner-workings-of-decentralized-confidential-computing)).
 - **TEE role:** TEEs provide hardware-enforced isolation so that conditions and data can be evaluated **in use** without exposing them on-chain. Messari and others describe TEEs as a practical way to achieve confidential execution with low overhead, and note projects like Secret Network, Phala, and TEN using TEEs for private smart contracts and rollups ([Cointelegraph – TEE explained](https://cointelegraph.com/news/trusted-execution-environments-tee-explained-the-future-of-secure-blockchain-applications)).
-- **Implication for Lucid:** We use Magicblock’s **PER (TEE)** so that inactivity checks and beneficiary logic run inside a trusted environment; only execution outcomes are committed to Solana. No ZK proofs are required for this flow.
+- **Implication for Heres:** We use Magicblock’s **PER (TEE)** so that inactivity checks and beneficiary logic run inside a trusted environment; only execution outcomes are committed to Solana. No ZK proofs are required for this flow.
 
 ### Solana ecosystem
 
 - **Adoption and infra:** Solana has seen strong developer growth, high DEX share, and institutional interest (e.g. CME futures, tokenized funds). Chain GDP and stablecoin usage on Solana have grown sharply ([Messari State of Solana](https://messari.io/report/state-of-solana-q1-2025), [Helius Ecosystem Report](https://helius.dev/blog/solana-ecosystem-report-h1-2025)).
-- **Implication for Lucid:** We build on Solana for speed, low fees, and a clear program model; we integrate Helius for RPC and Magicblock for private execution so capsules are both persistent on-chain and privately monitored off-chain.
+- **Implication for Heres:** We build on Solana for speed, low fees, and a clear program model; we integrate Helius for RPC and Magicblock for private execution so capsules are both persistent on-chain and privately monitored off-chain.
 
 ---
 
 ## Overview
 
-**Lucid** is a protocol that lets you create **Intent Capsules** on Solana: you lock SOL (or define NFT intents), set an **inactivity period** and **beneficiaries**, and delegate the capsule to Magicblock ER or PER (TEE). Your **conditions stay private** inside the rollup; when you have been inactive long enough, **execution is automatic** (e.g. SOL sent to beneficiaries). No third-party executor holds your keys; the program and the private runtime enforce your intent.
+**Heres** is a protocol that lets you create **Intent Capsules** on Solana: you lock SOL (or define NFT intents), set an **inactivity period** and **beneficiaries**, and delegate the capsule to Magicblock ER or PER (TEE). Your **conditions stay private** inside the rollup; when you have been inactive long enough, **execution is automatic** (e.g. SOL sent to beneficiaries). No third-party executor holds your keys; the program and the private runtime enforce your intent.
 
 | Layer | Role |
 |-------|------|
@@ -57,7 +57,7 @@ Our design and positioning are informed by published research and ecosystem repo
 
 ## Solution
 
-Lucid combines:
+Heres combines:
 
 1. **Persistent capsules on Solana** – Capsule account holds owner, vault (locked SOL), inactivity period, and intent data; delegation state is on-chain.
 2. **Private execution logic** – Conditions (inactivity, beneficiaries) are evaluated inside Magicblock **ER** or **PER (TEE)**; only the fact that conditions were satisfied and execution occurred is visible on-chain.
@@ -90,7 +90,7 @@ Result: **Intent remains private, execution is deterministic and automatic.**
 
 | Partner | How we use it | Code & links |
 |--------|----------------|---------------|
-| **Solana** | We run the **Lucid program** on Solana Devnet: capsule accounts (owner, vault, inactivity period, intent data), PDAs for vault and fee config, and all instructions (`create_capsule`, `execute_intent`, `delegate_capsule`, etc.) are executed on-chain. The frontend uses the Solana connection (via Helius RPC) and Anchor to build and sign transactions. | **Contract:** [lucid_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/lucid_program/programs/lucid_program/src/lib.rs) · **Program on Devnet:** [Explorer](https://explorer.solana.com/address/BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms?cluster=devnet) · **App:** [config/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/config/solana.ts), [lib/program.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/program.ts), [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) |
+| **Solana** | We run the **Heres program** on Solana Devnet: capsule accounts (owner, vault, inactivity period, intent data), PDAs for vault and fee config, and all instructions (`create_capsule`, `execute_intent`, `delegate_capsule`, etc.) are executed on-chain. The frontend uses the Solana connection (via Helius RPC) and Anchor to build and sign transactions. | **Contract:** [lucid_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/lucid_program/programs/lucid_program/src/lib.rs) · **Program on Devnet:** [Explorer](https://explorer.solana.com/address/BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms?cluster=devnet) · **App:** [config/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/config/solana.ts), [lib/program.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/program.ts), [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) |
 | **Magicblock** | We use **Ephemeral Rollups (ER)** and **Private Ephemeral Rollup (PER / TEE)** for private condition monitoring. The capsule PDA is delegated to Magicblock via `delegate_capsule` (default validator: TEE). The private runtime checks inactivity and beneficiaries; only execution results are committed to Devnet via Magic Actions. TEE auth uses `getAuthToken` and optional `verifyTeeRpcIntegrity` from the Magicblock SDK. | **Contract (delegate):** [lucid_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/lucid_program/programs/lucid_program/src/lib.rs) · **App:** [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) (`delegateCapsule`, `undelegateCapsule`), [lib/tee.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/tee.ts) (TEE auth), [constants/index.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/constants/index.ts) (`MAGICBLOCK_ER`, `PER_TEE`) |
 | **Helius** | We use Helius for **RPC** (primary Solana connection with fallback to public RPC), **Enhanced Transactions API** for the dashboard (parsed capsule create/execute events and history), and **DAS API** for NFT listing when creating NFT capsules. | **Config:** [config/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/config/solana.ts) (`getSolanaConnection`), [constants/index.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/constants/index.ts) (`HELIUS_CONFIG`) · **App:** [lib/helius.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/helius.ts) (`getEnhancedTransactions`, `getNftsByOwner`) |
 
@@ -103,7 +103,7 @@ Result: **Intent remains private, execution is deterministic and automatic.**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   Solana Devnet                          │
-│  Lucid Program (Persistent)                              │
+│  Heres Program (Persistent)                              │
 │  · Capsule: owner, vault (locked SOL), inactivity_period │
 │  · intent_data (beneficiaries, amounts); delegation      │
 └─────────────────────────▲───────────────────────────────┘

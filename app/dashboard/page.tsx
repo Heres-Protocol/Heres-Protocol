@@ -734,7 +734,7 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-baseline gap-4">
                 <h1 className="text-2xl font-bold text-lucid-white sm:text-3xl">
-                  Lucid Capsules
+                  Heres Capsules
                 </h1>
                 <span className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-2.5 py-1 text-xs font-medium text-lucid-muted">
                   v1.0
