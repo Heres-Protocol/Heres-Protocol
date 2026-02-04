@@ -487,20 +487,24 @@ pub struct UndelegateCapsuleInput<'info> {
 
 #[derive(Accounts)]
 pub struct ScheduleExecuteIntent<'info> {
-    /// CHECK: Magic program for CPI
+    /// CHECK: Magic program for CPI (MagicBlock crank scheduler)
     pub magic_program: AccountInfo<'info>,
+    /// Payer who signs the schedule transaction (on PER/TEE RPC)
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"intent_capsule", owner.key().as_ref()], bump = capsule.bump)]
-    pub capsule: Account<'info, IntentCapsule>,
-    #[account(mut, seeds = [b"capsule_vault", owner.key().as_ref()], bump = capsule.vault_bump)]
-    pub vault: Account<'info, CapsuleVault>,
+    /// CHECK: Capsule PDA delegated to PER/ER. Passed as AccountInfo to avoid
+    /// Anchor owner checks and re-serialization after CPI, as recommended in
+    /// MagicBlock crank examples.
     #[account(mut)]
-    pub owner: Signer<'info>,
+    pub capsule: AccountInfo<'info>,
+    /// CHECK: Vault PDA that holds locked SOL for this capsule.
+    #[account(mut)]
+    pub vault: AccountInfo<'info>,
+    /// System program – only its key is used when constructing the execute_intent ix.
     pub system_program: Program<'info, System>,
-    #[account(seeds = [b"fee_config"], bump)]
-    pub fee_config: Account<'info, FeeConfig>,
-    /// CHECK: platform fee recipient (optional; validated in execute_intent)
+    /// CHECK: Fee config account (read-only for scheduling; validated inside execute_intent).
+    pub fee_config: AccountInfo<'info>,
+    /// CHECK: Platform fee recipient (optional; validated in execute_intent).
     #[account(mut)]
     pub platform_fee_recipient: AccountInfo<'info>,
 }

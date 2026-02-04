@@ -365,7 +365,6 @@ export async function scheduleExecuteIntentViaTee(
       payer: wallet.publicKey,
       capsule: capsulePDA,
       vault: vaultPDA,
-      owner: wallet.publicKey,
       systemProgram: SystemProgram.programId,
       feeConfig: feeConfigPDA,
       platformFeeRecipient,

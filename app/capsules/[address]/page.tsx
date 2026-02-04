@@ -5,16 +5,14 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { BN } from '@coral-xyz/anchor'
 import { ArrowLeft, Copy, RefreshCw, Shield, Play } from 'lucide-react'
 import {
   getCapsuleByAddress,
   delegateCapsule,
   executeIntent,
-  scheduleExecuteIntent,
-  CRANK_DEFAULT_INTERVAL_MS,
-  CRANK_DEFAULT_ITERATIONS,
+  scheduleExecuteIntentViaTee,
 } from '@/lib/solana'
+import { getTeeAuthToken } from '@/lib/tee'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { decodeIntentData, secondsToDays } from '@/utils/intent'
@@ -124,23 +122,27 @@ export default function CapsuleDetailPage() {
   const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
 
   const handleDelegate = useCallback(async () => {
-    if (!wallet.publicKey || !wallet.signTransaction) return
+    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signMessage) return
     setDelegatePending(true)
     setDelegateError(null)
     setDelegateTx(null)
     setScheduleTx(null)
     setScheduleError(null)
     try {
-      // PER(TEE) delegate on-chain는 Devnet 상 프로그램 제약으로 인해 임시 비활성화.
-      // 대신 Magicblock Magic Program 크랭크만 등록해서 cron 없이 자동 실행을 보장한다.
+      // 1) Delegate capsule to PER (TEE) validator on Magicblock (delegation program)
+      const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
+      setDelegateTx(tx)
+
+      // 2) Obtain TEE auth token by signing a message, then schedule crank via PER RPC
       setSchedulePending(true)
       try {
-        const scheduleSig = await scheduleExecuteIntent(wallet, {
-          taskId: new BN(Date.now()),
-          executionIntervalMillis: new BN(CRANK_DEFAULT_INTERVAL_MS),
-          iterations: new BN(CRANK_DEFAULT_ITERATIONS),
-        })
-        setScheduleTx(scheduleSig)
+        const auth = await getTeeAuthToken(wallet)
+        if (auth?.token) {
+          const scheduleSig = await scheduleExecuteIntentViaTee(wallet, auth.token)
+          setScheduleTx(scheduleSig)
+        } else {
+          setScheduleError('TEE auth token not available — please enable message signing in your wallet.')
+        }
       } catch (e: unknown) {
         setScheduleError(e instanceof Error ? e.message : String(e))
       } finally {
