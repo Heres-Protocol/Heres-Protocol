@@ -54,6 +54,30 @@ a {
   touch-action: manipulation;
 }
 
+/* Mobile menu: wallet button must not overflow – stay inside menu box */
+.mobile-menu-wallet-wrap {
+  overflow: hidden;
+}
+.mobile-menu-wallet-wrap > * {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+.mobile-menu-wallet-wrap .wallet-adapter-button {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+.mobile-menu-wallet-wrap .wallet-adapter-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  min-width: 0;
+}
+
 /* Mobile: wallet adapter – min touch target 44px, modal fits viewport */
 @media (max-width: 640px) {
   .wallet-adapter-button {

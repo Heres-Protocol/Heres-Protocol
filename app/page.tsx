@@ -727,8 +727,8 @@ export default function HomePage() {
                   return items.map((p, i) => {
                     const angleDeg = (360 / ring.count) * i
                     const angleRad = (angleDeg * Math.PI) / 180
-                    const x = ring.radiusX * Math.sin(angleRad)
-                    const y = -ring.radiusY * Math.cos(angleRad)
+                    const x = Math.round(ring.radiusX * Math.sin(angleRad))
+                    const y = Math.round(-ring.radiusY * Math.cos(angleRad))
                     return (
                       <a
                         key={`${ringIdx}-${i}`}

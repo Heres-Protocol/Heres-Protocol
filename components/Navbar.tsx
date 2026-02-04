@@ -49,22 +49,12 @@ export function Navbar() {
 
   return (
     <header className="nav-glass">
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-2 px-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-2 px-3 pr-4 sm:px-6 sm:pr-6 lg:px-8">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
           <Link href="/" className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <Image src="/logo-white.png" alt="Heres" width={52} height={52} className="h-9 w-auto sm:h-[52px]" priority unoptimized />
             <span className="truncate text-lg font-bold tracking-tight text-lucid-white sm:text-xl">Heres</span>
           </Link>
-          {/* Mobile: hamburger */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen((v) => !v)}
-            className="ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-lucid-border bg-lucid-surface text-lucid-white md:hidden"
-            aria-expanded={mobileOpen}
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
         </div>
 
         <nav className="hidden items-center gap-8 md:flex">
@@ -83,6 +73,16 @@ export function Navbar() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {/* Mobile: hamburger top right (pr on container avoids clip) */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-lucid-border bg-lucid-surface text-white md:hidden ml-1"
+            aria-expanded={mobileOpen}
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
           <div className="relative hidden sm:block" ref={dropdownRef}>
             <button
               type="button"
@@ -127,18 +127,24 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu: nav links + Connect on the right so the user can just choose */}
+      {/* Mobile menu: extend toward bottom, height slightly cut so panel doesn't go full viewport */}
       {mobileOpen && (
-        <div className="border-t border-lucid-border/50 bg-lucid-bg/95 backdrop-blur-xl md:hidden">
-          <nav className="mx-auto max-w-7xl px-3 py-4 sm:px-6">
-            <ul className="flex flex-col gap-1">
+        <div
+          className="border-t border-white/20 bg-[#0f172a] md:hidden overflow-x-hidden"
+          style={{
+            backgroundColor: '#0f172a',
+            minHeight: 'calc(100dvh - 4rem - env(safe-area-inset-top, 0px) - 25rem)',
+          }}
+        >
+          <nav className="mx-auto max-w-7xl px-4 py-2 sm:px-6 min-w-0 overflow-hidden">
+            <ul className="flex flex-col gap-0.5">
               {navLinks.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className={`block rounded-lg px-4 py-3 text-base font-medium transition-colors ${pathname === link.href
-                      ? 'bg-lucid-accent/20 text-lucid-accent'
-                      : 'text-lucid-white hover:bg-lucid-surface'
+                    className={`block rounded-lg px-4 py-2 text-sm font-medium transition-colors ${pathname === link.href
+                      ? 'bg-lucid-accent/30 text-white'
+                      : 'text-white hover:bg-white/15'
                       }`}
                   >
                     {link.label}
@@ -146,24 +152,24 @@ export function Navbar() {
                 </li>
               ))}
             </ul>
-            <div className="mt-4 flex justify-end border-t border-lucid-border/50 pt-4">
-              <WalletMultiButton className="!h-12 !min-h-[44px] !rounded-xl !bg-lucid-surface !px-5 !py-0 !text-sm !font-medium !text-lucid-white transition-opacity hover:!bg-lucid-card active:scale-95" />
-            </div>
-            <div className="mt-4 border-t border-lucid-border/50 pt-4">
-              <p className="px-4 py-2 text-xs font-medium uppercase tracking-wider text-lucid-muted">Network</p>
+            <div className="mt-2 border-t border-white/20 pt-2">
+              <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wider text-slate-300">Network</p>
               <div className="space-y-0.5">
                 {NETWORKS.map((net) => (
                   <button
                     key={net.id}
                     type="button"
                     onClick={() => setSelectedNetwork(net)}
-                    className={`flex w-full items-center rounded-lg px-4 py-3 text-left text-sm ${selectedNetwork.id === net.id ? 'bg-lucid-accent/20 text-lucid-accent' : 'text-lucid-white hover:bg-lucid-surface'
+                    className={`flex w-full items-center rounded-lg px-4 py-2 text-sm font-medium ${selectedNetwork.id === net.id ? 'bg-lucid-accent/30 text-white' : 'text-white hover:bg-white/15'
                       }`}
                   >
                     {net.label}
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="mobile-menu-wallet-wrap mt-2 w-full min-w-0 overflow-hidden border-t border-white/20 px-6 pt-2 pb-3">
+              <WalletMultiButton className="!h-11 !min-h-[44px] !w-full !max-w-full !min-w-0 !rounded-xl !bg-lucid-surface !px-4 !py-0 !text-sm !font-medium !text-white transition-opacity hover:!bg-lucid-card active:scale-95" />
             </div>
           </nav>
         </div>
