@@ -8,9 +8,14 @@ import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/lucid_program.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
 import { getCapsulePDA, getFeeConfigPDA, getCapsuleVaultPDA } from './program'
+import { getTeeConnection } from './tee'
 import { SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
 import { MAGICBLOCK_ER } from '@/constants'
 import type { IntentCapsule } from '@/types'
+
+/** Default crank: run execute_intent check every 15 min, up to 100k iterations (MagicBlock Crank). */
+export const CRANK_DEFAULT_INTERVAL_MS = 15 * 60 * 1000
+export const CRANK_DEFAULT_ITERATIONS = 100_000
 
 // Re-export connection function
 export { getSolanaConnection as getConnection }
@@ -306,6 +311,61 @@ export async function scheduleExecuteIntent(
       capsule: capsulePDA,
       vault: vaultPDA,
       owner: wallet.publicKey!,
+      systemProgram: SystemProgram.programId,
+      feeConfig: feeConfigPDA,
+      platformFeeRecipient,
+    })
+    .rpc()
+
+  return tx
+}
+
+/**
+ * Schedule crank on TEE/PER so execute_intent runs automatically at intervals (MagicBlock Crank).
+ * Call this after delegate_capsule so execution happens on-chain without anyone visiting.
+ * See: https://docs.magicblock.app/pages/tools/crank/introduction
+ */
+export async function scheduleExecuteIntentViaTee(
+  wallet: WalletContextState,
+  teeAuthToken: string,
+  args?: {
+    taskId?: BN
+    executionIntervalMillis?: BN
+    iterations?: BN
+  }
+): Promise<string> {
+  if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
+
+  const connection = getTeeConnection(teeAuthToken)
+  const walletAdapter = {
+    publicKey: wallet.publicKey,
+    signTransaction: wallet.signTransaction,
+    signAllTransactions: wallet.signAllTransactions ?? (async (txs) => txs),
+  } as Wallet
+  const provider = new AnchorProvider(connection, walletAdapter, { commitment: 'confirmed' })
+  const program = new Program(idl as any, provider)
+
+  const [capsulePDA] = getCapsulePDA(wallet.publicKey)
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
+    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
+    : feeConfigPDA
+
+  const taskId = args?.taskId ?? new BN(Date.now())
+  const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(CRANK_DEFAULT_INTERVAL_MS)
+  const iterations = args?.iterations ?? new BN(CRANK_DEFAULT_ITERATIONS)
+
+  const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+
+  const tx = await program.methods
+    .scheduleExecuteIntent({ taskId, executionIntervalMillis, iterations })
+    .accounts({
+      magicProgram,
+      payer: wallet.publicKey,
+      capsule: capsulePDA,
+      vault: vaultPDA,
+      owner: wallet.publicKey,
       systemProgram: SystemProgram.programId,
       feeConfig: feeConfigPDA,
       platformFeeRecipient,

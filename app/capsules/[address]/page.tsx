@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { ArrowLeft, Copy, RefreshCw, Shield, Play } from 'lucide-react'
-import { getCapsuleByAddress, delegateCapsule, executeIntent } from '@/lib/solana'
+import { getCapsuleByAddress, delegateCapsule, executeIntent, scheduleExecuteIntentViaTee } from '@/lib/solana'
+import { getTeeAuthToken } from '@/lib/tee'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { decodeIntentData, secondsToDays } from '@/utils/intent'
@@ -106,6 +107,9 @@ export default function CapsuleDetailPage() {
   const [delegatePending, setDelegatePending] = useState(false)
   const [delegateTx, setDelegateTx] = useState<string | null>(null)
   const [delegateError, setDelegateError] = useState<string | null>(null)
+  const [schedulePending, setSchedulePending] = useState(false)
+  const [scheduleTx, setScheduleTx] = useState<string | null>(null)
+  const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [executePending, setExecutePending] = useState(false)
   const [executeTx, setExecuteTx] = useState<string | null>(null)
   const [executeError, setExecuteError] = useState<string | null>(null)
@@ -117,9 +121,25 @@ export default function CapsuleDetailPage() {
     setDelegatePending(true)
     setDelegateError(null)
     setDelegateTx(null)
+    setScheduleTx(null)
+    setScheduleError(null)
     try {
       const tx = await delegateCapsule(wallet)
       setDelegateTx(tx)
+      setSchedulePending(true)
+      try {
+        const auth = await getTeeAuthToken(wallet)
+        if (auth?.token) {
+          const scheduleSig = await scheduleExecuteIntentViaTee(wallet, auth.token)
+          setScheduleTx(scheduleSig)
+        } else {
+          setScheduleError('TEE auth skipped — sign message to enable automatic execution')
+        }
+      } catch (e: unknown) {
+        setScheduleError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setSchedulePending(false)
+      }
     } catch (e: unknown) {
       setDelegateError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -446,11 +466,11 @@ export default function CapsuleDetailPage() {
                 <button
                   type="button"
                   onClick={handleDelegate}
-                  disabled={delegatePending}
+                  disabled={delegatePending || schedulePending}
                   className="inline-flex items-center gap-2 rounded-lg border border-lucid-accent bg-lucid-accent/20 px-4 py-2 text-sm font-medium text-lucid-accent transition hover:bg-lucid-accent/30 disabled:opacity-60"
                 >
                   <Shield className="h-4 w-4" />
-                  {delegatePending ? 'Delegating…' : 'Delegate to PER (TEE)'}
+                  {delegatePending ? 'Delegating…' : schedulePending ? 'Scheduling automatic execution…' : 'Delegate to PER (TEE)'}
                 </button>
                 {delegateTx && (
                   <a
@@ -459,10 +479,16 @@ export default function CapsuleDetailPage() {
                     rel="noopener noreferrer"
                     className="text-sm text-lucid-accent hover:underline"
                   >
-                    View transaction
+                    View delegate tx
                   </a>
                 )}
+                {scheduleTx && (
+                  <span className="text-sm text-lucid-accent">
+                    Automatic execution scheduled. When conditions are met, assets will be distributed without anyone visiting.
+                  </span>
+                )}
                 {delegateError && <p className="text-sm text-amber-400">{delegateError}</p>}
+                {scheduleError && <p className="text-sm text-amber-400">Schedule: {scheduleError}</p>}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -2,12 +2,21 @@
  * Private Ephemeral Rollup (PER) / TEE auth and verification
  */
 
-import { PublicKey } from '@solana/web3.js'
+import { Connection, PublicKey } from '@solana/web3.js'
 import { getAuthToken, verifyTeeRpcIntegrity } from '@magicblock-labs/ephemeral-rollups-sdk'
 import { PER_TEE } from '@/constants'
 import type { WalletContextState } from '@solana/wallet-adapter-react'
 
 const TEE_RPC_URL = PER_TEE.RPC_URL
+
+/**
+ * Get Connection to TEE/PER RPC for sending transactions to the Ephemeral Rollup
+ * (e.g. schedule_execute_intent after delegate → crank runs on-chain automatically).
+ */
+export function getTeeConnection(authToken: string): Connection {
+  const url = authToken ? `${TEE_RPC_URL}?token=${encodeURIComponent(authToken)}` : TEE_RPC_URL
+  return new Connection(url, { commitment: 'confirmed' })
+}
 
 /**
  * Get authorization token for TEE RPC (PER). Wallet signs challenge; use token in getTeeConnection(token).

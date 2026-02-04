@@ -86,9 +86,21 @@ Result: **Intent remains private, execution is deterministic and automatic.**
 4. **Execution** – When `last_activity + inactivity_period` has passed, **the crank runs automatically** (or anyone can submit `execute_intent`). The program checks time condition on-chain, deducts execution fee, and distributes SOL from the vault to beneficiaries. For NFT intents, logic can be extended similarly.
 5. **Post-execution** – Capsule can be deactivated or recreated via `recreate_capsule` for a new intent.
 
-### Automatic execution (crank)
+### Automatic execution (no one needs to visit)
 
-When conditions are met, execution and distribution happen **without any user visiting the app**. A crank calls `execute_intent` for every eligible capsule on a schedule.
+When conditions are met, execution and distribution happen **without the creator or beneficiaries visiting the app**. Two options:
+
+#### 1. MagicBlock Crank (recommended — on-chain, no external cron)
+
+When you **delegate** the capsule to PER (TEE) from the capsule detail page, the app also **schedules a crank** on the Ephemeral Rollup via MagicBlock’s [ScheduleTask](https://docs.magicblock.app/pages/tools/crank/introduction). The crank runs `execute_intent` at intervals (e.g. every 15 min) **on-chain**. When `last_activity + inactivity_period` is satisfied, execution happens automatically — **no off-chain cron or user visit required**.
+
+- **Flow:** Create capsule → Delegate to PER (TEE) → App calls `schedule_execute_intent` via TEE RPC → MagicBlock runs the crank on the rollup.
+- **Docs:** [MagicBlock Crank — Introduction](https://docs.magicblock.app/pages/tools/crank/introduction), [Implementation](https://docs.magicblock.app/pages/tools/crank/implementation), [crank-counter example](https://github.com/magicblock-labs/magicblock-engine-examples/tree/main/crank-counter).
+- **Code:** `lib/solana.ts` (`scheduleExecuteIntentViaTee`), `lib/tee.ts` (`getTeeConnection`), `app/capsules/[address]/page.tsx` (after delegate, schedule crank).
+
+#### 2. Off-chain cron (fallback)
+
+For capsules that were **not** delegated, or as a fallback, you can use the API so a cron job calls `execute_intent` for eligible capsules on the Solana base layer.
 
 - **Endpoint:** `GET` or `POST` `/api/cron/execute-intent`. Optional: send `Authorization: Bearer <CRON_SECRET>` if `CRON_SECRET` is set.
 - **No Vercel Cron required (Vercel Cron is a paid feature).** Use a **free external cron** to hit your deployed API every 15 minutes, for example:
