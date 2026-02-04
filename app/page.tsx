@@ -6,6 +6,7 @@ import { useRef, useEffect, useState } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { CapsuleMediaBlock } from '@/components/CapsuleMediaBlock'
+import { HeroCapsuleVideo } from '@/components/HeroCapsuleVideo'
 import { AsciiCapsule } from '@/components/AsciiCapsule'
 gsap.registerPlugin(ScrollTrigger)
 
@@ -296,13 +297,20 @@ export default function HomePage() {
             <p className="mx-auto max-w-2xl text-base sm:text-lg text-lucid-muted leading-relaxed">
               Define once. Delegate to Magicblock PER (TEE). Execution runs on Solana when conditions are met. No bridges, no third party.
             </p>
-            <div className="mt-8 flex justify-center">
+            <div className="mt-8 flex flex-wrap justify-center gap-3 sm:gap-4">
               <Link
                 href="/create"
                 className="btn-primary min-w-[160px] shrink-0 rounded-full py-3.5 text-center shadow-[0_0_24px_rgba(34,211,238,0.3)]"
               >
                 Get Started
               </Link>
+              <button
+                type="button"
+                className="btn-secondary min-w-[180px] shrink-0 rounded-full py-3.5 text-center"
+                aria-label="Download APK (coming soon)"
+              >
+                Download APK
+              </button>
             </div>
           </div>
         </div>
@@ -583,6 +591,50 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Heres on Solana Mobile – card left, copy right; storytelling title + APK CTA (distinct bg from How it works) */}
+      <section className="relative border-y border-lucid-border/30 bg-[#0d1220] py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+            {/* Left: composite image only – no box-in-box, display as-is like reference */}
+            <div className="flex flex-col items-center justify-center order-2 lg:order-1">
+              <div className="relative w-full max-w-xl lg:max-w-2xl rounded-xl overflow-hidden border border-lucid-border/50">
+                <Image
+                  src="/solana-mobile-hero.png"
+                  alt="Heres – web dashboard and mobile Create Capsule"
+                  width={800}
+                  height={600}
+                  className="w-full h-auto"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                />
+              </div>
+            </div>
+            {/* Right: copy + CTA */}
+            <div className="order-1 lg:order-2">
+              <h2 className="text-3xl font-bold leading-tight text-lucid-white sm:text-4xl">
+                Set it once. It runs forever.
+              </h2>
+              <p className="mt-4 text-sm font-medium uppercase tracking-wider text-lucid-accent">
+                Heres on Solana Mobile Seeker
+              </p>
+              <p className="mt-6 text-lg leading-relaxed text-slate-300">
+                Download the APK, tap a few times, and leave a will-like intent: who gets your assets and after how long of inactivity. Your capsule lives on Solana. Delete the app tomorrow. Execution still runs and distributes to your beneficiaries.
+              </p>
+              <p className="mt-4 text-base leading-relaxed text-lucid-muted">
+                The future is uncertain. Set your capsule while you hold the keys.
+              </p>
+              <Link
+                href="https://seeker.solanamobile.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-lucid-accent/20 border border-lucid-accent px-6 py-3 font-medium text-lucid-accent transition hover:bg-lucid-accent/30"
+              >
+                Download APK
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Unleash the Power of Heres - capsule image + project copy */}
       <section ref={unleashRef} className="relative overflow-hidden py-24 sm:py-32">
         <div className="absolute inset-0 bg-black/40" />
@@ -601,17 +653,11 @@ export default function HomePage() {
             </div>
             <div
               data-gsap-unleash-3d
-              data-poster-url="/lucid-capsule-hero.png"
-              data-video-urls=""
-              data-autoplay="true"
-              data-loop="true"
-              className="background-video w-background-video relative aspect-video max-w-lg overflow-hidden rounded-2xl border border-lucid-border/50 bg-lucid-surface/80 shadow-xl"
+              className="relative aspect-video max-w-lg overflow-hidden rounded-2xl border border-lucid-border/50 bg-lucid-surface/80 shadow-xl"
             >
-              <CapsuleMediaBlock
+              <HeroCapsuleVideo
                 posterSrc="/lucid-capsule-hero.png"
-                alt="Lucid capsule – privacy-preserving intent on Solana"
-                objectFit="cover"
-                withMotion
+                alt="Heres capsule – privacy-preserving intent on Solana"
                 className="absolute inset-0 h-full w-full"
               />
             </div>
@@ -626,7 +672,7 @@ export default function HomePage() {
             The Possibilities Are Limitless, All On Solana
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted">
-            Lucid uses Solana for persistence, Magicblock PER (TEE) for private execution, Helius for RPC, Phantom and Backpack for wallets.
+            Heres uses Solana for persistence, Magicblock PER (TEE) for private execution, Helius for RPC, Phantom and Backpack for wallets, and Solana Mobile Seeker for the APK.
           </p>
         </div>
         <div className="partners-content relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -654,6 +700,7 @@ export default function HomePage() {
                 {(() => {
                   const partners = [
                     { name: 'Solana', href: 'https://solana.com', color: '#9945FF', logo: '/logos/solana.svg' },
+                    { name: 'Solana Mobile Seeker', href: 'https://seeker.solanamobile.com', color: '#ffffff', logo: '/logos/solana-mobile-seeker.png' },
                     { name: 'Phantom', href: 'https://phantom.app', color: '#ab9ff2', logo: '/logos/phantom.svg' },
                     { name: 'Helius', href: 'https://helius.dev', color: '#f97316', logo: '/logos/helius.svg' },
                     { name: 'Backpack', href: 'https://backpack.app', color: '#E33E3F', logo: '/logos/backpack.png' },
@@ -694,7 +741,7 @@ export default function HomePage() {
             {/* Central content – higher contrast font */}
             <div className="relative z-10 max-w-lg text-center">
               <h2 className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
-                4+
+                5+
               </h2>
               <h3 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
                 Powered by

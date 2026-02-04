@@ -247,6 +247,218 @@ a {
   object-fit: cover;
 }
 
+/* Hero section: video-style animated capsule (no video file) */
+.hero-capsule-motion {
+  min-height: 240px;
+}
+.hero-capsule-3d {
+  position: relative;
+  z-index: 10;
+  transform-style: preserve-3d;
+  animation: heroCapsuleFloat 12s ease-in-out infinite;
+}
+@keyframes heroCapsuleFloat {
+  0%, 100% { transform: perspective(900px) rotateY(0deg) rotateX(8deg) scale(1); }
+  25% { transform: perspective(900px) rotateY(90deg) rotateX(5deg) scale(1.02); }
+  50% { transform: perspective(900px) rotateY(180deg) rotateX(-5deg) scale(1); }
+  75% { transform: perspective(900px) rotateY(270deg) rotateX(-8deg) scale(1.02); }
+}
+.hero-capsule-glow {
+  border-radius: 50%;
+  background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(34, 211, 238, 0.35), rgba(167, 139, 250, 0.2) 50%, transparent 70%);
+  animation: heroCapsuleGlow 4s ease-in-out infinite;
+}
+.hero-capsule-shell {
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.15) 0%, transparent 40%, transparent 60%, rgba(167, 139, 250, 0.15) 100%);
+  box-shadow:
+    0 0 0 2px rgba(34, 211, 238, 0.5),
+    0 0 24px rgba(34, 211, 238, 0.25),
+    inset 0 0 40px rgba(34, 211, 238, 0.08);
+  animation: heroCapsulePulse 3s ease-in-out infinite;
+}
+@keyframes heroCapsuleGlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.05); }
+}
+@keyframes heroCapsulePulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.5), 0 0 24px rgba(34, 211, 238, 0.25), inset 0 0 40px rgba(34, 211, 238, 0.08); }
+  50% { box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.4), 0 0 32px rgba(167, 139, 250, 0.2), inset 0 0 50px rgba(34, 211, 238, 0.1); }
+}
+
+/* Heres Promo Reel (15s timeline) — 위아래 잘림 방지용 최소 높이 */
+.promo-reel {
+  --promo-cyan: rgba(34, 211, 238, 0.65);
+  --promo-purple: rgba(167, 139, 250, 0.35);
+  min-height: 200px;
+}
+@supports (aspect-ratio: 16 / 9) {
+  .promo-reel {
+    min-height: min(56.25vw, 360px);
+  }
+}
+.promo-abs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.promo-abs.center {
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+/* top 클래스가 있으면 위쪽 기준 정렬로 텍스트 겹침 방지 */
+.promo-abs.center[class*="top-"] {
+  align-items: flex-start;
+  padding-top: 0;
+}
+/* Scene 2·3·4: 좌/우 각 50% 영역 가운데 정렬, 세로는 조금 위로(아래 치우침 방지) */
+.promo-half-left {
+  left: 0;
+  width: 50%;
+  top: 45%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 0.5rem;
+}
+.promo-half-right {
+  left: 50%;
+  width: 50%;
+  top: 45%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 0.5rem;
+}
+.promo-capsule-wrap {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+/* Capsule: 가로로 누운 pill — 크기 확대, 아래 짤리지 않게 높이 제한 */
+.promo-capsule-full {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-left: -160px;
+  margin-top: -48px;
+  width: 320px;
+  height: 96px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--promo-cyan) 0%, transparent 40%, transparent 60%, var(--promo-purple) 100%);
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.7), 0 0 28px rgba(34, 211, 238, 0.35), inset 0 0 48px rgba(34, 211, 238, 0.12);
+}
+@media (min-width: 640px) {
+  .promo-capsule-full {
+    margin-left: -190px;
+    margin-top: -52px;
+    width: 380px;
+    height: 104px;
+  }
+}
+/* Scene 4: 가로 pill이 세로로 짤림(좌/우 절반으로 분리) — 각 절반 폭 확대 */
+.promo-capsule-half {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 160px;
+  height: 96px;
+  transform-origin: center center;
+  background: linear-gradient(135deg, var(--promo-cyan) 0%, transparent 50%, var(--promo-purple) 100%);
+}
+@media (min-width: 640px) {
+  .promo-capsule-half {
+    width: 190px;
+    height: 104px;
+  }
+}
+.promo-capsule-left {
+  margin-left: -160px;
+  margin-top: -48px;
+  border-radius: 9999px 0 0 9999px;
+  border: 2px solid rgba(34, 211, 238, 0.6);
+  border-right: none;
+  box-shadow: -8px 0 24px rgba(34, 211, 238, 0.25);
+}
+@media (min-width: 640px) {
+  .promo-capsule-left { margin-left: -190px; margin-top: -52px; }
+}
+.promo-capsule-right {
+  margin-left: 0;
+  margin-top: -48px;
+  border-radius: 0 9999px 9999px 0;
+  border: 2px solid rgba(34, 211, 238, 0.6);
+  border-left: none;
+  box-shadow: 8px 0 24px rgba(167, 139, 250, 0.2);
+}
+@media (min-width: 640px) {
+  .promo-capsule-right { margin-top: -52px; }
+}
+@keyframes promoFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+/* Scan beams: 70% length, 0.6 opacity */
+.promo-scan {
+  top: 15%;
+  left: 50%;
+  width: 2px;
+  height: 70%;
+  transform: translateX(-50%);
+  background: linear-gradient(to bottom, transparent, rgba(34, 211, 238, 0.6), transparent);
+  animation: promoScan 2s ease-in-out infinite;
+}
+@keyframes promoScan {
+  0%, 100% { opacity: 0.4; transform: translateX(-50%) translateY(-20%); }
+  50% { opacity: 0.6; transform: translateX(-50%) translateY(20%); }
+}
+/* Execution lines: 6 lines at 0/60/120/180/240/300°, expand from center (--line-length) */
+.promo-txlines {
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.promo-txline {
+  position: absolute;
+  bottom: 50%;
+  left: 50%;
+  width: 2px;
+  height: var(--line-length, 0px);
+  max-height: 800px;
+  transform-origin: 50% 100%;
+  background: linear-gradient(to top, rgba(34, 211, 238, 0.9), rgba(167, 139, 250, 0.5));
+  filter: blur(1px);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+}
+/* Execution burst: radial 500px, blur 20px, cyan→purple */
+.promo-burst {
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(34, 211, 238, 0.25) 25%,
+    rgba(167, 139, 250, 0.15) 50%,
+    transparent 70%
+  );
+  filter: blur(20px);
+  transform-origin: center center;
+}
+/* Global screen flash (impact frame at 9.25s) */
+.promo-flash {
+  background: #fff;
+  mix-blend-mode: overlay;
+}
+
 /* Partners logo grid (The Graph style) */
 .partners-logo-grid {
   display: grid;

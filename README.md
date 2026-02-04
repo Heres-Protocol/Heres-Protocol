@@ -83,8 +83,18 @@ Result: **Intent remains private, execution is deterministic and automatic.**
 1. **Create** – You define intent (e.g. total SOL, beneficiaries, inactivity period in days). SOL is locked in the capsule vault; creation fee is paid to the platform.
 2. **Delegate** – You delegate the capsule PDA to Magicblock ER or PER (TEE). Private runtime starts monitoring (e.g. last activity vs inactivity threshold).
 3. **Heartbeat (optional)** – You can call `update_activity` to refresh “last activity” and postpone execution.
-4. **Execution** – When `last_activity + inactivity_period` has passed, anyone submits `execute_intent`. The program checks time condition on-chain, deducts execution fee, and distributes SOL from the vault to beneficiaries. For NFT intents, logic can be extended similarly.
+4. **Execution** – When `last_activity + inactivity_period` has passed, **the crank runs automatically** (or anyone can submit `execute_intent`). The program checks time condition on-chain, deducts execution fee, and distributes SOL from the vault to beneficiaries. For NFT intents, logic can be extended similarly.
 5. **Post-execution** – Capsule can be deactivated or recreated via `recreate_capsule` for a new intent.
+
+### Automatic execution (crank)
+
+When conditions are met, execution and distribution happen **without any user visiting the app**. A server-side crank runs on a schedule and calls `execute_intent` for every eligible capsule.
+
+- **Endpoint:** `GET` or `POST` `/api/cron/execute-intent`. Optional: send `Authorization: Bearer <CRON_SECRET>` if `CRON_SECRET` is set.
+- **Schedule:** Vercel Cron runs the endpoint every 15 minutes (see `vercel.json`). You can also call it from an external cron (e.g. cron-job.org).
+- **Env:** Set `CRANK_WALLET_PRIVATE_KEY` to the crank wallet’s secret key (base64 or JSON array of 64 bytes). This wallet pays the transaction fee for each `execute_intent`; it does not need to hold SOL beyond fees. Optionally set `CRON_SECRET` to protect the endpoint.
+
+Code: `lib/crank.ts` (eligible capsules, execute), `app/api/cron/execute-intent/route.ts` (HTTP handler).
 
 ### How we use Solana, Magicblock, and Helius
 

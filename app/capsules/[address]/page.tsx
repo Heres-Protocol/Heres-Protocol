@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { ArrowLeft, Copy, RefreshCw, Shield } from 'lucide-react'
-import { getCapsuleByAddress, delegateCapsule } from '@/lib/solana'
+import { ArrowLeft, Copy, RefreshCw, Shield, Play } from 'lucide-react'
+import { getCapsuleByAddress, delegateCapsule, executeIntent } from '@/lib/solana'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { decodeIntentData, secondsToDays } from '@/utils/intent'
@@ -106,6 +106,9 @@ export default function CapsuleDetailPage() {
   const [delegatePending, setDelegatePending] = useState(false)
   const [delegateTx, setDelegateTx] = useState<string | null>(null)
   const [delegateError, setDelegateError] = useState<string | null>(null)
+  const [executePending, setExecutePending] = useState(false)
+  const [executeTx, setExecuteTx] = useState<string | null>(null)
+  const [executeError, setExecuteError] = useState<string | null>(null)
 
   const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
 
@@ -123,6 +126,38 @@ export default function CapsuleDetailPage() {
       setDelegatePending(false)
     }
   }, [wallet])
+
+  const handleExecute = useCallback(async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    const beneficiaries = intentParsed && 'beneficiaries' in intentParsed && Array.isArray(intentParsed.beneficiaries)
+      ? (intentParsed.beneficiaries as Array<{ address?: string; amount?: string; amountType?: string }>)
+          .filter((b) => b?.address)
+          .map((b) => ({
+            address: b.address!,
+            amount: typeof b.amount === 'string' ? b.amount : String(b.amount ?? '0'),
+            amountType: b.amountType ?? 'fixed',
+          }))
+      : undefined
+    if (!beneficiaries?.length) {
+      setExecuteError('No beneficiaries in intent data')
+      return
+    }
+    setExecutePending(true)
+    setExecuteError(null)
+    setExecuteTx(null)
+    try {
+      const tx = await executeIntent(wallet, capsule.owner, beneficiaries)
+      setExecuteTx(tx)
+      const pubkey = new PublicKey(capsule.capsuleAddress)
+      getCapsuleByAddress(pubkey).then((updated) => {
+        if (updated) setCapsule(updated)
+      }).catch(() => {})
+    } catch (e: unknown) {
+      setExecuteError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setExecutePending(false)
+    }
+  }, [wallet, capsule, intentParsed])
 
   const intentParsed = useMemo(() => {
     if (!capsule?.intentData) return null
@@ -310,9 +345,35 @@ export default function CapsuleDetailPage() {
                   {status}
                 </span>
               </div>
-              <p className="text-sm text-lucid-muted">
-                Updated {timeAgo(lastUpdatedMs)}
-              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                {status === 'Expired' && capsule.isActive && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleExecute}
+                      disabled={executePending || !wallet.connected}
+                      className="inline-flex items-center gap-2 rounded-lg bg-lucid-accent/20 border border-lucid-accent px-4 py-2 text-sm font-medium text-lucid-accent transition hover:bg-lucid-accent/30 disabled:opacity-60"
+                    >
+                      <Play className="h-4 w-4" />
+                      {executePending ? 'Executing…' : 'Execute intent'}
+                    </button>
+                    {executeTx && (
+                      <a
+                        href={`https://explorer.solana.com/tx/${executeTx}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-lucid-accent hover:underline"
+                      >
+                        View transaction
+                      </a>
+                    )}
+                    {executeError && <p className="text-sm text-amber-400">{executeError}</p>}
+                  </>
+                )}
+                <p className="text-sm text-lucid-muted">
+                  Updated {timeAgo(lastUpdatedMs)}
+                </p>
+              </div>
             </div>
             <p className="mt-3 text-sm text-lucid-muted max-w-xl">
               {isNft ? 'NFT capsule' : 'Token (SOL) capsule'} · Inactivity period:{' '}
