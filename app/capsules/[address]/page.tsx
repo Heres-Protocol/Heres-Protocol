@@ -5,9 +5,16 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
+import { BN } from '@coral-xyz/anchor'
 import { ArrowLeft, Copy, RefreshCw, Shield, Play } from 'lucide-react'
-import { getCapsuleByAddress, delegateCapsule, executeIntent, scheduleExecuteIntentViaTee } from '@/lib/solana'
-import { getTeeAuthToken } from '@/lib/tee'
+import {
+  getCapsuleByAddress,
+  delegateCapsule,
+  executeIntent,
+  scheduleExecuteIntent,
+  CRANK_DEFAULT_INTERVAL_MS,
+  CRANK_DEFAULT_ITERATIONS,
+} from '@/lib/solana'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { decodeIntentData, secondsToDays } from '@/utils/intent'
@@ -124,18 +131,19 @@ export default function CapsuleDetailPage() {
     setScheduleTx(null)
     setScheduleError(null)
     try {
-      // Pass TEE validator explicitly so Anchor client receives required `validator` account
+      // 1) Delegate capsule to PER (TEE) validator on Magicblock
       const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
       setDelegateTx(tx)
+
+      // 2) Schedule on-chain crank via Magicblock Magic Program (no external cron, no TEE RPC)
       setSchedulePending(true)
       try {
-        const auth = await getTeeAuthToken(wallet)
-        if (auth?.token) {
-          const scheduleSig = await scheduleExecuteIntentViaTee(wallet, auth.token)
-          setScheduleTx(scheduleSig)
-        } else {
-          setScheduleError('TEE auth skipped — sign message to enable automatic execution')
-        }
+        const scheduleSig = await scheduleExecuteIntent(wallet, {
+          taskId: new BN(Date.now()),
+          executionIntervalMillis: new BN(CRANK_DEFAULT_INTERVAL_MS),
+          iterations: new BN(CRANK_DEFAULT_ITERATIONS),
+        })
+        setScheduleTx(scheduleSig)
       } catch (e: unknown) {
         setScheduleError(e instanceof Error ? e.message : String(e))
       } finally {
