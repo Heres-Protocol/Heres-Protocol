@@ -124,7 +124,8 @@ export default function CapsuleDetailPage() {
     setScheduleTx(null)
     setScheduleError(null)
     try {
-      const tx = await delegateCapsule(wallet)
+      // Pass TEE validator explicitly so Anchor client receives required `validator` account
+      const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
       setDelegateTx(tx)
       setSchedulePending(true)
       try {
