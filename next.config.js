@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Improve Lighthouse: optimize images, reduce unused JS
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
   webpack: (config, { isServer, webpack }) => {
     // Ignore server-only modules in client bundle
     if (!isServer) {

@@ -5,7 +5,7 @@
  * called and SOL is distributed to beneficiaries without any user action.
  */
 
-import { Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction, VersionedTransaction } from '@solana/web3.js'
 import { Program, AnchorProvider, Wallet } from '@coral-xyz/anchor'
 import idl from '../idl/lucid_program.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
@@ -89,14 +89,20 @@ function parseBeneficiaries(intentData: Uint8Array): Array<{ address: string; am
 }
 
 function walletFromKeypair(keypair: Keypair): Wallet {
+  const signTx = async <T extends Transaction | VersionedTransaction>(tx: T): Promise<T> => {
+    if ('partialSign' in tx && typeof (tx as Transaction).partialSign === 'function') {
+      (tx as Transaction).partialSign(keypair)
+    } else if ('sign' in tx && typeof (tx as VersionedTransaction).sign === 'function') {
+      (tx as VersionedTransaction).sign([keypair])
+    }
+    return tx
+  }
   return {
     publicKey: keypair.publicKey,
-    signTransaction: async (tx) => {
-      tx.partialSign(keypair)
-      return tx
-    },
+    payer: keypair,
+    signTransaction: signTx,
     signAllTransactions: async (txs) => {
-      txs.forEach((tx) => tx.partialSign(keypair))
+      for (const tx of txs) await signTx(tx)
       return txs
     },
   }

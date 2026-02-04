@@ -88,11 +88,13 @@ Result: **Intent remains private, execution is deterministic and automatic.**
 
 ### Automatic execution (crank)
 
-When conditions are met, execution and distribution happen **without any user visiting the app**. A server-side crank runs on a schedule and calls `execute_intent` for every eligible capsule.
+When conditions are met, execution and distribution happen **without any user visiting the app**. A crank calls `execute_intent` for every eligible capsule on a schedule.
 
 - **Endpoint:** `GET` or `POST` `/api/cron/execute-intent`. Optional: send `Authorization: Bearer <CRON_SECRET>` if `CRON_SECRET` is set.
-- **Schedule:** Vercel Cron runs the endpoint every 15 minutes (see `vercel.json`). You can also call it from an external cron (e.g. cron-job.org).
-- **Env:** Set `CRANK_WALLET_PRIVATE_KEY` to the crank wallet’s secret key (base64 or JSON array of 64 bytes). This wallet pays the transaction fee for each `execute_intent`; it does not need to hold SOL beyond fees. Optionally set `CRON_SECRET` to protect the endpoint.
+- **No Vercel Cron required (Vercel Cron is a paid feature).** Use a **free external cron** to hit your deployed API every 15 minutes, for example:
+  - [cron-job.org](https://cron-job.org): create a job, URL `https://heres.vercel.app/api/cron/execute-intent`, method GET or POST, schedule `*/15 * * * *` (every 15 min). If you set `CRON_SECRET`, add header `Authorization: Bearer <your-secret>`.
+  - [Uptime Robot](https://uptimerobot.com): monitor or HTTP check to the same URL every 15 minutes.
+- **Env:** Set `CRANK_WALLET_PRIVATE_KEY` to the crank wallet’s secret key (base58, base64, or JSON array of 64 bytes). This wallet pays the transaction fee for each `execute_intent`; it does not need to hold SOL beyond fees. Optionally set `CRON_SECRET` to protect the endpoint.
 
 Code: `lib/crank.ts` (eligible capsules, execute), `app/api/cron/execute-intent/route.ts` (HTTP handler).
 

@@ -127,6 +127,11 @@ export default function CapsuleDetailPage() {
     }
   }, [wallet])
 
+  const intentParsed = useMemo(() => {
+    if (!capsule?.intentData) return null
+    return parseIntentData(capsule.intentData)
+  }, [capsule?.intentData])
+
   const handleExecute = useCallback(async () => {
     if (!wallet.connected || !wallet.publicKey || !capsule) return
     const beneficiaries = intentParsed && 'beneficiaries' in intentParsed && Array.isArray(intentParsed.beneficiaries)
@@ -158,11 +163,6 @@ export default function CapsuleDetailPage() {
       setExecutePending(false)
     }
   }, [wallet, capsule, intentParsed])
-
-  const intentParsed = useMemo(() => {
-    if (!capsule?.intentData) return null
-    return parseIntentData(capsule.intentData)
-  }, [capsule?.intentData])
 
   const isNft = intentParsed?.type === 'nft'
   const isToken = intentParsed?.type === 'token'

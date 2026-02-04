@@ -2,13 +2,19 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import { useRef, useEffect, useState } from 'react'
-import { gsap } from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { CapsuleMediaBlock } from '@/components/CapsuleMediaBlock'
-import { HeroCapsuleVideo } from '@/components/HeroCapsuleVideo'
-import { AsciiCapsule } from '@/components/AsciiCapsule'
-gsap.registerPlugin(ScrollTrigger)
+
+const AsciiCapsule = dynamic(() => import('@/components/AsciiCapsule').then((m) => ({ default: m.AsciiCapsule })), {
+  ssr: false,
+  loading: () => <div className="min-h-[120px]" aria-hidden />,
+})
+
+const HeroCapsuleVideo = dynamic(() => import('@/components/HeroCapsuleVideo').then((m) => ({ default: m.HeroCapsuleVideo })), {
+  ssr: false,
+  loading: () => <div className="aspect-video w-full animate-pulse rounded-2xl bg-lucid-surface/50" aria-hidden />,
+})
 
 function DashedLine({
   height = 50,
@@ -168,107 +174,118 @@ export default function HomePage() {
   const partnersSectionRef = useRef<HTMLElement>(null)
   const unleashRef = useRef<HTMLElement>(null)
   const [activeWhyIndex, setActiveWhyIndex] = useState(0)
+  const gsapCtxRef = useRef<{ revert?: () => void } | null>(null)
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.from(heroRef.current?.querySelector('h1') ?? {}, {
-        opacity: 0,
-        y: 40,
-        duration: 0.8,
-        ease: 'power3.out',
-      })
-      gsap.from(heroRef.current?.querySelector('[data-hero-ascii]') ?? {}, {
-        opacity: 0,
-        y: 24,
-        duration: 0.9,
-        delay: 0.3,
-        ease: 'power3.out',
-      })
-      gsap.from(heroRef.current?.querySelector('[data-hero-below-capsule]') ?? {}, {
-        opacity: 0,
-        y: 20,
-        duration: 0.8,
-        delay: 0.6,
-        ease: 'power3.out',
-      })
-      // Why Build – Your development environment: same scroll animations as The Graph subgraphs
-      if (whySectionRef.current) {
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: whySectionRef.current,
-            start: 'top 82%',
-            end: 'top 20%',
-            once: true,
-          },
+    let cancelled = false
+    void (async () => {
+      const gsap = (await import('gsap')).default
+      const ScrollTrigger = (await import('gsap/ScrollTrigger')).default
+      gsap.registerPlugin(ScrollTrigger)
+      if (cancelled) return
+      gsapCtxRef.current = gsap.context(() => {
+        gsap.from(heroRef.current?.querySelector('h1') ?? {}, {
+          opacity: 0,
+          y: 40,
+          duration: 0.8,
+          ease: 'power3.out',
         })
-        if (whyTitleRef.current) {
-          tl.from(whyTitleRef.current, { opacity: 0, y: 28, duration: 0.65, ease: 'power3.out' })
-        }
-        const whyHeading = whySectionRef.current.querySelector('[data-why-heading]')
-        if (whyHeading) {
-          tl.from(whyHeading, { opacity: 0, y: 20, duration: 0.5, ease: 'power3.out' }, '-=0.4')
-        }
-        if (whyLeftRef.current) {
-          const cards = whyLeftRef.current.querySelectorAll('[data-gsap-why-card]')
-          tl.fromTo(cards, { y: 32, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, stagger: 0.12, ease: 'power3.out' }, '-=0.35')
-        }
-        if (whyVisualMainRef.current) {
-          tl.from(whyVisualMainRef.current, { x: 48, opacity: 0, duration: 0.7, ease: 'power3.out' }, '-=0.45')
-        }
-      }
-      if (howTitleRef.current) {
-        ScrollTrigger.create({
-          trigger: howTitleRef.current,
-          start: 'top 85%',
-          onEnter: () => {
-            gsap.from(howTitleRef.current, { opacity: 0, y: 30, duration: 0.7, ease: 'power3.out' })
-          },
-          once: true,
+        gsap.from(heroRef.current?.querySelector('[data-hero-ascii]') ?? {}, {
+          opacity: 0,
+          y: 24,
+          duration: 0.9,
+          delay: 0.3,
+          ease: 'power3.out',
         })
-      }
-      if (stepsRef.current) {
-        const stepEls = stepsRef.current.querySelectorAll('[data-gsap-step]')
-        gsap.fromTo(
-          stepEls,
-          { y: 32 },
-          {
-            y: 0,
-            scrollTrigger: { trigger: stepsRef.current, start: 'top 88%', once: true },
-            stagger: 0.12,
-            duration: 0.5,
-            ease: 'power3.out',
+        gsap.from(heroRef.current?.querySelector('[data-hero-below-capsule]') ?? {}, {
+          opacity: 0,
+          y: 20,
+          duration: 0.8,
+          delay: 0.6,
+          ease: 'power3.out',
+        })
+        if (whySectionRef.current) {
+          const tl = gsap.timeline({
+            scrollTrigger: {
+              trigger: whySectionRef.current,
+              start: 'top 82%',
+              end: 'top 20%',
+              once: true,
+            },
+          })
+          if (whyTitleRef.current) {
+            tl.from(whyTitleRef.current, { opacity: 0, y: 28, duration: 0.65, ease: 'power3.out' })
           }
-        )
-      }
-      if (partnersSectionRef.current) {
-        gsap.from(partnersSectionRef.current.querySelector('h2'), {
-          scrollTrigger: { trigger: partnersSectionRef.current, start: 'top 85%', once: true },
-          opacity: 0,
-          y: 30,
-          duration: 0.7,
-          ease: 'power3.out',
-        })
-      }
-      if (unleashRef.current) {
-        const left = unleashRef.current.querySelector('[data-gsap-unleash-text]')
-        const right = unleashRef.current.querySelector('[data-gsap-unleash-3d]')
-        gsap.from(left, {
-          scrollTrigger: { trigger: unleashRef.current, start: 'top 80%', once: true },
-          opacity: 0,
-          x: -50,
-          duration: 0.9,
-          ease: 'power3.out',
-        })
-        gsap.from(right, {
-          scrollTrigger: { trigger: unleashRef.current, start: 'top 80%', once: true },
-          opacity: 0,
-          x: 50,
-          duration: 0.9,
-          delay: 0.2,
-          ease: 'power3.out',
-        })
-      }
-    })
-    return () => ctx.revert()
+          const whyHeading = whySectionRef.current.querySelector('[data-why-heading]')
+          if (whyHeading) {
+            tl.from(whyHeading, { opacity: 0, y: 20, duration: 0.5, ease: 'power3.out' }, '-=0.4')
+          }
+          if (whyLeftRef.current) {
+            const cards = whyLeftRef.current.querySelectorAll('[data-gsap-why-card]')
+            tl.fromTo(cards, { y: 32, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, stagger: 0.12, ease: 'power3.out' }, '-=0.35')
+          }
+          if (whyVisualMainRef.current) {
+            tl.from(whyVisualMainRef.current, { x: 48, opacity: 0, duration: 0.7, ease: 'power3.out' }, '-=0.45')
+          }
+        }
+        if (howTitleRef.current) {
+          ScrollTrigger.create({
+            trigger: howTitleRef.current,
+            start: 'top 85%',
+            onEnter: () => {
+              gsap.from(howTitleRef.current, { opacity: 0, y: 30, duration: 0.7, ease: 'power3.out' })
+            },
+            once: true,
+          })
+        }
+        if (stepsRef.current) {
+          const stepEls = stepsRef.current.querySelectorAll('[data-gsap-step]')
+          gsap.fromTo(
+            stepEls,
+            { y: 32 },
+            {
+              y: 0,
+              scrollTrigger: { trigger: stepsRef.current, start: 'top 88%', once: true },
+              stagger: 0.12,
+              duration: 0.5,
+              ease: 'power3.out',
+            }
+          )
+        }
+        if (partnersSectionRef.current) {
+          gsap.from(partnersSectionRef.current.querySelector('h2'), {
+            scrollTrigger: { trigger: partnersSectionRef.current, start: 'top 85%', once: true },
+            opacity: 0,
+            y: 30,
+            duration: 0.7,
+            ease: 'power3.out',
+          })
+        }
+        if (unleashRef.current) {
+          const left = unleashRef.current.querySelector('[data-gsap-unleash-text]')
+          const right = unleashRef.current.querySelector('[data-gsap-unleash-3d]')
+          gsap.from(left, {
+            scrollTrigger: { trigger: unleashRef.current, start: 'top 80%', once: true },
+            opacity: 0,
+            x: -50,
+            duration: 0.9,
+            ease: 'power3.out',
+          })
+          gsap.from(right, {
+            scrollTrigger: { trigger: unleashRef.current, start: 'top 80%', once: true },
+            opacity: 0,
+            x: 50,
+            duration: 0.9,
+            delay: 0.2,
+            ease: 'power3.out',
+          })
+        }
+      })
+    })()
+    return () => {
+      cancelled = true
+      if (gsapCtxRef.current?.revert) gsapCtxRef.current.revert()
+      gsapCtxRef.current = null
+    }
   }, [])
 
   return (

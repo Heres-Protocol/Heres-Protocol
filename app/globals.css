@@ -54,6 +54,23 @@ a {
   touch-action: manipulation;
 }
 
+/* Mobile: wallet adapter – min touch target 44px, modal fits viewport */
+@media (max-width: 640px) {
+  .wallet-adapter-button {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    padding: 0 16px !important;
+  }
+  .wallet-adapter-modal-wrapper {
+    max-height: 100dvh !important;
+    overflow-y: auto !important;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left) !important;
+  }
+  .wallet-adapter-modal-list li {
+    min-height: 48px !important;
+  }
+}
+
 /* Magicblock-style gradient background */
 .bg-hero {
   background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.12), transparent 50%),
