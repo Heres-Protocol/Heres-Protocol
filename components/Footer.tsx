@@ -29,7 +29,7 @@ export function Footer() {
         <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <Image src="/logo-white.png" alt="Heres" width={44} height={44} className="h-11 w-auto" unoptimized />
+              <Image src="/logo-white.png?v=3" alt="Heres" width={44} height={44} className="h-11 w-auto" unoptimized />
               <span className="text-xl font-bold text-lucid-white">Heres</span>
             </div>
             <div className="flex gap-2">

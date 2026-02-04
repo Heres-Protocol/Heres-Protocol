@@ -545,6 +545,7 @@ export default function HomePage() {
                     fill
                     className="object-cover object-top"
                     sizes="(max-width: 768px) 100vw, 33vw"
+                    unoptimized
                   />
                 </div>
               </div>
@@ -597,6 +598,7 @@ export default function HomePage() {
                     fill
                     className="object-cover object-top"
                     sizes="(max-width: 768px) 100vw, 33vw"
+                    unoptimized
                   />
                 </div>
               </div>
@@ -622,6 +624,7 @@ export default function HomePage() {
                   height={600}
                   className="w-full h-auto"
                   sizes="(max-width: 768px) 100vw, 60vw"
+                  unoptimized
                 />
               </div>
             </div>
