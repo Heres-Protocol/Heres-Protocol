@@ -131,11 +131,8 @@ export default function CapsuleDetailPage() {
     setScheduleTx(null)
     setScheduleError(null)
     try {
-      // 1) Delegate capsule to PER (TEE) validator on Magicblock
-      const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
-      setDelegateTx(tx)
-
-      // 2) Schedule on-chain crank via Magicblock Magic Program (no external cron, no TEE RPC)
+      // PER(TEE) delegate on-chain는 Devnet 상 프로그램 제약으로 인해 임시 비활성화.
+      // 대신 Magicblock Magic Program 크랭크만 등록해서 cron 없이 자동 실행을 보장한다.
       setSchedulePending(true)
       try {
         const scheduleSig = await scheduleExecuteIntent(wallet, {
