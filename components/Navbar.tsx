@@ -120,13 +120,14 @@ export function Navbar() {
               </ul>
             )}
           </div>
-          <div className="relative z-50 flex items-center wallet-nav-trigger">
+          {/* Desktop: Connect visible in nav; mobile: Connect only inside hamburger */}
+          <div className="relative z-50 hidden items-center wallet-nav-trigger md:flex">
             <WalletMultiButton className="!h-10 !rounded-xl !bg-lucid-surface !px-4 !py-0 !text-sm !font-medium !text-lucid-white transition-opacity hover:!bg-lucid-card active:scale-95" />
           </div>
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu: nav links + Connect on the right so the user can just choose */}
       {mobileOpen && (
         <div className="border-t border-lucid-border/50 bg-lucid-bg/95 backdrop-blur-xl md:hidden">
           <nav className="mx-auto max-w-7xl px-3 py-4 sm:px-6">
@@ -145,6 +146,9 @@ export function Navbar() {
                 </li>
               ))}
             </ul>
+            <div className="mt-4 flex justify-end border-t border-lucid-border/50 pt-4">
+              <WalletMultiButton className="!h-12 !min-h-[44px] !rounded-xl !bg-lucid-surface !px-5 !py-0 !text-sm !font-medium !text-lucid-white transition-opacity hover:!bg-lucid-card active:scale-95" />
+            </div>
             <div className="mt-4 border-t border-lucid-border/50 pt-4">
               <p className="px-4 py-2 text-xs font-medium uppercase tracking-wider text-lucid-muted">Network</p>
               <div className="space-y-0.5">

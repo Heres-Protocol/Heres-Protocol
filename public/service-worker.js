@@ -1,6 +1,5 @@
-const CACHE_NAME = 'heres-cache-v1';
+const CACHE_NAME = 'heres-cache-v2';
 const urlsToCache = [
-  '/',
   '/manifest.json',
   '/logo-white.png',
   '/logo-black.png',
@@ -16,9 +15,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache);
-      })
+      .then((cache) => cache.addAll(urlsToCache))
   );
 });
 
@@ -27,14 +24,15 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  const isDocument = event.request.mode === 'navigate' || event.request.destination === 'document';
+  const isNextData = url.pathname.startsWith('/_next') || url.searchParams.has('rsc');
+  if (isDocument || isNextData) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
+    caches.match(event.request).then((response) => response || fetch(event.request))
   );
 });
 

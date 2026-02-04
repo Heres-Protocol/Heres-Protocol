@@ -241,6 +241,37 @@ const fetchAllSignatures = async (
   return all
 }
 
+/** Fetch transactions in small batches with delay to avoid 429 (Too Many Requests) on public RPC. */
+const fetchTransactionsBatched = async (
+  connection: ReturnType<typeof getSolanaConnection>,
+  signatureInfos: Array<{ signature: string; err: any; blockTime?: number; memo?: string | null; slot?: number }>,
+  batchSize = 6,
+  delayMs = 200
+): Promise<Array<{ info: typeof signatureInfos[0]; tx: any }>> => {
+  const results: Array<{ info: typeof signatureInfos[0]; tx: any }> = []
+  for (let i = 0; i < signatureInfos.length; i += batchSize) {
+    const batch = signatureInfos.slice(i, i + batchSize)
+    const batchResults = await Promise.all(
+      batch.map(async (signatureInfo) => {
+        try {
+          const tx = await connection.getTransaction(signatureInfo.signature, {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0,
+          })
+          return { info: signatureInfo, tx }
+        } catch {
+          return { info: signatureInfo, tx: null }
+        }
+      })
+    )
+    results.push(...batchResults)
+    if (i + batchSize < signatureInfos.length && delayMs > 0) {
+      await new Promise((r) => setTimeout(r, delayMs))
+    }
+  }
+  return results
+}
+
 const getSignatureFromTx = (tx: any) =>
   tx?.signature ||
   tx?.transactionSignature ||
@@ -472,19 +503,7 @@ export default function DashboardPage() {
           }
         }
 
-        const rpcTransactions = await Promise.all(
-          signatureInfos.map(async (signatureInfo) => {
-            try {
-              const tx = await connection.getTransaction(signatureInfo.signature, {
-                commitment: 'confirmed',
-                maxSupportedTransactionVersion: 0,
-              })
-              return { info: signatureInfo, tx }
-            } catch {
-              return { info: signatureInfo, tx: null }
-            }
-          })
-        )
+        const rpcTransactions = await fetchTransactionsBatched(connection, signatureInfos)
 
         const combinedTxMap = new Map<string, ReturnType<typeof toTxRecordFromRpc>>()
         rpcTransactions

@@ -5,37 +5,30 @@
 import { Connection, PublicKey } from '@solana/web3.js'
 import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE } from '@/constants'
 
+let cachedConnection: Connection | null = null
+
 /**
- * Get Solana connection with Helius RPC
- * Enhanced with better timeout and retry handling
+ * Get Solana connection with Helius RPC (cached to avoid duplicate instances and reduce RPC pressure).
+ * Use Helius when API key is set; otherwise fallback to public RPC (rate-limited).
  */
 export function getSolanaConnection(): Connection {
-  // Helius RPC URL with API key in query parameter
-  // Use Helius if API key is available, otherwise fallback to public RPC
+  if (cachedConnection) return cachedConnection
+
   const rpcUrl = HELIUS_CONFIG.RPC_URL
-  
-  // Mask API key in logs
-  const maskedUrl = rpcUrl.replace(/api-key=[^&]+/, 'api-key=***')
-  console.log('Creating Solana connection to:', maskedUrl)
-  
   try {
-    return new Connection(rpcUrl, {
+    cachedConnection = new Connection(rpcUrl, {
       commitment: 'confirmed',
-      confirmTransactionInitialTimeout: 120000, // 120 seconds
-      httpHeaders: {
-        'Content-Type': 'application/json',
-      },
+      confirmTransactionInitialTimeout: 120000,
+      httpHeaders: { 'Content-Type': 'application/json' },
     })
-  } catch (error) {
-    console.error('Error creating connection with Helius RPC, trying fallback:', error)
-    // Fallback to public Solana RPC
+  } catch {
     const fallbackUrl = HELIUS_CONFIG.RPC_URL_ALT
-    console.log('Using fallback RPC:', fallbackUrl)
-    return new Connection(fallbackUrl, {
+    cachedConnection = new Connection(fallbackUrl, {
       commitment: 'confirmed',
       confirmTransactionInitialTimeout: 120000,
     })
   }
+  return cachedConnection
 }
 
 /**

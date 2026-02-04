@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Improve Lighthouse: optimize images, reduce unused JS
   images: {
     formats: ['image/avif', 'image/webp'],
   },
