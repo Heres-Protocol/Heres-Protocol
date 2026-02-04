@@ -244,11 +244,11 @@ const fetchAllSignatures = async (
 /** Fetch transactions in small batches with delay to avoid 429 (Too Many Requests) on public RPC. */
 const fetchTransactionsBatched = async (
   connection: ReturnType<typeof getSolanaConnection>,
-  signatureInfos: Array<{ signature: string; err: any; blockTime?: number; memo?: string | null; slot?: number }>,
+  signatureInfos: Array<{ signature: string; err: any; blockTime?: number | null; memo?: string | null; slot?: number }>,
   batchSize = 6,
   delayMs = 200
-): Promise<Array<{ info: typeof signatureInfos[0]; tx: any }>> => {
-  const results: Array<{ info: typeof signatureInfos[0]; tx: any }> = []
+): Promise<Array<{ info: (typeof signatureInfos)[0]; tx: any }>> => {
+  const results: Array<{ info: (typeof signatureInfos)[0]; tx: any }> = []
   for (let i = 0; i < signatureInfos.length; i += batchSize) {
     const batch = signatureInfos.slice(i, i + batchSize)
     const batchResults = await Promise.all(
