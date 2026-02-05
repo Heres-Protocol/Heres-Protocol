@@ -52,7 +52,7 @@ export function Navbar() {
       <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-2 px-3 pr-4 sm:px-6 sm:pr-6 lg:px-8">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
           <Link href="/" className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <Image src="/logo-white.png" alt="Heres" width={52} height={52} className="h-9 w-auto sm:h-[52px]" priority unoptimized />
+            <Image src="/logo-white.png?v=3" alt="Heres" width={52} height={52} className="h-9 w-auto sm:h-[52px]" priority unoptimized />
             <span className="truncate text-lg font-bold tracking-tight text-lucid-white sm:text-xl">Heres</span>
           </Link>
         </div>
