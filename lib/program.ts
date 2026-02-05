@@ -34,3 +34,33 @@ export function getCapsuleVaultPDA(owner: PublicKey): [PublicKey, number] {
     getProgramId()
   )
 }
+
+/**
+ * Derive Magicblock Buffer PDA (seeds = ["buffer", pda])
+ */
+export function getBufferPDA(pda: PublicKey, magicProgramId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('buffer'), pda.toBuffer()],
+    magicProgramId
+  )
+}
+
+/**
+ * Derive Magicblock Delegation Record PDA (seeds = ["delegation", pda])
+ */
+export function getDelegationRecordPDA(pda: PublicKey, delegationProgramId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('delegation'), pda.toBuffer()],
+    delegationProgramId
+  )
+}
+
+/**
+ * Derive Magicblock Delegation Metadata PDA (seeds = ["delegation-metadata", pda])
+ */
+export function getDelegationMetadataPDA(pda: PublicKey, delegationProgramId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('delegation-metadata'), pda.toBuffer()],
+    delegationProgramId
+  )
+}

@@ -7,7 +7,14 @@ import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor'
 import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/lucid_program.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
-import { getCapsulePDA, getFeeConfigPDA, getCapsuleVaultPDA } from './program'
+import {
+  getCapsulePDA,
+  getFeeConfigPDA,
+  getCapsuleVaultPDA,
+  getBufferPDA,
+  getDelegationRecordPDA,
+  getDelegationMetadataPDA,
+} from './program'
 import { getTeeConnection } from './tee'
 import { SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
 import { MAGICBLOCK_ER } from '@/constants'
@@ -29,11 +36,11 @@ export function getProvider(wallet: WalletContextState): AnchorProvider | null {
   }
 
   const connection = getSolanaConnection()
-  
+
   const walletAdapter = {
     publicKey: wallet.publicKey,
     signTransaction: wallet.signTransaction,
-    signAllTransactions: wallet.signAllTransactions,
+    signAllTransactions: wallet.signAllTransactions || (async (txs: any) => txs),
   } as Wallet
 
   return new AnchorProvider(connection, walletAdapter, {
@@ -112,17 +119,17 @@ export async function createCapsule(
       return tx
     } catch (error: any) {
       lastError = error
-      
+
       // Check if it's a retryable RPC error
       const errorMessage = error?.message || ''
-      const isRetryableError = 
+      const isRetryableError =
         errorMessage.includes('503') ||
         errorMessage.includes('Service unavailable') ||
         errorMessage.includes('failed to get recent blockhash') ||
         errorMessage.includes('timeout') ||
         errorMessage.includes('ECONNREFUSED') ||
         errorMessage.includes('network')
-      
+
       if (isRetryableError && attempt < maxRetries - 1) {
         // Wait before retry (exponential backoff: 2s, 4s, 8s, 16s)
         const delay = Math.min(2000 * Math.pow(2, attempt), 16000)
@@ -130,7 +137,7 @@ export async function createCapsule(
         await new Promise(resolve => setTimeout(resolve, delay))
         continue
       }
-      
+
       // If it's not a retryable error or max retries reached, throw
       throw error
     }
@@ -140,7 +147,7 @@ export async function createCapsule(
   if (lastError?.message?.includes('503') || lastError?.message?.includes('Service unavailable')) {
     throw new Error('RPC 서버가 일시적으로 사용 불가능합니다. 잠시 후 다시 시도해주세요.\nRPC server is temporarily unavailable. Please try again in a few moments.')
   }
-  
+
   throw lastError
 }
 
@@ -238,15 +245,34 @@ export async function delegateCapsule(
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey)
 
+  // Derive PDAs for delegation accounts
+  const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+  const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+  const [bufferPDA] = getBufferPDA(capsulePDA, magicProgramId)
+  const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA, delegationProgramId)
+  const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA, delegationProgramId)
+
   const accounts: {
     payer: PublicKey
     owner: PublicKey
     validator?: PublicKey
+    bufferPda: PublicKey
+    delegationRecordPda: PublicKey
+    delegationMetadataPda: PublicKey
     pda: PublicKey
+    ownerProgram: PublicKey
+    delegationProgram: PublicKey
+    systemProgram: PublicKey
   } = {
     payer: wallet.publicKey,
     owner: wallet.publicKey,
+    bufferPda: bufferPDA,
+    delegationRecordPda: delegationRecordPDA,
+    delegationMetadataPda: delegationMetadataPDA,
     pda: capsulePDA,
+    ownerProgram: getProgramId(),
+    delegationProgram: delegationProgramId,
+    systemProgram: SystemProgram.programId,
   }
   if (validatorPubkey) accounts.validator = validatorPubkey
 
@@ -529,12 +555,12 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
   try {
     console.log('Fetching capsule for owner:', owner.toString())
     console.log('Capsule PDA:', capsulePDA.toString())
-    
+
     // Retry logic for RPC errors
     const maxRetries = 3
     let accountInfo = null
     let lastError: any
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         // Use Anchor's account decoder to parse the account
@@ -545,7 +571,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       } catch (error: any) {
         lastError = error
         const errorMessage = error?.message || ''
-        const isRetryableError = 
+        const isRetryableError =
           errorMessage.includes('503') ||
           errorMessage.includes('401') ||
           errorMessage.includes('32401') ||
@@ -554,7 +580,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
           errorMessage.includes('timeout') ||
           errorMessage.includes('network') ||
           errorMessage.includes('Unauthorized')
-        
+
         if (isRetryableError && attempt < maxRetries - 1) {
           const delay = Math.min(2000 * Math.pow(2, attempt), 10000)
           console.log(`RPC error (attempt ${attempt + 1}/${maxRetries}): ${errorMessage}, retrying in ${delay}ms...`)
@@ -564,7 +590,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
         throw error // Not retryable or max retries reached
       }
     }
-    
+
     if (!accountInfo || !accountInfo.data) {
       console.log('No account info or data found for PDA:', capsulePDA.toString())
       return null
@@ -573,15 +599,15 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
     // Anchor accounts start with an 8-byte discriminator
     // Skip the discriminator and parse the account data
     const data = accountInfo.data
-    
+
     // Discriminator is 8 bytes, skip it
     let offset = 8
-    
+
     // owner: Pubkey (32 bytes)
     const ownerBytes = data.slice(offset, offset + 32)
     const ownerPubkey = new PublicKey(ownerBytes)
     offset += 32
-    
+
     // Helper function to read i64 (little-endian)
     const readI64 = (bytes: Uint8Array, start: number): bigint => {
       let result = 0n
@@ -594,30 +620,30 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       }
       return result
     }
-    
+
     // Helper function to read u32 (little-endian)
     const readU32 = (bytes: Uint8Array, start: number): number => {
       return bytes[start] | (bytes[start + 1] << 8) | (bytes[start + 2] << 16) | (bytes[start + 3] << 24)
     }
-    
+
     // inactivity_period: i64 (8 bytes, little-endian)
     const inactivityPeriod = readI64(data, offset)
     offset += 8
-    
+
     // last_activity: i64 (8 bytes, little-endian)
     const lastActivity = readI64(data, offset)
     offset += 8
-    
+
     // intent_data: Vec<u8> (4 bytes length + data)
     const intentDataLength = readU32(data, offset)
     offset += 4
     const intentDataBytes = data.slice(offset, offset + intentDataLength)
     offset += intentDataLength
-    
+
     // is_active: bool (1 byte)
     const isActive = data[offset] === 1
     offset += 1
-    
+
     // executed_at: Option<i64> (1 byte for Some/None + 8 bytes if Some)
     let executedAt: number | null = null
     const hasExecutedAt = data[offset] === 1
@@ -626,7 +652,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       executedAt = Number(readI64(data, offset))
       offset += 8
     }
-    
+
     // bump: u8 (1 byte) - we don't need this for the return value
 
     const capsule = {
@@ -637,14 +663,14 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       isActive,
       executedAt,
     }
-    
+
     console.log('Successfully fetched capsule:', {
       owner: capsule.owner.toString(),
       isActive: capsule.isActive,
       executedAt: capsule.executedAt,
       inactivityPeriod: capsule.inactivityPeriod,
     })
-    
+
     return capsule
   } catch (error) {
     console.error('Error fetching capsule:', error)
