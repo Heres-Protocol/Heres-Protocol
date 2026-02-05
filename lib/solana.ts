@@ -248,7 +248,7 @@ export async function delegateCapsule(
   // Derive PDAs for delegation accounts
   const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
   const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
-  const [bufferPDA] = getBufferPDA(capsulePDA, magicProgramId)
+  const [bufferPDA] = getBufferPDA(capsulePDA, getProgramId())
   const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA, delegationProgramId)
   const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA, delegationProgramId)
 
