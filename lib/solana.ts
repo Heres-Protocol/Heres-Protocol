@@ -325,7 +325,7 @@ export async function scheduleExecuteIntent(
   const [feeConfigPDA] = getFeeConfigPDA()
   const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
     ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
-    : feeConfigPDA // placeholder if not set
+    : (wallet.publicKey as PublicKey) // Use user as fallback to avoid SystemAccount mismatch
 
   const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
 
@@ -333,10 +333,10 @@ export async function scheduleExecuteIntent(
     .scheduleExecuteIntent(args)
     .accounts({
       magicProgram,
-      payer: wallet.publicKey!,
+      payer: wallet.publicKey as PublicKey,
       capsule: capsulePDA,
       vault: vaultPDA,
-      owner: wallet.publicKey!,
+      owner: wallet.publicKey as PublicKey,
       systemProgram: SystemProgram.programId,
       feeConfig: feeConfigPDA,
       platformFeeRecipient,
@@ -376,7 +376,7 @@ export async function scheduleExecuteIntentViaTee(
   const [feeConfigPDA] = getFeeConfigPDA()
   const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
     ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
-    : feeConfigPDA
+    : (wallet.publicKey as PublicKey) // Use user as fallback to avoid SystemAccount mismatch
 
   const taskId = args?.taskId ?? new BN(Date.now())
   const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(CRANK_DEFAULT_INTERVAL_MS)
@@ -388,9 +388,10 @@ export async function scheduleExecuteIntentViaTee(
     .scheduleExecuteIntent({ taskId, executionIntervalMillis, iterations })
     .accounts({
       magicProgram,
-      payer: wallet.publicKey,
+      payer: wallet.publicKey as PublicKey,
       capsule: capsulePDA,
       vault: vaultPDA,
+      owner: wallet.publicKey as PublicKey, // Explicitly pass owner (signer)
       systemProgram: SystemProgram.programId,
       feeConfig: feeConfigPDA,
       platformFeeRecipient,
@@ -662,6 +663,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       intentData: new Uint8Array(intentDataBytes),
       isActive,
       executedAt,
+      accountOwner: accountInfo.owner,
     }
 
     console.log('Successfully fetched capsule:', {
@@ -669,6 +671,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       isActive: capsule.isActive,
       executedAt: capsule.executedAt,
       inactivityPeriod: capsule.inactivityPeriod,
+      accountOwner: capsule.accountOwner.toString(),
     })
 
     return capsule
@@ -731,6 +734,7 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
       isActive,
       executedAt,
       capsuleAddress: capsulePda.toBase58(),
+      accountOwner: accountInfo.owner, // Return the actual account owner (Lucid or Delegation program)
     }
   } catch {
     return null

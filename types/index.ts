@@ -19,6 +19,7 @@ export interface IntentCapsule {
   intentData: Uint8Array
   isActive: boolean
   executedAt: number | null
+  accountOwner?: PublicKey
 }
 
 // Wallet Activity types

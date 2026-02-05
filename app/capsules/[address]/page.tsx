@@ -62,7 +62,7 @@ function parseIntentData(intentData: Uint8Array): IntentParsed | null {
     try {
       const decoded = decodeIntentData(intentData)
       if (decoded) return { type: 'token', ...decoded } as IntentParsed
-    } catch {}
+    } catch { }
     return null
   }
 }
@@ -122,16 +122,24 @@ export default function CapsuleDetailPage() {
   const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
 
   const handleDelegate = useCallback(async () => {
-    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signMessage) return
+    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signMessage || !capsule) return
+
+    // Check if the account is already delegated by checking its program owner
+    const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+    const isAlreadyDelegated = capsule.accountOwner?.equals(delegationProgramId)
+
     setDelegatePending(true)
     setDelegateError(null)
     setDelegateTx(null)
     setScheduleTx(null)
     setScheduleError(null)
     try {
-      // 1) Delegate capsule to PER (TEE) validator on Magicblock (delegation program)
-      const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
-      setDelegateTx(tx)
+      // 1) Delegate capsule to PER (TEE) validator on Magicblock (only if not already delegated)
+      if (!isAlreadyDelegated) {
+        const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
+        setDelegateTx(tx)
+        // Wait a small amount for the ledger to update or refresh manually if needed
+      }
 
       // 2) Obtain TEE auth token by signing a message, then schedule crank via PER RPC
       setSchedulePending(true)
@@ -143,17 +151,24 @@ export default function CapsuleDetailPage() {
         } else {
           setScheduleError('TEE auth token not available — please enable message signing in your wallet.')
         }
-      } catch (e: unknown) {
-        setScheduleError(e instanceof Error ? e.message : String(e))
+      } catch (e: any) {
+        // Pretty print simulation errors (common on Devnet/Backpack)
+        const msg = e?.message || String(e)
+        if (msg.includes('Simulation failed')) {
+          setScheduleError(`Schedule Failure: ${msg}. If delegation just succeeded, wait 5s and try again.`)
+        } else {
+          setScheduleError(msg)
+        }
       } finally {
         setSchedulePending(false)
       }
-    } catch (e: unknown) {
-      setDelegateError(e instanceof Error ? e.message : String(e))
+    } catch (e: any) {
+      const msg = e?.message || String(e)
+      setDelegateError(msg)
     } finally {
       setDelegatePending(false)
     }
-  }, [wallet])
+  }, [wallet, capsule])
 
   const intentParsed = useMemo(() => {
     if (!capsule?.intentData) return null
@@ -164,12 +179,12 @@ export default function CapsuleDetailPage() {
     if (!wallet.connected || !wallet.publicKey || !capsule) return
     const beneficiaries = intentParsed && 'beneficiaries' in intentParsed && Array.isArray(intentParsed.beneficiaries)
       ? (intentParsed.beneficiaries as Array<{ address?: string; amount?: string; amountType?: string }>)
-          .filter((b) => b?.address)
-          .map((b) => ({
-            address: b.address!,
-            amount: typeof b.amount === 'string' ? b.amount : String(b.amount ?? '0'),
-            amountType: b.amountType ?? 'fixed',
-          }))
+        .filter((b) => b?.address)
+        .map((b) => ({
+          address: b.address!,
+          amount: typeof b.amount === 'string' ? b.amount : String(b.amount ?? '0'),
+          amountType: b.amountType ?? 'fixed',
+        }))
       : undefined
     if (!beneficiaries?.length) {
       setExecuteError('No beneficiaries in intent data')
@@ -184,7 +199,7 @@ export default function CapsuleDetailPage() {
       const pubkey = new PublicKey(capsule.capsuleAddress)
       getCapsuleByAddress(pubkey).then((updated) => {
         if (updated) setCapsule(updated)
-      }).catch(() => {})
+      }).catch(() => { })
     } catch (e: unknown) {
       setExecuteError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -262,7 +277,7 @@ export default function CapsuleDetailPage() {
           const usd = data?.solana?.usd
           if (typeof usd === 'number' && usd > 0) setCurrentSolPrice(usd)
         })
-        .catch(() => {})
+        .catch(() => { })
     }
     fetchPrice()
     const interval = setInterval(fetchPrice, 60_000)
@@ -328,10 +343,10 @@ export default function CapsuleDetailPage() {
   const status = capsule.executedAt
     ? 'Executed'
     : !capsule.isActive
-    ? 'Waiting'
-    : capsule.lastActivity + capsule.inactivityPeriod < Math.floor(Date.now() / 1000)
-    ? 'Expired'
-    : 'Active'
+      ? 'Waiting'
+      : capsule.lastActivity + capsule.inactivityPeriod < Math.floor(Date.now() / 1000)
+        ? 'Expired'
+        : 'Active'
   const lastUpdatedMs = capsule.lastActivity ? capsule.lastActivity * 1000 : null
 
   return (
@@ -360,15 +375,14 @@ export default function CapsuleDetailPage() {
                   v1.0
                 </span>
                 <span
-                  className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
-                    status === 'Active'
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium ${status === 'Active'
                       ? 'bg-lucid-accent/20 text-lucid-accent'
                       : status === 'Executed'
-                      ? 'bg-lucid-accent/20 text-lucid-accent'
-                      : status === 'Expired'
-                      ? 'bg-red-500/20 text-red-400'
-                      : 'bg-lucid-purple/20 text-lucid-purple'
-                  }`}
+                        ? 'bg-lucid-accent/20 text-lucid-accent'
+                        : status === 'Expired'
+                          ? 'bg-red-500/20 text-red-400'
+                          : 'bg-lucid-purple/20 text-lucid-purple'
+                    }`}
                 >
                   {status}
                 </span>
@@ -581,11 +595,10 @@ export default function CapsuleDetailPage() {
                       key={r.key}
                       type="button"
                       onClick={() => setChartRange(r.key)}
-                      className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                        chartRange === r.key
+                      className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${chartRange === r.key
                           ? 'border-lucid-accent bg-lucid-accent/20 text-lucid-accent'
                           : 'border-lucid-border bg-lucid-card/80 text-lucid-muted hover:border-lucid-accent/40 hover:text-lucid-accent'
-                      }`}
+                        }`}
                     >
                       {r.label}
                     </button>
