@@ -299,6 +299,16 @@ export async function delegateCapsule(
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey)
 
+  // Verify capsule account exists and is owned by our program
+  const connection = getSolanaConnection()
+  const accountInfo = await connection.getAccountInfo(capsulePDA)
+  if (!accountInfo) {
+    throw new Error('Capsule account not found. Please create a capsule first.')
+  }
+  if (!accountInfo.owner.equals(getProgramId())) {
+    throw new Error(`Capsule is not owned by the Lucid Program. Current owner: ${accountInfo.owner.toBase58()}`)
+  }
+
   // Derive PDAs for delegation accounts
   const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
   const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
