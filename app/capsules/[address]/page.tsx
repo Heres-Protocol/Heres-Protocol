@@ -143,8 +143,9 @@ export default function CapsuleDetailPage() {
         const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
         setDelegateTx(tx)
         console.log('[STEP 1] ✓ Delegation successful. Tx:', tx)
-        // Wait a moment for the ledger to update before scheduling the crank
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        // Wait for the ER to sync the delegated account (5 seconds)
+        console.log('[STEP 1] Waiting 5 seconds for ER to sync the delegated account...')
+        await new Promise(resolve => setTimeout(resolve, 5000))
       } else {
         console.log('[STEP 1] Capsule already delegated, skipping delegation step')
       }
@@ -153,29 +154,46 @@ export default function CapsuleDetailPage() {
       // This transaction is sent to the Ephemeral Rollup (ER) via TEE RPC
       // to schedule automatic execution when conditions are met
       setSchedulePending(true)
-      try {
-        console.log('[STEP 2] Obtaining TEE auth token...')
-        const auth = await getTeeAuthToken(wallet)
-        if (auth?.token) {
-          console.log('[STEP 2] ✓ TEE auth token obtained. Scheduling crank on ER...')
+
+      // Retry logic for crank scheduling (ER may need time to sync)
+      const maxRetries = 3
+      let lastError: any = null
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[STEP 2] Attempt ${attempt}/${maxRetries}: Obtaining TEE auth token...`)
+          const auth = await getTeeAuthToken(wallet)
+          if (!auth?.token) {
+            const errorMsg = 'TEE auth token not available — please enable message signing in your wallet.'
+            console.error('[STEP 2] ✗', errorMsg)
+            setScheduleError(errorMsg)
+            return
+          }
+
+          console.log(`[STEP 2] Attempt ${attempt}/${maxRetries}: Scheduling crank on ER...`)
           const scheduleSig = await scheduleExecuteIntentViaTee(wallet, auth.token)
           setScheduleTx(scheduleSig)
           console.log('[STEP 2] ✓ Crank scheduled successfully on ER. Tx:', scheduleSig)
-        } else {
-          const errorMsg = 'TEE auth token not available — please enable message signing in your wallet.'
-          console.error('[STEP 2] ✗', errorMsg)
-          setScheduleError(errorMsg)
+          return // Success, exit the function
+        } catch (e: any) {
+          lastError = e
+          const msg = e?.message || String(e)
+          console.error(`[STEP 2] ✗ Attempt ${attempt}/${maxRetries} failed:`, msg)
+
+          if (attempt < maxRetries) {
+            // Wait before retry (3 seconds)
+            console.log(`[STEP 2] Waiting 3 seconds before retry...`)
+            await new Promise(resolve => setTimeout(resolve, 3000))
+          }
         }
-      } catch (e: any) {
-        const msg = e?.message || String(e)
-        console.error('[STEP 2] ✗ Crank scheduling failed:', msg)
-        if (msg.includes('Simulation failed')) {
-          setScheduleError(`Crank scheduling failed: ${msg}. If delegation just succeeded, wait a few seconds and try again.`)
-        } else {
-          setScheduleError(`Crank scheduling failed: ${msg}`)
-        }
-      } finally {
-        setSchedulePending(false)
+      }
+
+      // All retries failed
+      const msg = lastError?.message || String(lastError)
+      if (msg.includes('writable account') || msg.includes('Simulation failed')) {
+        setScheduleError(`Crank scheduling failed after ${maxRetries} attempts: The ER may still be syncing. Please try again in a few seconds.`)
+      } else {
+        setScheduleError(`Crank scheduling failed: ${msg}`)
       }
     } catch (e: any) {
       const msg = e?.message || String(e)
@@ -183,6 +201,7 @@ export default function CapsuleDetailPage() {
       setDelegateError(`Delegation failed: ${msg}`)
     } finally {
       setDelegatePending(false)
+      setSchedulePending(false)
     }
   }, [wallet, capsule])
 
