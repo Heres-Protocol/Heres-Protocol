@@ -92,9 +92,13 @@ When conditions are met, execution and distribution happen **without the creator
 
 #### 1. MagicBlock Crank (recommended — on-chain, no external cron)
 
-When you **delegate** the capsule to PER (TEE) from the capsule detail page, the app also **schedules a crank** on the Ephemeral Rollup via MagicBlock’s [ScheduleTask](https://docs.magicblock.app/pages/tools/crank/introduction). The crank runs `execute_intent` at intervals (e.g. every 15 min) **on-chain**. When `last_activity + inactivity_period` is satisfied, execution happens automatically — **no off-chain cron or user visit required**.
+When you **delegate** the capsule to PER (TEE) from the capsule detail page, the system performs **two separate transactions**:
 
-- **Flow:** Create capsule → Delegate to PER (TEE) → App calls `schedule_execute_intent` via TEE RPC → MagicBlock runs the crank on the rollup.
+**Step 1: Delegation** – The capsule PDA is delegated to the Ephemeral Rollup (ER) delegation program on Solana Devnet. This transaction is sent to Solana Devnet and transfers ownership of the capsule account to the MagicBlock delegation program.
+
+**Step 2: Crank Scheduling** – After successful delegation, a **separate transaction is sent to the ER** (via TEE RPC) to schedule automatic execution using MagicBlock's [ScheduleTask](https://docs.magicblock.app/pages/tools/crank/introduction). The crank runs `execute_intent` at intervals (e.g. every 15 min) **on the Ephemeral Rollup**. When `last_activity + inactivity_period` is satisfied, execution happens automatically — **no off-chain cron or user visit required**.
+
+- **Flow:** Create capsule → **[Step 1]** Delegate to PER (TEE) on Devnet → **[Step 2]** Schedule crank on ER via TEE RPC → MagicBlock runs the crank on the rollup.
 - **Docs:** [MagicBlock Crank — Introduction](https://docs.magicblock.app/pages/tools/crank/introduction), [Implementation](https://docs.magicblock.app/pages/tools/crank/implementation), [crank-counter example](https://github.com/magicblock-labs/magicblock-engine-examples/tree/main/crank-counter).
 - **Code:** `lib/solana.ts` (`scheduleExecuteIntentViaTee`), `lib/tee.ts` (`getTeeConnection`), `app/capsules/[address]/page.tsx` (after delegate, schedule crank).
 

@@ -305,13 +305,21 @@ export async function delegateCapsule(
   if (!accountInfo) {
     throw new Error('Capsule account not found. Please create a capsule first.')
   }
+
+  const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+  const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+
+  // Check if already delegated
+  if (accountInfo.owner.equals(delegationProgramId)) {
+    console.log('Capsule is already delegated to MagicBlock (Ephemereality). Proceeding...')
+    return 'ALREADY_DELEGATED'
+  }
+
   if (!accountInfo.owner.equals(getProgramId())) {
     throw new Error(`Capsule is not owned by the Lucid Program. Current owner: ${accountInfo.owner.toBase58()}`)
   }
 
   // Derive PDAs for delegation accounts
-  const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
-  const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
   const [bufferPDA] = getBufferPDA(capsulePDA, getProgramId())
   const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA, delegationProgramId)
   const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA, delegationProgramId)

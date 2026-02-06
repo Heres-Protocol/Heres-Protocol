@@ -133,38 +133,54 @@ export default function CapsuleDetailPage() {
     setDelegateTx(null)
     setScheduleTx(null)
     setScheduleError(null)
+
     try {
-      // 1) Delegate capsule to PER (TEE) validator on Magicblock (only if not already delegated)
+      // ===== STEP 1: Delegate capsule to PER (TEE) validator =====
+      // This transaction is sent to Solana Devnet to delegate the capsule account
+      // to the MagicBlock Ephemeral Rollup (ER) delegation program
       if (!isAlreadyDelegated) {
+        console.log('[STEP 1] Delegating capsule to PER (TEE) validator...')
         const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
         setDelegateTx(tx)
-        // Wait a small amount for the ledger to update or refresh manually if needed
+        console.log('[STEP 1] ✓ Delegation successful. Tx:', tx)
+        // Wait a moment for the ledger to update before scheduling the crank
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      } else {
+        console.log('[STEP 1] Capsule already delegated, skipping delegation step')
       }
 
-      // 2) Obtain TEE auth token by signing a message, then schedule crank via PER RPC
+      // ===== STEP 2: Schedule crank on ER to automatically execute intent =====
+      // This transaction is sent to the Ephemeral Rollup (ER) via TEE RPC
+      // to schedule automatic execution when conditions are met
       setSchedulePending(true)
       try {
+        console.log('[STEP 2] Obtaining TEE auth token...')
         const auth = await getTeeAuthToken(wallet)
         if (auth?.token) {
+          console.log('[STEP 2] ✓ TEE auth token obtained. Scheduling crank on ER...')
           const scheduleSig = await scheduleExecuteIntentViaTee(wallet, auth.token)
           setScheduleTx(scheduleSig)
+          console.log('[STEP 2] ✓ Crank scheduled successfully on ER. Tx:', scheduleSig)
         } else {
-          setScheduleError('TEE auth token not available — please enable message signing in your wallet.')
+          const errorMsg = 'TEE auth token not available — please enable message signing in your wallet.'
+          console.error('[STEP 2] ✗', errorMsg)
+          setScheduleError(errorMsg)
         }
       } catch (e: any) {
-        // Pretty print simulation errors (common on Devnet/Backpack)
         const msg = e?.message || String(e)
+        console.error('[STEP 2] ✗ Crank scheduling failed:', msg)
         if (msg.includes('Simulation failed')) {
-          setScheduleError(`Schedule Failure: ${msg}. If delegation just succeeded, wait 5s and try again.`)
+          setScheduleError(`Crank scheduling failed: ${msg}. If delegation just succeeded, wait a few seconds and try again.`)
         } else {
-          setScheduleError(msg)
+          setScheduleError(`Crank scheduling failed: ${msg}`)
         }
       } finally {
         setSchedulePending(false)
       }
     } catch (e: any) {
       const msg = e?.message || String(e)
-      setDelegateError(msg)
+      console.error('[STEP 1] ✗ Delegation failed:', msg)
+      setDelegateError(`Delegation failed: ${msg}`)
     } finally {
       setDelegatePending(false)
     }
@@ -495,33 +511,54 @@ export default function CapsuleDetailPage() {
               </p>
             </div>
             {isOwner && capsule?.isActive && (
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <button
-                  type="button"
-                  onClick={handleDelegate}
-                  disabled={delegatePending || schedulePending}
-                  className="inline-flex items-center gap-2 rounded-lg border border-lucid-accent bg-lucid-accent/20 px-4 py-2 text-sm font-medium text-lucid-accent transition hover:bg-lucid-accent/30 disabled:opacity-60"
-                >
-                  <Shield className="h-4 w-4" />
-                  {delegatePending ? 'Delegating…' : schedulePending ? 'Scheduling automatic execution…' : 'Delegate to PER (TEE)'}
-                </button>
-                {delegateTx && (
-                  <a
-                    href={`https://explorer.solana.com/tx/${delegateTx}?cluster=devnet`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-lucid-accent hover:underline"
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleDelegate}
+                    disabled={delegatePending || schedulePending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-lucid-accent bg-lucid-accent/20 px-4 py-2 text-sm font-medium text-lucid-accent transition hover:bg-lucid-accent/30 disabled:opacity-60"
                   >
-                    View delegate tx
-                  </a>
+                    <Shield className="h-4 w-4" />
+                    {delegatePending ? 'Step 1: Delegating to ER...' : schedulePending ? 'Step 2: Scheduling crank on ER...' : 'Delegate & Schedule Crank'}
+                  </button>
+                </div>
+
+                {/* Step 1: Delegation Status */}
+                {delegateTx && (
+                  <div className="rounded-lg border border-lucid-accent/30 bg-lucid-accent/5 p-3">
+                    <p className="text-xs font-semibold text-lucid-accent mb-1">✓ Step 1: Delegation Complete</p>
+                    <p className="text-xs text-lucid-muted mb-2">Capsule delegated to Ephemeral Rollup (ER)</p>
+                    <a
+                      href={`https://explorer.solana.com/tx/${delegateTx}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-lucid-accent hover:underline"
+                    >
+                      View delegation tx →
+                    </a>
+                  </div>
                 )}
+                {delegateError && (
+                  <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
+                    <p className="text-xs font-semibold text-amber-400 mb-1">✗ Step 1: Delegation Failed</p>
+                    <p className="text-xs text-amber-400">{delegateError}</p>
+                  </div>
+                )}
+
+                {/* Step 2: Crank Scheduling Status */}
                 {scheduleTx && (
-                  <span className="text-sm text-lucid-accent">
-                    Automatic execution scheduled. When conditions are met, assets will be distributed without anyone visiting.
-                  </span>
+                  <div className="rounded-lg border border-lucid-accent/30 bg-lucid-accent/5 p-3">
+                    <p className="text-xs font-semibold text-lucid-accent mb-1">✓ Step 2: Crank Scheduled on ER</p>
+                    <p className="text-xs text-lucid-muted">When conditions are met, assets will be distributed automatically without anyone visiting.</p>
+                  </div>
                 )}
-                {delegateError && <p className="text-sm text-amber-400">{delegateError}</p>}
-                {scheduleError && <p className="text-sm text-amber-400">Schedule: {scheduleError}</p>}
+                {scheduleError && (
+                  <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
+                    <p className="text-xs font-semibold text-amber-400 mb-1">✗ Step 2: Crank Scheduling Failed</p>
+                    <p className="text-xs text-amber-400">{scheduleError}</p>
+                  </div>
+                )}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
