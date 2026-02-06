@@ -24,7 +24,24 @@ const idlPath = path.join(process.cwd(), 'idl', 'lucid_program.json')
 const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'))
 
 const PROGRAM_ID = new PublicKey('BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms')
-const HELIUS_RPC = `https://devnet.helius-rpc.com/?api-key=${env.NEXT_PUBLIC_HELIUS_API_KEY}`
+const HELIUS_RPC = env.NEXT_PUBLIC_HELIUS_API_KEY
+    ? `https://devnet.helius-rpc.com/?api-key=${env.NEXT_PUBLIC_HELIUS_API_KEY}`
+    : 'https://api.devnet.solana.com'
+
+const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+const SYSTEM_PROGRAM_ID = SystemProgram.programId
+
+function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+        [
+            owner.toBuffer(),
+            TOKEN_PROGRAM_ID.toBuffer(),
+            mint.toBuffer(),
+        ],
+        SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID
+    )[0]
+}
 
 async function resetExpiredCapsules() {
     const connection = new Connection(HELIUS_RPC, 'confirmed')
@@ -38,7 +55,7 @@ async function resetExpiredCapsules() {
     const keypair = Keypair.fromSecretKey(bs58.decode(privateKey))
     const wallet = new Wallet(keypair)
     const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' })
-    const program = new Program(idl as any, provider)
+    const program = new Program(idl as any, provider) as any
 
     console.log('Fetching all capsules...')
     const capsules = await program.account.intentCapsule.all()
@@ -55,19 +72,44 @@ async function resetExpiredCapsules() {
 
     for (const capsule of expiredCapsules) {
         const owner = capsule.account.owner
-        console.log(`Executing capsule for owner: ${owner.toString()}...`)
+        const capsuleKey = capsule.publicKey
+        console.log(`Processing capsule: ${capsuleKey.toString()} (Owner: ${owner.toString()})...`)
+
+        // Check for delegation
+        const accountInfo = await connection.getAccountInfo(capsuleKey)
+        if (accountInfo && accountInfo.owner.toString() === 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh') {
+            console.log(`Capsule ${capsuleKey.toString()} is DELEGATED. Skipping base layer execution.`)
+            continue
+        }
 
         try {
             const intentData = capsule.account.intentData as Buffer
             const json = Buffer.from(intentData).toString('utf8')
             const data = JSON.parse(json)
+            const mint = capsule.account.mint // From new IDL
+
+            const isSpl = mint && !mint.equals(PublicKey.default) && !mint.equals(SYSTEM_PROGRAM_ID)
+
+            console.log(`Capsule type: ${isSpl ? 'SPL' : 'SOL'} (Mint: ${mint ? mint.toString() : 'None'})`)
 
             const beneficiaries = data.beneficiaries || []
-            const remainingAccounts = beneficiaries.map((b: any) => ({
-                pubkey: new PublicKey(b.address),
-                isSigner: false,
-                isWritable: true,
-            }))
+            const remainingAccounts = beneficiaries.map((b: any) => {
+                const beneficiaryOwner = new PublicKey(b.address)
+                if (isSpl) {
+                    const beneficiaryAta = getAssociatedTokenAddress(mint, beneficiaryOwner)
+                    return {
+                        pubkey: beneficiaryAta,
+                        isSigner: false,
+                        isWritable: true,
+                    }
+                } else {
+                    return {
+                        pubkey: beneficiaryOwner,
+                        isSigner: false,
+                        isWritable: true,
+                    }
+                }
+            })
 
             const [capsulePDA] = PublicKey.findProgramAddressSync(
                 [Buffer.from('intent_capsule'), owner.toBuffer()],
@@ -84,12 +126,20 @@ async function resetExpiredCapsules() {
 
             const platformFeeRecipient = new PublicKey(env.NEXT_PUBLIC_PLATFORM_FEE_RECIPIENT || 'Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb')
 
+            let vaultTokenAccount = null
+            if (isSpl) {
+                vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
+            }
+
             const tx = await program.methods
                 .executeIntent()
                 .accounts({
                     capsule: capsulePDA,
                     vault: vaultPDA,
                     systemProgram: SystemProgram.programId,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                    // @ts-ignore
+                    vaultTokenAccount: vaultTokenAccount, // Optional in IDL
                     feeConfig: feeConfigPDA,
                     platformFeeRecipient: platformFeeRecipient,
                 })

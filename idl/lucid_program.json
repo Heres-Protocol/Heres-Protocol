@@ -123,6 +123,24 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "mint",
+          "optional": true
+        },
+        {
+          "name": "source_token_account",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true,
+          "optional": true
         }
       ],
       "args": [
@@ -454,6 +472,15 @@
           "address": "11111111111111111111111111111111"
         },
         {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "fee_config",
           "pda": {
             "seeds": [
@@ -735,100 +762,33 @@
         },
         {
           "name": "payer",
+          "docs": [
+            "Payer who signs the schedule transaction (on PER/TEE RPC)"
+          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "capsule",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  116,
-                  101,
-                  110,
-                  116,
-                  95,
-                  99,
-                  97,
-                  112,
-                  115,
-                  117,
-                  108,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "docs": [
+            "Anchor owner checks and re-serialization after CPI, as recommended in",
+            "MagicBlock crank examples."
+          ],
+          "writable": true
         },
         {
           "name": "vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  97,
-                  112,
-                  115,
-                  117,
-                  108,
-                  101,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
+          "writable": true
         },
         {
           "name": "system_program",
+          "docs": [
+            "System program – only its key is used when constructing the execute_intent ix."
+          ],
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "fee_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  102,
-                  101,
-                  101,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "fee_config"
         },
         {
           "name": "platform_fee_recipient",
@@ -1186,6 +1146,11 @@
       "code": 6009,
       "name": "InvalidFeeConfig",
       "msg": "Invalid fee config or fee recipient"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidTokenAccount",
+      "msg": "Invalid token account provided"
     }
   ],
   "types": [
@@ -1266,6 +1231,10 @@
           {
             "name": "vault_bump",
             "type": "u8"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
           }
         ]
       }

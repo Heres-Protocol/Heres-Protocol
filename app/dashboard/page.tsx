@@ -203,6 +203,14 @@ const decodeCapsuleAccount = (data: Uint8Array) => {
   let executedAt: number | null = null
   if (hasExecutedAt) {
     executedAt = Number(readI64(data, offset))
+    offset += 8
+  }
+
+  // Skip bump (1) and vault_bump (1)
+  offset += 2
+  let mint: PublicKey | undefined
+  if (offset + 32 <= data.length) {
+    mint = new PublicKey(data.slice(offset, offset + 32))
   }
 
   return {
@@ -212,6 +220,7 @@ const decodeCapsuleAccount = (data: Uint8Array) => {
     intentData: new Uint8Array(intentDataBytes),
     isActive,
     executedAt,
+    mint,
   }
 }
 

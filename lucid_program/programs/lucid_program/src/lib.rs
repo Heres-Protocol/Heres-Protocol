@@ -10,6 +10,7 @@ use ephemeral_rollups_sdk::cpi::DelegateConfig;
 use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
 use ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID;
 use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
 #[cfg(feature = "oracle")]
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
@@ -65,7 +66,7 @@ pub mod lucid_program {
         inactivity_period: i64,
         intent_data: Vec<u8>,
     ) -> Result<()> {
-        // Parse totalAmount from intent_data to lock SOL in vault
+        // Parse totalAmount from intent_data
         let total_amount_lamports = {
             let intent_data_str = String::from_utf8(intent_data.clone())
                 .map_err(|_| ErrorCode::InvalidIntentData)?;
@@ -100,15 +101,35 @@ pub mod lucid_program {
         capsule.bump = ctx.bumps.capsule;
         capsule.vault_bump = ctx.bumps.vault;
 
-        // Lock SOL in vault (owner signs; at execution, program signs for vault → beneficiaries)
-        let cpi_accounts = system_program::Transfer {
-            from: ctx.accounts.owner.to_account_info(),
-            to: ctx.accounts.vault.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.system_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        system_program::transfer(cpi_ctx, total_amount_lamports)?;
-        msg!("Locked {} lamports in vault for capsule {:?}", total_amount_lamports, capsule.key());
+        // Check if SPL Mint is provided
+        if let Some(mint) = &ctx.accounts.mint {
+            capsule.mint = mint.key();
+            let from_ata = ctx.accounts.source_token_account.as_ref().ok_or(ErrorCode::InvalidTokenAccount)?;
+            let to_ata = ctx.accounts.vault_token_account.as_ref().ok_or(ErrorCode::InvalidTokenAccount)?;
+            
+            // Transfer SPL tokens
+            let cpi_accounts = Transfer {
+                from: from_ata.to_account_info(),
+                to: to_ata.to_account_info(),
+                authority: ctx.accounts.owner.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+            token::transfer(cpi_ctx, total_amount_lamports)?;
+            msg!("Locked {} tokens in vault for capsule {:?}", total_amount_lamports, capsule.key());
+        } else {
+            capsule.mint = Pubkey::default(); // default to 0000... (SystemProgram-like behavior)
+
+            // Lock SOL in vault
+            let cpi_accounts = system_program::Transfer {
+                from: ctx.accounts.owner.to_account_info(),
+                to: ctx.accounts.vault.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.system_program.to_account_info();
+            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+            system_program::transfer(cpi_ctx, total_amount_lamports)?;
+            msg!("Locked {} lamports in vault for capsule {:?}", total_amount_lamports, capsule.key());
+        }
 
         msg!("Intent Capsule created: {:?}", capsule.key());
         Ok(())
@@ -175,30 +196,44 @@ pub mod lucid_program {
         // Platform execution fee (from vault)
         let fee_config = &ctx.accounts.fee_config;
         let mut remaining_for_beneficiaries = total_amount_lamports;
+        
+        let is_spl = capsule.mint != Pubkey::default();
+
         if fee_config.execution_fee_bps > 0 {
             let execution_fee = (total_amount_lamports as u64)
                 .checked_mul(fee_config.execution_fee_bps as u64)
                 .and_then(|v| v.checked_div(10_000))
                 .ok_or(ErrorCode::InvalidIntentData)?;
+            
             if execution_fee > 0 {
                 let platform_recipient = ctx.accounts.platform_fee_recipient.as_mut().ok_or(ErrorCode::InvalidFeeConfig)?;
                 require!(platform_recipient.key() == fee_config.fee_recipient, ErrorCode::InvalidFeeConfig);
-                let cpi_accounts = system_program::Transfer {
-                    from: ctx.accounts.vault.to_account_info(),
-                    to: platform_recipient.clone(),
-                };
-                let cpi_program = ctx.accounts.system_program.to_account_info();
-                let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-                system_program::transfer(cpi_ctx, execution_fee)?;
+                
+                if is_spl {
+                     let vault_ata = ctx.accounts.vault_token_account.as_ref().ok_or(ErrorCode::InvalidTokenAccount)?;
+                     let cpi_accounts = Transfer {
+                        from: vault_ata.to_account_info(),
+                        to: platform_recipient.to_account_info(), // For SPL this should be an ATA
+                        authority: ctx.accounts.vault.to_account_info(),
+                     };
+                     let cpi_program = ctx.accounts.token_program.to_account_info();
+                     let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+                     token::transfer(cpi_ctx, execution_fee)?;
+                } else {
+                    // Direct lamport transfer for PDA vault
+                    **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= execution_fee;
+                    **platform_recipient.to_account_info().try_borrow_mut_lamports()? += execution_fee;
+                }
                 remaining_for_beneficiaries = total_amount_lamports.saturating_sub(execution_fee);
-                msg!("Execution fee {} lamports sent to platform", execution_fee);
+                msg!("Execution fee {} sent to platform", execution_fee);
             }
         }
         
-        // Distribute SOL from vault to each beneficiary (proportional if fee was taken)
+        // Distribute from vault to each beneficiary
         let total_for_ratio = total_amount_lamports;
         let mut distributed: u64 = 0;
         let beneficiary_count = beneficiaries.len();
+        
         for (idx, beneficiary) in beneficiaries.iter().enumerate() {
             let address_str = beneficiary.get("address")
                 .and_then(|a| a.as_str())
@@ -224,7 +259,7 @@ pub mod lucid_program {
                     .map_err(|_| ErrorCode::InvalidIntentData)?
             };
             
-            // Proportional amount after execution fee (last beneficiary gets remainder to avoid dust)
+            // Proportional amount logic
             let to_send = if total_for_ratio == 0 {
                 0u64
             } else if idx == beneficiary_count.saturating_sub(1) {
@@ -238,26 +273,36 @@ pub mod lucid_program {
             distributed = distributed.saturating_add(to_send);
             
             if to_send > 0 {
+                // For SPL, we expect the remaining accounts to contain the Beneficiary ATAs
                 let beneficiary_account = ctx.remaining_accounts
                     .iter()
-                    .find(|acc| acc.key() == beneficiary_pubkey)
+                    .find(|acc| acc.key() == beneficiary_pubkey) // This finds the account passed in remaining_accounts
                     .ok_or(ErrorCode::InvalidBeneficiaryAddress)?;
                 
-                let cpi_accounts = system_program::Transfer {
-                    from: ctx.accounts.vault.to_account_info(),
-                    to: beneficiary_account.clone(),
-                };
-                let cpi_program = ctx.accounts.system_program.to_account_info();
-                let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-                system_program::transfer(cpi_ctx, to_send)?;
-                msg!("Transferred {} lamports to beneficiary: {}", to_send, beneficiary_pubkey);
+                if is_spl {
+                     let vault_ata = ctx.accounts.vault_token_account.as_ref().ok_or(ErrorCode::InvalidTokenAccount)?;
+                     let cpi_accounts = Transfer {
+                        from: vault_ata.to_account_info(),
+                        to: beneficiary_account.to_account_info(), 
+                        authority: ctx.accounts.vault.to_account_info(),
+                     };
+                     let cpi_program = ctx.accounts.token_program.to_account_info();
+                     let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+                     token::transfer(cpi_ctx, to_send)?;
+
+                } else {
+                    // Direct lamport transfer for PDA vault
+                    **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= to_send;
+                    **beneficiary_account.to_account_info().try_borrow_mut_lamports()? += to_send;
+                }
+                msg!("Transferred {} to beneficiary: {}", to_send, beneficiary_pubkey);
             }
         }
         
         capsule.is_active = false;
         capsule.executed_at = Some(current_time);
         
-        msg!("Intent executed for capsule: {:?} (anyone could trigger)", capsule.key());
+        msg!("Intent executed for capsule: {:?}", capsule.key());
         emit!(IntentExecuted {
             capsule: capsule.key(),
             owner: capsule.owner,
@@ -591,6 +636,16 @@ pub struct CreateCapsule<'info> {
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
     
     pub system_program: Program<'info, System>,
+    
+    pub token_program: Program<'info, Token>,
+    
+    pub mint: Option<Account<'info, Mint>>,
+    
+    #[account(mut)]
+    pub source_token_account: Option<Account<'info, TokenAccount>>,
+    
+    #[account(mut)]
+    pub vault_token_account: Option<Account<'info, TokenAccount>>,
 }
 
 #[derive(Accounts)]
@@ -619,9 +674,15 @@ pub struct ExecuteIntent<'info> {
         seeds = [b"capsule_vault", capsule.owner.as_ref()],
         bump = capsule.vault_bump
     )]
+    /// CHECK: Vault, signer for SOL or authority for Spl
     pub vault: Account<'info, CapsuleVault>,
     
     pub system_program: Program<'info, System>,
+    
+    pub token_program: Program<'info, Token>,
+    
+    #[account(mut)]
+    pub vault_token_account: Option<Account<'info, TokenAccount>>,
     
     #[account(seeds = [b"fee_config"], bump)]
     pub fee_config: Account<'info, FeeConfig>,
@@ -698,6 +759,7 @@ pub struct IntentCapsule {
     pub executed_at: Option<i64>,
     pub bump: u8,
     pub vault_bump: u8, // for invoke_signed when transferring from vault
+    pub mint: Pubkey,
 }
 
 impl IntentCapsule {
@@ -708,7 +770,8 @@ impl IntentCapsule {
         1 +                      // is_active
         1 + 8 +                  // executed_at (Option<i64>)
         1 +                      // bump
-        1;                       // vault_bump
+        1 +                      // vault_bump
+        32;                      // mint
 }
 
 #[event]
@@ -740,6 +803,8 @@ pub enum ErrorCode {
     InvalidPriceFeed,
     #[msg("Invalid fee config or fee recipient")]
     InvalidFeeConfig,
+    #[msg("Invalid token account provided")]
+    InvalidTokenAccount,
 }
 
 /// Parse SOL amount string to lamports

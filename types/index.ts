@@ -20,6 +20,7 @@ export interface IntentCapsule {
   isActive: boolean
   executedAt: number | null
   accountOwner?: PublicKey
+  mint?: PublicKey
 }
 
 // Wallet Activity types

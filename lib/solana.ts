@@ -19,6 +19,19 @@ import { getTeeConnection } from './tee'
 import { SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
 import { MAGICBLOCK_ER } from '@/constants'
 import type { IntentCapsule } from '@/types'
+const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+
+function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [
+      owner.toBuffer(),
+      TOKEN_PROGRAM_ID.toBuffer(),
+      mint.toBuffer(),
+    ],
+    SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID
+  )[0]
+}
 
 /** Default crank: run execute_intent check every 15 min, up to 100k iterations (MagicBlock Crank). */
 export const CRANK_DEFAULT_INTERVAL_MS = 15 * 60 * 1000
@@ -102,12 +115,14 @@ export async function createCapsule(
         feeConfig: PublicKey
         platformFeeRecipient?: PublicKey
         systemProgram: PublicKey
+        tokenProgram: PublicKey
       } = {
         capsule: capsulePDA,
         vault: vaultPDA,
         owner: wallet.publicKey!,
         feeConfig: feeConfigPDA,
         systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
       }
       if (platformFeeRecipient) accounts.platformFeeRecipient = platformFeeRecipient
 
@@ -190,7 +205,8 @@ export async function updateIntent(
 export async function executeIntent(
   wallet: WalletContextState,
   ownerPublicKey: PublicKey,
-  beneficiaries?: Array<{ address: string; amount: string; amountType: string }>
+  beneficiaries?: Array<{ address: string; amount: string; amountType: string }>,
+  mint?: PublicKey
 ): Promise<string> {
   const program = getProgram(wallet)
   if (!program) throw new Error('Wallet not connected')
@@ -206,25 +222,48 @@ export async function executeIntent(
     capsule: PublicKey
     vault: PublicKey
     systemProgram: PublicKey
+    tokenProgram: PublicKey
     feeConfig: PublicKey
     platformFeeRecipient?: PublicKey
   } = {
     capsule: capsulePDA,
     vault: vaultPDA,
     systemProgram: SystemProgram.programId,
+    tokenProgram: TOKEN_PROGRAM_ID,
     feeConfig: feeConfigPDA,
   }
   if (platformFeeRecipient) accounts.platformFeeRecipient = platformFeeRecipient
 
-  const remainingAccounts = beneficiaries?.map(b => ({
-    pubkey: new PublicKey(b.address),
-    isSigner: false,
-    isWritable: true,
-  })) || []
+  const remainingAccounts = beneficiaries?.map(b => {
+    const beneficiaryOwner = new PublicKey(b.address)
+    if (mint && !mint.equals(PublicKey.default)) {
+      const beneficiaryAta = getAssociatedTokenAddress(mint, beneficiaryOwner)
+      return {
+        pubkey: beneficiaryAta,
+        isSigner: false,
+        isWritable: true,
+      }
+    }
+    return {
+      pubkey: beneficiaryOwner,
+      isSigner: false,
+      isWritable: true,
+    }
+  }) || []
+
+  // Add vaultTokenAccount if SPL
+  let vaultTokenAccount = null
+  if (mint && !mint.equals(PublicKey.default)) {
+    vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
+  }
 
   const tx = await program.methods
     .executeIntent()
-    .accounts(accounts)
+    .accounts({
+      ...accounts,
+      // @ts-ignore
+      vaultTokenAccount: vaultTokenAccount,
+    })
     .remainingAccounts(remainingAccounts)
     .rpc()
 
@@ -656,7 +695,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
 
     // bump: u8 (1 byte) - we don't need this for the return value
 
-    const capsule = {
+    const capsule: IntentCapsule & { accountOwner: PublicKey } = {
       owner: ownerPubkey,
       inactivityPeriod: Number(inactivityPeriod),
       lastActivity: Number(lastActivity),
@@ -664,6 +703,13 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       isActive,
       executedAt,
       accountOwner: accountInfo.owner,
+      mint: undefined,
+    }
+
+    // Skip bump (1) and vault_bump (1)
+    offset += 2
+    if (offset + 32 <= data.length) {
+      capsule.mint = new PublicKey(data.slice(offset, offset + 32))
     }
 
     console.log('Successfully fetched capsule:', {
@@ -672,6 +718,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       executedAt: capsule.executedAt,
       inactivityPeriod: capsule.inactivityPeriod,
       accountOwner: capsule.accountOwner.toString(),
+      mint: capsule.mint?.toString(),
     })
 
     return capsule
@@ -724,9 +771,11 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
     if (data[offset] === 1) {
       offset += 1
       executedAt = Number(readI64(data, offset))
+      offset += 8
     }
 
-    return {
+    // @ts-ignore
+    const result = {
       owner: ownerPubkey,
       inactivityPeriod,
       lastActivity,
@@ -735,7 +784,16 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
       executedAt,
       capsuleAddress: capsulePda.toBase58(),
       accountOwner: accountInfo.owner, // Return the actual account owner (Lucid or Delegation program)
+      mint: undefined,
     }
+
+    // Skip bump (1) and vault_bump (1)
+    offset += 2
+    if (offset + 32 <= data.length) {
+      // @ts-ignore
+      result.mint = new PublicKey(data.slice(offset, offset + 32))
+    }
+    return result as IntentCapsule & { capsuleAddress: string }
   } catch {
     return null
   }

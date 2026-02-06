@@ -194,7 +194,7 @@ export default function CapsuleDetailPage() {
     setExecuteError(null)
     setExecuteTx(null)
     try {
-      const tx = await executeIntent(wallet, capsule.owner, beneficiaries)
+      const tx = await executeIntent(wallet, capsule.owner, beneficiaries, capsule.mint)
       setExecuteTx(tx)
       const pubkey = new PublicKey(capsule.capsuleAddress)
       getCapsuleByAddress(pubkey).then((updated) => {
@@ -376,12 +376,12 @@ export default function CapsuleDetailPage() {
                 </span>
                 <span
                   className={`rounded-lg px-2.5 py-1 text-xs font-medium ${status === 'Active'
+                    ? 'bg-lucid-accent/20 text-lucid-accent'
+                    : status === 'Executed'
                       ? 'bg-lucid-accent/20 text-lucid-accent'
-                      : status === 'Executed'
-                        ? 'bg-lucid-accent/20 text-lucid-accent'
-                        : status === 'Expired'
-                          ? 'bg-red-500/20 text-red-400'
-                          : 'bg-lucid-purple/20 text-lucid-purple'
+                      : status === 'Expired'
+                        ? 'bg-red-500/20 text-red-400'
+                        : 'bg-lucid-purple/20 text-lucid-purple'
                     }`}
                 >
                   {status}
@@ -464,6 +464,17 @@ export default function CapsuleDetailPage() {
                 <CopyButton value={getProgramId().toBase58()} />
               </div>
             </div>
+            {capsule.mint && (
+              <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Token Mint</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-sm font-mono text-lucid-white truncate min-w-0" title={capsule.mint.toBase58()}>
+                    {maskAddress(capsule.mint.toBase58())}
+                  </p>
+                  <CopyButton value={capsule.mint.toBase58()} />
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Privacy & Delegation (PER / TEE) */}
@@ -596,8 +607,8 @@ export default function CapsuleDetailPage() {
                       type="button"
                       onClick={() => setChartRange(r.key)}
                       className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${chartRange === r.key
-                          ? 'border-lucid-accent bg-lucid-accent/20 text-lucid-accent'
-                          : 'border-lucid-border bg-lucid-card/80 text-lucid-muted hover:border-lucid-accent/40 hover:text-lucid-accent'
+                        ? 'border-lucid-accent bg-lucid-accent/20 text-lucid-accent'
+                        : 'border-lucid-border bg-lucid-card/80 text-lucid-muted hover:border-lucid-accent/40 hover:text-lucid-accent'
                         }`}
                     >
                       {r.label}
