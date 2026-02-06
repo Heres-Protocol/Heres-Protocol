@@ -79,7 +79,8 @@ export function getProgram(wallet: WalletContextState): Program | null {
 export async function createCapsule(
   wallet: WalletContextState,
   inactivityPeriodSeconds: number,
-  intentData: Uint8Array
+  intentData: Uint8Array,
+  mint?: PublicKey
 ): Promise<string> {
   const program = getProgram(wallet)
   if (!program) throw new Error('Wallet not connected')
@@ -116,6 +117,9 @@ export async function createCapsule(
         platformFeeRecipient?: PublicKey
         systemProgram: PublicKey
         tokenProgram: PublicKey
+        mint: PublicKey | null
+        sourceTokenAccount: PublicKey | null
+        vaultTokenAccount: PublicKey | null
       } = {
         capsule: capsulePDA,
         vault: vaultPDA,
@@ -123,11 +127,22 @@ export async function createCapsule(
         feeConfig: feeConfigPDA,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
+        mint: null,
+        sourceTokenAccount: null,
+        vaultTokenAccount: null,
       }
+
+      if (mint) {
+        accounts.mint = mint
+        accounts.sourceTokenAccount = getAssociatedTokenAddress(mint, wallet.publicKey!)
+        accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
+      }
+
       if (platformFeeRecipient) accounts.platformFeeRecipient = platformFeeRecipient
 
       const tx = await program.methods
         .createCapsule(new BN(inactivityPeriodSeconds), intentDataBuffer)
+        // @ts-ignore
         .accounts(accounts)
         .rpc()
 
@@ -354,7 +369,8 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
  */
 export async function scheduleExecuteIntent(
   wallet: WalletContextState,
-  args: { taskId: BN; executionIntervalMillis: BN; iterations: BN }
+  args: { taskId: BN; executionIntervalMillis: BN; iterations: BN },
+  mint?: PublicKey
 ): Promise<string> {
   const program = getProgram(wallet)
   if (!program) throw new Error('Wallet not connected')
@@ -364,22 +380,48 @@ export async function scheduleExecuteIntent(
   const [feeConfigPDA] = getFeeConfigPDA()
   const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
     ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
-    : (wallet.publicKey as PublicKey) // Use user as fallback to avoid SystemAccount mismatch
+    : (wallet.publicKey as PublicKey)
 
   const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
 
+  const accounts: {
+    magicProgram: PublicKey
+    payer: PublicKey
+    capsule: PublicKey
+    vault: PublicKey
+    owner: PublicKey
+    systemProgram: PublicKey
+    feeConfig: PublicKey
+    platformFeeRecipient: PublicKey
+    tokenProgram: PublicKey
+    mint: PublicKey | null
+    // @ts-ignore
+    sourceTokenAccount: PublicKey | null
+    vaultTokenAccount: PublicKey | null
+  } = {
+    magicProgram,
+    payer: wallet.publicKey as PublicKey,
+    capsule: capsulePDA,
+    vault: vaultPDA,
+    owner: wallet.publicKey as PublicKey,
+    systemProgram: SystemProgram.programId,
+    feeConfig: feeConfigPDA,
+    platformFeeRecipient,
+    tokenProgram: TOKEN_PROGRAM_ID,
+    mint: null,
+    sourceTokenAccount: null,
+    vaultTokenAccount: null,
+  }
+
+  if (mint) {
+    accounts.mint = mint
+    accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
+  }
+
   const tx = await program.methods
     .scheduleExecuteIntent(args)
-    .accounts({
-      magicProgram,
-      payer: wallet.publicKey as PublicKey,
-      capsule: capsulePDA,
-      vault: vaultPDA,
-      owner: wallet.publicKey as PublicKey,
-      systemProgram: SystemProgram.programId,
-      feeConfig: feeConfigPDA,
-      platformFeeRecipient,
-    })
+    // @ts-ignore
+    .accounts(accounts)
     .rpc()
 
   return tx
@@ -397,7 +439,8 @@ export async function scheduleExecuteIntentViaTee(
     taskId?: BN
     executionIntervalMillis?: BN
     iterations?: BN
-  }
+  },
+  mint?: PublicKey
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
 
@@ -415,7 +458,7 @@ export async function scheduleExecuteIntentViaTee(
   const [feeConfigPDA] = getFeeConfigPDA()
   const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
     ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
-    : (wallet.publicKey as PublicKey) // Use user as fallback to avoid SystemAccount mismatch
+    : (wallet.publicKey as PublicKey)
 
   const taskId = args?.taskId ?? new BN(Date.now())
   const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(CRANK_DEFAULT_INTERVAL_MS)
@@ -423,18 +466,43 @@ export async function scheduleExecuteIntentViaTee(
 
   const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
 
+  const accounts: {
+    magicProgram: PublicKey
+    payer: PublicKey
+    capsule: PublicKey
+    vault: PublicKey
+    owner: PublicKey
+    systemProgram: PublicKey
+    feeConfig: PublicKey
+    platformFeeRecipient: PublicKey
+    tokenProgram: PublicKey
+    mint: PublicKey | null
+    sourceTokenAccount: PublicKey | null
+    vaultTokenAccount: PublicKey | null
+  } = {
+    magicProgram,
+    payer: wallet.publicKey as PublicKey,
+    capsule: capsulePDA,
+    vault: vaultPDA,
+    owner: wallet.publicKey as PublicKey,
+    systemProgram: SystemProgram.programId,
+    feeConfig: feeConfigPDA,
+    platformFeeRecipient,
+    tokenProgram: TOKEN_PROGRAM_ID,
+    mint: null,
+    sourceTokenAccount: null,
+    vaultTokenAccount: null,
+  }
+
+  if (mint) {
+    accounts.mint = mint
+    accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
+  }
+
   const tx = await program.methods
     .scheduleExecuteIntent({ taskId, executionIntervalMillis, iterations })
-    .accounts({
-      magicProgram,
-      payer: wallet.publicKey as PublicKey,
-      capsule: capsulePDA,
-      vault: vaultPDA,
-      owner: wallet.publicKey as PublicKey, // Explicitly pass owner (signer)
-      systemProgram: SystemProgram.programId,
-      feeConfig: feeConfigPDA,
-      platformFeeRecipient,
-    })
+    // @ts-ignore
+    .accounts(accounts)
     .rpc()
 
   return tx
@@ -555,13 +623,15 @@ export async function deactivateCapsule(wallet: WalletContextState): Promise<str
 export async function recreateCapsule(
   wallet: WalletContextState,
   inactivityPeriodSeconds: number,
-  intentData: Uint8Array
+  intentData: Uint8Array,
+  mint?: PublicKey
 ): Promise<string> {
   const program = getProgram(wallet)
   if (!program) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
+  const [feeConfigPDA] = getFeeConfigPDA()
 
   // Convert Uint8Array to Buffer for Anchor (required by Blob.encode)
   let intentDataBuffer: Buffer | number[]
@@ -572,14 +642,38 @@ export async function recreateCapsule(
     intentDataBuffer = Array.from(intentData)
   }
 
+  const accounts: {
+    capsule: PublicKey
+    vault: PublicKey
+    owner: PublicKey
+    systemProgram: PublicKey
+    feeConfig: PublicKey
+    tokenProgram: PublicKey
+    mint: PublicKey | null
+    sourceTokenAccount: PublicKey | null
+    vaultTokenAccount: PublicKey | null
+  } = {
+    capsule: capsulePDA,
+    vault: vaultPDA,
+    owner: wallet.publicKey!,
+    systemProgram: SystemProgram.programId,
+    feeConfig: feeConfigPDA,
+    tokenProgram: TOKEN_PROGRAM_ID,
+    mint: null,
+    sourceTokenAccount: null,
+    vaultTokenAccount: null,
+  }
+
+  if (mint) {
+    accounts.mint = mint
+    accounts.sourceTokenAccount = getAssociatedTokenAddress(mint, wallet.publicKey!)
+    accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
+  }
+
   const tx = await program.methods
     .recreateCapsule(new BN(inactivityPeriodSeconds), intentDataBuffer)
-    .accounts({
-      capsule: capsulePDA,
-      vault: vaultPDA,
-      owner: wallet.publicKey!,
-      systemProgram: SystemProgram.programId,
-    })
+    // @ts-ignore
+    .accounts(accounts)
     .rpc()
 
   return tx

@@ -476,11 +476,6 @@
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "vault_token_account",
-          "writable": true,
-          "optional": true
-        },
-        {
           "name": "fee_config",
           "pda": {
             "seeds": [
@@ -507,6 +502,11 @@
           "docs": [
             "Platform fee recipient (must match fee_config.fee_recipient when execution_fee_bps > 0)"
           ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vault_token_account",
           "writable": true,
           "optional": true
         }
@@ -788,11 +788,21 @@
           "address": "11111111111111111111111111111111"
         },
         {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
           "name": "fee_config"
         },
         {
           "name": "platform_fee_recipient",
-          "writable": true
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true,
+          "optional": true
         }
       ],
       "args": [

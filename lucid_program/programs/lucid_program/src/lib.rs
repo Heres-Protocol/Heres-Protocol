@@ -375,15 +375,45 @@ pub mod lucid_program {
         ctx: Context<ScheduleExecuteIntent>,
         args: ScheduleExecuteIntentArgs,
     ) -> Result<()> {
-        let execute_ix = Instruction {
-            program_id: crate::ID,
-            accounts: vec![
+        let mut accounts = vec![
                 AccountMeta::new(ctx.accounts.capsule.key(), false),
                 AccountMeta::new(ctx.accounts.vault.key(), false),
                 AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
                 AccountMeta::new_readonly(ctx.accounts.fee_config.key(), false),
-                AccountMeta::new(ctx.accounts.platform_fee_recipient.key(), false),
-            ],
+            ];
+
+        // 6. platform_fee_recipient (Option)
+        // If vault_token_account is present, we MUST provide a value for platform_fee_recipient (positional).
+        // If not present, we can provide it if it exists.
+        if ctx.accounts.vault_token_account.is_some() {
+             if let Some(recipient) = &ctx.accounts.platform_fee_recipient {
+                 accounts.push(AccountMeta::new(recipient.key(), false));
+             } else {
+                 // Placeholder: Use payer if recipient is missing but needed for position
+                 accounts.push(AccountMeta::new(ctx.accounts.payer.key(), false));
+             }
+        } else if let Some(recipient) = &ctx.accounts.platform_fee_recipient {
+             accounts.push(AccountMeta::new(recipient.key(), false));
+        }
+
+        // 7. vault_token_account (Option)
+        if let Some(vta) = &ctx.accounts.vault_token_account {
+            accounts.push(AccountMeta::new(vta.key(), false));
+        }
+
+        // 8. Beneficiaries (Remaining accounts)
+        for acc in ctx.remaining_accounts.iter() {
+            if acc.is_writable {
+                accounts.push(AccountMeta::new(acc.key(), acc.is_signer));
+            } else {
+                accounts.push(AccountMeta::new_readonly(acc.key(), acc.is_signer));
+            }
+        }
+
+        let execute_ix = Instruction {
+            program_id: crate::ID,
+            accounts,
             data: EXECUTE_INTENT_DISCRIMINATOR.to_vec(),
         };
 
@@ -547,11 +577,15 @@ pub struct ScheduleExecuteIntent<'info> {
     pub vault: AccountInfo<'info>,
     /// System program – only its key is used when constructing the execute_intent ix.
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
     /// CHECK: Fee config account (read-only for scheduling; validated inside execute_intent).
     pub fee_config: AccountInfo<'info>,
     /// CHECK: Platform fee recipient (optional; validated in execute_intent).
     #[account(mut)]
-    pub platform_fee_recipient: AccountInfo<'info>,
+    pub platform_fee_recipient: Option<AccountInfo<'info>>,
+    /// CHECK: Vault ATA (optional; validated in execute_intent).
+    #[account(mut)]
+    pub vault_token_account: Option<AccountInfo<'info>>,
 }
 
 #[derive(Accounts)]
@@ -681,9 +715,6 @@ pub struct ExecuteIntent<'info> {
     
     pub token_program: Program<'info, Token>,
     
-    #[account(mut)]
-    pub vault_token_account: Option<Account<'info, TokenAccount>>,
-    
     #[account(seeds = [b"fee_config"], bump)]
     pub fee_config: Account<'info, FeeConfig>,
     
@@ -691,6 +722,9 @@ pub struct ExecuteIntent<'info> {
     /// CHECK: validated against fee_config.fee_recipient in instruction
     #[account(mut)]
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
+
+    #[account(mut)]
+    pub vault_token_account: Option<Account<'info, TokenAccount>>,
 }
 
 #[derive(Accounts)]
