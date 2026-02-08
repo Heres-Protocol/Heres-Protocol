@@ -234,18 +234,12 @@
           "signer": true
         },
         {
-          "name": "magic_program"
-        },
-        {
-          "name": "delegation_program"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        },
-        {
           "name": "validator",
           "optional": true
+        },
+        {
+          "name": "pda",
+          "writable": true
         },
         {
           "name": "pda_buffer",
@@ -260,7 +254,7 @@
           "writable": true
         },
         {
-          "name": "pda",
+          "name": "vault",
           "writable": true
         },
         {
@@ -276,8 +270,14 @@
           "writable": true
         },
         {
-          "name": "vault",
-          "writable": true
+          "name": "magic_program"
+        },
+        {
+          "name": "delegation_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -734,12 +734,6 @@
           "signer": true
         },
         {
-          "name": "magic_context"
-        },
-        {
-          "name": "magic_program"
-        },
-        {
           "name": "capsule",
           "writable": true
         },
@@ -750,6 +744,12 @@
         {
           "name": "buffer",
           "writable": true
+        },
+        {
+          "name": "magic_context"
+        },
+        {
+          "name": "magic_program"
         },
         {
           "name": "system_program",

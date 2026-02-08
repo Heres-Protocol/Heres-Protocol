@@ -321,31 +321,32 @@ export async function delegateCapsule(
 
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
 
-  // Derive PDAs for Capsule delegation
-  const [bufferPDA] = getBufferPDA(capsulePDA, getProgramId())
+  // Derive PDAs for Capsule delegation (Correct Owners: magicProgramId for buffer, delegationProgramId for others)
+  const [bufferPDA] = getBufferPDA(capsulePDA, magicProgramId)
   const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA, delegationProgramId)
   const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA, delegationProgramId)
 
   // Derive PDAs for Vault delegation
-  const [vaultBufferPDA] = getBufferPDA(vaultPDA, getProgramId())
+  const [vaultBufferPDA] = getBufferPDA(vaultPDA, magicProgramId)
   const [vaultDelegationRecordPDA] = getDelegationRecordPDA(vaultPDA, delegationProgramId)
   const [vaultDelegationMetadataPDA] = getDelegationMetadataPDA(vaultPDA, delegationProgramId)
 
   const accounts = {
     payer: wallet.publicKey,
     owner: wallet.publicKey,
-    magicProgram: magicProgramId,
-    delegationProgram: delegationProgramId,
-    systemProgram: SystemProgram.programId,
     validator: validatorPubkey ?? null,
+    pda: capsulePDA,
     pdaBuffer: bufferPDA,
     pdaDelegationRecord: delegationRecordPDA,
     pdaDelegationMetadata: delegationMetadataPDA,
-    pda: capsulePDA,
+    vault: vaultPDA,
     vaultBuffer: vaultBufferPDA,
     vaultDelegationRecord: vaultDelegationRecordPDA,
     vaultDelegationMetadata: vaultDelegationMetadataPDA,
-    vault: vaultPDA,
+    // Programs at the end
+    magicProgram: magicProgramId,
+    delegationProgram: delegationProgramId,
+    systemProgram: SystemProgram.programId,
   }
 
   const tx = await program.methods
@@ -369,18 +370,19 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
   const magicContext = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
 
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
-  const [commitBufferPDA] = getBufferPDA(capsulePDA, getProgramId())
+  const [commitBufferPDA] = getBufferPDA(capsulePDA, magicProgram)
 
   const tx = await program.methods
     .undelegateCapsule()
     .accounts({
       payer: wallet.publicKey as PublicKey,
       owner: wallet.publicKey as PublicKey,
-      magicContext,
-      magicProgram,
       capsule: capsulePDA,
       vault: vaultPDA,
       buffer: commitBufferPDA,
+      // Programs at the end
+      magicContext,
+      magicProgram,
       systemProgram: SystemProgram.programId,
     })
     .rpc()

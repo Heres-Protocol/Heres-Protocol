@@ -527,12 +527,6 @@ pub struct DelegateCapsuleInput<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub owner: Signer<'info>,
-    /// CHECK: Magic program
-    pub magic_program: AccountInfo<'info>,
-    /// CHECK: Delegation program
-    pub delegation_program: AccountInfo<'info>,
-    /// CHECK: System program
-    pub system_program: Program<'info, System>,
     /// CHECK: Checked by the delegation program
     pub validator: Option<AccountInfo<'info>>,
     /// CHECK: PDA to delegate (capsule); seeds: [b"intent_capsule", owner]
@@ -541,6 +535,12 @@ pub struct DelegateCapsuleInput<'info> {
     /// CHECK: PDA to delegate (vault); seeds: [b"capsule_vault", owner]
     #[account(mut, del)]
     pub vault: AccountInfo<'info>,
+    /// CHECK: Magic program
+    pub magic_program: AccountInfo<'info>,
+    /// CHECK: Delegation program
+    pub delegation_program: AccountInfo<'info>,
+    /// CHECK: System program
+    pub system_program: Program<'info, System>,
 }
 
 #[commit]
@@ -549,15 +549,18 @@ pub struct UndelegateCapsuleInput<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub owner: Signer<'info>,
-    /// CHECK: used for CPI
-    pub magic_context: AccountInfo<'info>,
-    /// CHECK: Magic program
-    pub magic_program: AccountInfo<'info>,
     #[account(mut, seeds = [b"intent_capsule", owner.key().as_ref()], bump = capsule.bump)]
     pub capsule: Account<'info, IntentCapsule>,
     /// CHECK: Vault PDA (committed alongside capsule)
     #[account(mut, seeds = [b"capsule_vault", owner.key().as_ref()], bump = capsule.vault_bump)]
     pub vault: AccountInfo<'info>,
+    /// CHECK: Buffer PDA for commit
+    #[account(mut)]
+    pub buffer: AccountInfo<'info>,
+    /// CHECK: used for CPI
+    pub magic_context: AccountInfo<'info>,
+    /// CHECK: Magic program
+    pub magic_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
 }
 
