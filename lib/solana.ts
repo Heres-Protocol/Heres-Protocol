@@ -489,31 +489,24 @@ export async function scheduleExecuteIntentViaTee(
     payer: PublicKey
     capsule: PublicKey
     vault: PublicKey
-    owner: PublicKey
     systemProgram: PublicKey
+    tokenProgram: PublicKey
     feeConfig: PublicKey
     platformFeeRecipient: PublicKey
-    tokenProgram: PublicKey
-    mint: PublicKey | null
-    sourceTokenAccount: PublicKey | null
     vaultTokenAccount: PublicKey | null
   } = {
     magicProgram,
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
     vault: vaultPDA,
-    owner: wallet.publicKey as PublicKey,
     systemProgram: SystemProgram.programId,
+    tokenProgram: TOKEN_PROGRAM_ID,
     feeConfig: feeConfigPDA,
     platformFeeRecipient,
-    tokenProgram: TOKEN_PROGRAM_ID,
-    mint: null,
-    sourceTokenAccount: null,
     vaultTokenAccount: null,
   }
 
   if (mint) {
-    accounts.mint = mint
     accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
   }
 
