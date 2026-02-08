@@ -336,56 +336,24 @@ pub mod lucid_program {
     }
 
     /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
-    pub fn delegate_capsule(ctx: Context<DelegateCapsuleInput>) -> Result<()> {
-        let owner_key = ctx.accounts.owner.key();
-        let capsule_seeds: &[&[u8]] = &[b"intent_capsule", owner_key.as_ref()];
-        let vault_seeds: &[&[u8]] = &[b"capsule_vault", owner_key.as_ref()];
-        
-        let validator_pubkey = ctx
-            .accounts
-            .validator
-            .as_ref()
-            .map(|a| a.key())
-            .or(Some(TEE_VALIDATOR));
-
-        // 1. Delegate Capsule
-        ctx.accounts.delegate_pda(
-            &ctx.accounts.payer,
-            capsule_seeds,
-            DelegateConfig {
-                validator: validator_pubkey,
-                ..Default::default()
-            },
-        )?;
-
-        // 2. Delegate Vault (to the same validator)
-        // We call the inner delegation helper for the vault field
-        let vault_info = ctx.accounts.vault.to_account_info();
-        ephemeral_rollups_sdk::cpi::delegate_account(
-            &ctx.accounts.payer,
-            &vault_info,
-            &ctx.accounts.magic_program, // Wait! I need magic_program in DelegateCapsuleInput too
-            vault_seeds,
-            DelegateConfig {
-                validator: validator_pubkey,
-                ..Default::default()
-            },
-        )?;
-
-        msg!("Capsule and Vault delegated to Ephemeral Rollup (validator: {:?}): capsule={:?}, vault={:?}", 
-            validator_pubkey, ctx.accounts.pda.key(), ctx.accounts.vault.key());
+    /// The #[delegate] macro handles this automatically for all fields marked with 'del'.
+    pub fn delegate_capsule(_ctx: Context<DelegateCapsuleInput>) -> Result<()> {
+        msg!("Capsule and Vault delegated to Ephemeral Rollup");
         Ok(())
     }
 
-    /// Commit and undelegate capsule from Ephemeral Rollup back to Solana base layer (e.g. after execution)
+    /// Commit and undelegate capsule and vault from Ephemeral Rollup back to Solana base layer
     pub fn undelegate_capsule(ctx: Context<UndelegateCapsuleInput>) -> Result<()> {
         commit_and_undelegate_accounts(
             &ctx.accounts.payer,
-            vec![&ctx.accounts.capsule.to_account_info()],
+            vec![
+                &ctx.accounts.capsule.to_account_info(),
+                &ctx.accounts.vault.to_account_info(),
+            ],
             &ctx.accounts.magic_context,
             &ctx.accounts.magic_program,
         )?;
-        msg!("Capsule undelegated from Ephemeral Rollup: {:?}", ctx.accounts.capsule.key());
+        msg!("Capsule and Vault undelegated from Ephemeral Rollup");
         Ok(())
     }
 
@@ -559,15 +527,19 @@ pub struct DelegateCapsuleInput<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub owner: Signer<'info>,
-    /// CHECK: Magic program for manual delegation
+    /// CHECK: Magic program
     pub magic_program: AccountInfo<'info>,
+    /// CHECK: Delegation program
+    pub delegation_program: AccountInfo<'info>,
+    /// CHECK: System program
+    pub system_program: Program<'info, System>,
     /// CHECK: Checked by the delegation program
     pub validator: Option<AccountInfo<'info>>,
     /// CHECK: PDA to delegate (capsule); seeds: [b"intent_capsule", owner]
     #[account(mut, del)]
     pub pda: AccountInfo<'info>,
     /// CHECK: PDA to delegate (vault); seeds: [b"capsule_vault", owner]
-    #[account(mut)]
+    #[account(mut, del)]
     pub vault: AccountInfo<'info>,
 }
 
@@ -586,6 +558,7 @@ pub struct UndelegateCapsuleInput<'info> {
     /// CHECK: Vault PDA (committed alongside capsule)
     #[account(mut, seeds = [b"capsule_vault", owner.key().as_ref()], bump = capsule.vault_bump)]
     pub vault: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

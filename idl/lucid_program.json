@@ -237,28 +237,47 @@
           "name": "magic_program"
         },
         {
+          "name": "delegation_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
           "name": "validator",
           "optional": true
+        },
+        {
+          "name": "pda_buffer",
+          "writable": true
+        },
+        {
+          "name": "pda_delegation_record",
+          "writable": true
+        },
+        {
+          "name": "pda_delegation_metadata",
+          "writable": true
         },
         {
           "name": "pda",
           "writable": true
         },
         {
-          "name": "vault",
+          "name": "vault_buffer",
           "writable": true
         },
         {
-          "name": "owner_program",
-          "address": "BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms"
+          "name": "vault_delegation_record",
+          "writable": true
         },
         {
-          "name": "delegation_program",
-          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+          "name": "vault_delegation_metadata",
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "vault",
+          "writable": true
         }
       ],
       "args": []
@@ -727,6 +746,14 @@
         {
           "name": "vault",
           "writable": true
+        },
+        {
+          "name": "buffer",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []

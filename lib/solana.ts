@@ -321,12 +321,30 @@ export async function delegateCapsule(
 
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
 
+  // Derive PDAs for Capsule delegation
+  const [bufferPDA] = getBufferPDA(capsulePDA, getProgramId())
+  const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA, delegationProgramId)
+  const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA, delegationProgramId)
+
+  // Derive PDAs for Vault delegation
+  const [vaultBufferPDA] = getBufferPDA(vaultPDA, getProgramId())
+  const [vaultDelegationRecordPDA] = getDelegationRecordPDA(vaultPDA, delegationProgramId)
+  const [vaultDelegationMetadataPDA] = getDelegationMetadataPDA(vaultPDA, delegationProgramId)
+
   const accounts = {
     payer: wallet.publicKey,
     owner: wallet.publicKey,
     magicProgram: magicProgramId,
+    delegationProgram: delegationProgramId,
+    systemProgram: SystemProgram.programId,
     validator: validatorPubkey ?? null,
+    pdaBuffer: bufferPDA,
+    pdaDelegationRecord: delegationRecordPDA,
+    pdaDelegationMetadata: delegationMetadataPDA,
     pda: capsulePDA,
+    vaultBuffer: vaultBufferPDA,
+    vaultDelegationRecord: vaultDelegationRecordPDA,
+    vaultDelegationMetadata: vaultDelegationMetadataPDA,
     vault: vaultPDA,
   }
 
@@ -350,14 +368,20 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
   const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
   const magicContext = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
 
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
+  const [commitBufferPDA] = getBufferPDA(capsulePDA, getProgramId())
+
   const tx = await program.methods
     .undelegateCapsule()
     .accounts({
-      payer: wallet.publicKey!,
-      owner: wallet.publicKey!,
+      payer: wallet.publicKey as PublicKey,
+      owner: wallet.publicKey as PublicKey,
       magicContext,
       magicProgram,
       capsule: capsulePDA,
+      vault: vaultPDA,
+      buffer: commitBufferPDA,
+      systemProgram: SystemProgram.programId,
     })
     .rpc()
 
