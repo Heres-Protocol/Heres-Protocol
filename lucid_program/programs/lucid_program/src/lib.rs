@@ -335,25 +335,45 @@ pub mod lucid_program {
         Ok(())
     }
 
-    /// Delegate capsule PDA to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
+    /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
     pub fn delegate_capsule(ctx: Context<DelegateCapsuleInput>) -> Result<()> {
         let owner_key = ctx.accounts.owner.key();
-        let pda_seeds: &[&[u8]] = &[b"intent_capsule", owner_key.as_ref()];
+        let capsule_seeds: &[&[u8]] = &[b"intent_capsule", owner_key.as_ref()];
+        let vault_seeds: &[&[u8]] = &[b"capsule_vault", owner_key.as_ref()];
+        
         let validator_pubkey = ctx
             .accounts
             .validator
             .as_ref()
             .map(|a| a.key())
             .or(Some(TEE_VALIDATOR));
+
+        // 1. Delegate Capsule
         ctx.accounts.delegate_pda(
             &ctx.accounts.payer,
-            pda_seeds,
+            capsule_seeds,
             DelegateConfig {
                 validator: validator_pubkey,
                 ..Default::default()
             },
         )?;
-        msg!("Capsule delegated to Ephemeral Rollup (validator: {:?}): {:?}", validator_pubkey, ctx.accounts.pda.key());
+
+        // 2. Delegate Vault (to the same validator)
+        // We call the inner delegation helper for the vault field
+        let vault_info = ctx.accounts.vault.to_account_info();
+        ephemeral_rollups_sdk::cpi::delegate_account(
+            &ctx.accounts.payer,
+            &vault_info,
+            &ctx.accounts.magic_program, // Wait! I need magic_program in DelegateCapsuleInput too
+            vault_seeds,
+            DelegateConfig {
+                validator: validator_pubkey,
+                ..Default::default()
+            },
+        )?;
+
+        msg!("Capsule and Vault delegated to Ephemeral Rollup (validator: {:?}): capsule={:?}, vault={:?}", 
+            validator_pubkey, ctx.accounts.pda.key(), ctx.accounts.vault.key());
         Ok(())
     }
 
@@ -539,11 +559,16 @@ pub struct DelegateCapsuleInput<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub owner: Signer<'info>,
+    /// CHECK: Magic program for manual delegation
+    pub magic_program: AccountInfo<'info>,
     /// CHECK: Checked by the delegation program
     pub validator: Option<AccountInfo<'info>>,
-    /// CHECK: PDA to delegate (capsule); #[delegate] expects field name "pda"
+    /// CHECK: PDA to delegate (capsule); seeds: [b"intent_capsule", owner]
     #[account(mut, del)]
     pub pda: AccountInfo<'info>,
+    /// CHECK: PDA to delegate (vault); seeds: [b"capsule_vault", owner]
+    #[account(mut)]
+    pub vault: AccountInfo<'info>,
 }
 
 #[commit]
@@ -558,6 +583,9 @@ pub struct UndelegateCapsuleInput<'info> {
     pub magic_program: AccountInfo<'info>,
     #[account(mut, seeds = [b"intent_capsule", owner.key().as_ref()], bump = capsule.bump)]
     pub capsule: Account<'info, IntentCapsule>,
+    /// CHECK: Vault PDA (committed alongside capsule)
+    #[account(mut, seeds = [b"capsule_vault", owner.key().as_ref()], bump = capsule.vault_bump)]
+    pub vault: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -573,7 +601,6 @@ pub struct ScheduleExecuteIntent<'info> {
     #[account(mut)]
     pub capsule: AccountInfo<'info>,
     /// CHECK: Vault PDA that holds locked SOL for this capsule.
-    #[account(mut)]
     pub vault: AccountInfo<'info>,
     /// System program – only its key is used when constructing the execute_intent ix.
     pub system_program: Program<'info, System>,
@@ -581,10 +608,8 @@ pub struct ScheduleExecuteIntent<'info> {
     /// CHECK: Fee config account (read-only for scheduling; validated inside execute_intent).
     pub fee_config: AccountInfo<'info>,
     /// CHECK: Platform fee recipient (optional; validated in execute_intent).
-    #[account(mut)]
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
     /// CHECK: Vault ATA (optional; validated in execute_intent).
-    #[account(mut)]
     pub vault_token_account: Option<AccountInfo<'info>>,
 }
 

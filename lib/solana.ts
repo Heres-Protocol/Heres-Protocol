@@ -319,37 +319,20 @@ export async function delegateCapsule(
     throw new Error(`Capsule is not owned by the Lucid Program. Current owner: ${accountInfo.owner.toBase58()}`)
   }
 
-  // Derive PDAs for delegation accounts
-  const [bufferPDA] = getBufferPDA(capsulePDA, getProgramId())
-  const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA, delegationProgramId)
-  const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA, delegationProgramId)
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
 
-  const accounts: {
-    payer: PublicKey
-    owner: PublicKey
-    validator?: PublicKey
-    bufferPda: PublicKey
-    delegationRecordPda: PublicKey
-    delegationMetadataPda: PublicKey
-    pda: PublicKey
-    ownerProgram: PublicKey
-    delegationProgram: PublicKey
-    systemProgram: PublicKey
-  } = {
+  const accounts = {
     payer: wallet.publicKey,
     owner: wallet.publicKey,
-    bufferPda: bufferPDA,
-    delegationRecordPda: delegationRecordPDA,
-    delegationMetadataPda: delegationMetadataPDA,
+    magicProgram: magicProgramId,
+    validator: validatorPubkey ?? null,
     pda: capsulePDA,
-    ownerProgram: getProgramId(),
-    delegationProgram: delegationProgramId,
-    systemProgram: SystemProgram.programId,
+    vault: vaultPDA,
   }
-  if (validatorPubkey) accounts.validator = validatorPubkey
 
   const tx = await program.methods
     .delegateCapsule()
+    // @ts-ignore
     .accounts(accounts)
     .rpc()
 
@@ -484,17 +467,7 @@ export async function scheduleExecuteIntentViaTee(
 
   const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
 
-  const accounts: {
-    magicProgram: PublicKey
-    payer: PublicKey
-    capsule: PublicKey
-    vault: PublicKey
-    systemProgram: PublicKey
-    tokenProgram: PublicKey
-    feeConfig: PublicKey
-    platformFeeRecipient: PublicKey
-    vaultTokenAccount: PublicKey | null
-  } = {
+  const accounts = {
     magicProgram,
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
@@ -507,11 +480,12 @@ export async function scheduleExecuteIntentViaTee(
   }
 
   if (mint) {
-    accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
+    // @ts-ignore
+    accounts.vaultTokenAccount = getAssociatedTokenAddressSync(mint, vaultPDA, true)
   }
 
   const tx = await program.methods
-    .scheduleExecuteIntent({ taskId, executionIntervalMillis, iterations })
+    .scheduleExecuteIntent({ args: { taskId, executionIntervalMillis, iterations } })
     // @ts-ignore
     .accounts(accounts)
     .rpc()
