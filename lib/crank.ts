@@ -1,5 +1,8 @@
 import { Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
-import { Program, AnchorProvider, BN, Wallet } from '@coral-xyz/anchor'
+import { Program, AnchorProvider, BN } from '@coral-xyz/anchor'
+// Use a local Wallet helper if @coral-xyz/anchor Wallet export fails
+import type { Wallet } from '@coral-xyz/anchor'
+const WalletClass = (require('@coral-xyz/anchor').Wallet || (AnchorProvider.prototype as any).wallet)
 import idl from '../idl/HeresProgram.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
 import { getCapsulePDA, getCapsuleVaultPDA, getFeeConfigPDA } from './program'
@@ -29,7 +32,7 @@ function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey
 }
 
 export async function getEligibleCapsules(connection: Connection, crankKeypair: Keypair): Promise<DecodedCapsule[]> {
-  const wallet = new Wallet(crankKeypair)
+  const wallet = new WalletClass(crankKeypair)
   const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' })
   const program = new Program(idl as any, provider)
 
@@ -77,7 +80,7 @@ export async function executeCapsuleIntent(
   crankKeypair: Keypair,
   capsule: DecodedCapsule
 ): Promise<string> {
-  const wallet = new Wallet(crankKeypair)
+  const wallet = new WalletClass(crankKeypair)
   const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' })
   const program = new Program(idl as any, provider)
 

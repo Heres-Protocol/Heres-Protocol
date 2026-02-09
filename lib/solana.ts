@@ -3,7 +3,9 @@
  */
 
 import { SystemProgram, PublicKey, Connection } from '@solana/web3.js'
-import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor'
+import { Program, AnchorProvider, BN } from '@coral-xyz/anchor'
+import type { Wallet } from '@coral-xyz/anchor'
+const WalletClass = (require('@coral-xyz/anchor').Wallet || (AnchorProvider.prototype as any).wallet)
 import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/HeresProgram.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
