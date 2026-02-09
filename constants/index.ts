@@ -62,10 +62,10 @@ export const MAGICBLOCK_ER = {
 
 /** Ephemeral Rollup (ER) - Devnet endpoint for delegation and scheduling */
 export const PER_TEE = {
-  /** Devnet ER RPC URL */
-  RPC_URL: process.env.NEXT_PUBLIC_TEE_RPC_URL || 'https://devnet.magicblock.app',
-  /** Auth URL for TEE challenge-response (Must match RPC for consistency) */
-  AUTH_URL: process.env.NEXT_PUBLIC_TEE_AUTH_URL || 'https://devnet.magicblock.app',
+  /** Devnet ER TEE RPC URL */
+  RPC_URL: process.env.NEXT_PUBLIC_TEE_RPC_URL || 'https://tee.magicblock.app',
+  /** Auth URL for TEE challenge-response */
+  AUTH_URL: process.env.NEXT_PUBLIC_TEE_AUTH_URL || 'https://tee.magicblock.app',
   DOCS_URL: 'https://docs.magicblock.gg/pages/ephemeral-rollups-ers/introduction',
 } as const
 
