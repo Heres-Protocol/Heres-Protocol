@@ -395,7 +395,7 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
  */
 export async function scheduleExecuteIntent(
   wallet: WalletContextState,
-  args: { taskId: BN; executionIntervalMillis: BN; iterations: BN },
+  args?: { taskId?: BN; executionIntervalMillis?: BN; iterations?: BN },
   mint?: PublicKey
 ): Promise<string> {
   const program = getProgram(wallet)
@@ -446,77 +446,6 @@ export async function scheduleExecuteIntent(
 
   const tx = await program.methods
     .scheduleExecuteIntent(args)
-    // @ts-ignore
-    .accounts(accounts)
-    .rpc()
-
-  return tx
-}
-
-/**
- * Schedule crank on devnet ER so execute_intent runs automatically at intervals (MagicBlock Crank).
- * Call this after delegate_capsule so execution happens on-chain without anyone visiting.
- * See: https://docs.magicblock.app/pages/tools/crank/introduction
- */
-export async function scheduleExecuteIntent(
-  wallet: WalletContextState,
-  args?: {
-    taskId?: BN
-    executionIntervalMillis?: BN
-    iterations?: BN
-  },
-  mint?: PublicKey
-): Promise<string> {
-  if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
-
-  // Use regular devnet ER endpoint instead of TEE for scheduling
-  const connection = new Connection('https://devnet.magicblock.app', 'confirmed')
-  const walletAdapter = {
-    publicKey: wallet.publicKey,
-    signTransaction: wallet.signTransaction,
-    signAllTransactions: wallet.signAllTransactions ?? (async (txs) => txs),
-  } as Wallet
-  const provider = new AnchorProvider(connection, walletAdapter, { commitment: 'confirmed' })
-  const program = new Program(idl as any, provider)
-
-  const [capsulePDA] = getCapsulePDA(wallet.publicKey)
-  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
-  const [feeConfigPDA] = getFeeConfigPDA()
-  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
-    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
-    : (wallet.publicKey as PublicKey)
-
-  const taskId = args?.taskId ?? new BN(Date.now())
-  const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(CRANK_DEFAULT_INTERVAL_MS)
-  const iterations = args?.iterations ?? new BN(CRANK_DEFAULT_ITERATIONS)
-
-  const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
-
-  const accounts = {
-    magicProgram,
-    payer: wallet.publicKey as PublicKey,
-    capsule: capsulePDA,
-    vault: vaultPDA,
-    systemProgram: SystemProgram.programId,
-    tokenProgram: TOKEN_PROGRAM_ID,
-    feeConfig: feeConfigPDA,
-    platformFeeRecipient: platformFeeRecipient || wallet.publicKey,
-    vaultTokenAccount: null,
-  }
-
-  if (mint) {
-    // @ts-ignore
-    accounts.vaultTokenAccount = getAssociatedTokenAddressSync(mint, vaultPDA, true)
-  }
-
-  const tx = await program.methods
-    .scheduleExecuteIntent({
-      args: {
-        taskId,
-        executionIntervalMillis,
-        iterations,
-      },
-    })
     // @ts-ignore
     .accounts(accounts)
     .rpc()
