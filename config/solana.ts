@@ -49,15 +49,3 @@ export function isValidSolanaAddress(address: string): boolean {
     return false
   }
 }
-
-/**
- * TEE RPC connection for Private Ephemeral Rollup (PER).
- * Use after getTeeAuthToken; pass token so PER state can be queried.
- */
-export function getTeeConnection(authToken: string): Connection {
-  const url = `${PER_TEE.RPC_URL}?token=${encodeURIComponent(authToken)}`
-  return new Connection(url, {
-    commitment: 'confirmed',
-    confirmTransactionInitialTimeout: 120000,
-  })
-}

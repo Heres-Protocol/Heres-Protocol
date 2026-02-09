@@ -10,9 +10,8 @@ import {
   getCapsuleByAddress,
   delegateCapsule,
   executeIntent,
-  scheduleExecuteIntentViaTee,
+  scheduleExecuteIntent,
 } from '@/lib/solana'
-import { getTeeAuthToken } from '@/lib/tee'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { decodeIntentData, secondsToDays } from '@/utils/intent'
@@ -157,42 +156,14 @@ export default function CapsuleDetailPage() {
 
       // Retry logic for crank scheduling (ER may need time to sync)
       const maxRetries = 3
-      let lastError: any = null
-
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`[STEP 2] Attempt ${attempt}/${maxRetries}: Obtaining TEE auth token...`)
-          const auth = await getTeeAuthToken(wallet)
-          if (!auth?.token) {
-            const errorMsg = 'TEE auth token not available — please enable message signing in your wallet.'
-            console.error('[STEP 2] ✗', errorMsg)
-            setScheduleError(errorMsg)
-            return
-          }
-
-          console.log(`[STEP 2] Attempt ${attempt}/${maxRetries}: Scheduling crank on ER...`)
-          const scheduleSig = await scheduleExecuteIntentViaTee(wallet, auth.token)
-          setScheduleTx(scheduleSig)
-          console.log('[STEP 2] ✓ Crank scheduled successfully on ER. Tx:', scheduleSig)
-          return // Success, exit the function
-        } catch (e: any) {
-          lastError = e
-          const msg = e?.message || String(e)
-          console.error(`[STEP 2] ✗ Attempt ${attempt}/${maxRetries} failed:`, msg)
-
-          if (attempt < maxRetries) {
-            // Wait before retry (3 seconds)
-            console.log(`[STEP 2] Waiting 3 seconds before retry...`)
-            await new Promise(resolve => setTimeout(resolve, 3000))
-          }
-        }
-      }
-
-      // All retries failed
-      const msg = lastError?.message || String(lastError)
-      if (msg.includes('writable account') || msg.includes('Simulation failed')) {
-        setScheduleError(`Crank scheduling failed after ${maxRetries} attempts: The ER may still be syncing. Please try again in a few seconds.`)
-      } else {
+      try {
+        console.log('[STEP 2] Scheduling crank on devnet ER...')
+        const scheduleSig = await scheduleExecuteIntent(wallet)
+        setScheduleTx(scheduleSig)
+        console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', scheduleSig)
+      } catch (e: any) {
+        const msg = e?.message || String(e)
+        console.error('[STEP 2] ✗ Scheduling failed:', msg)
         setScheduleError(`Crank scheduling failed: ${msg}`)
       }
     } catch (e: any) {

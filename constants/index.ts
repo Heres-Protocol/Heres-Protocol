@@ -54,12 +54,11 @@ export const MAGICBLOCK_ER = {
   VALIDATOR_TEE: 'FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA',
 } as const
 
-/** Private Ephemeral Rollup (PER) - TEE RPC for confidential state; use getAuthToken + ?token= for access */
+/** Ephemeral Rollup (ER) - Devnet endpoint for delegation and scheduling */
 export const PER_TEE = {
-  /** TEE RPC base URL (devnet). Attach token: `${url}?token=${authToken}` */
-  RPC_URL: process.env.NEXT_PUBLIC_TEE_RPC_URL || 'https://devnet.magicblock.app/rpc/tee',
-  /** Docs page (clickable link; RPC URL is API-only and shows "Not found" in browser) */
-  DOCS_URL: 'https://docs.magicblock.gg/pages/tools/tee/introduction',
+  /** Devnet ER RPC URL (no auth required for scheduling) */
+  RPC_URL: 'https://devnet.magicblock.app',
+  DOCS_URL: 'https://docs.magicblock.gg/pages/ephemeral-rollups-ers/introduction',
 } as const
 
 // Local Storage Keys

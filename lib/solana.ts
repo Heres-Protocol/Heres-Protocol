@@ -15,7 +15,6 @@ import {
   getDelegationRecordPDA,
   getDelegationMetadataPDA,
 } from './program'
-import { getTeeConnection } from './tee'
 import { SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
 import { MAGICBLOCK_ER } from '@/constants'
 import type { IntentCapsule } from '@/types'
