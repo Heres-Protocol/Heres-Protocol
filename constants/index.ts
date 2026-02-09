@@ -41,10 +41,10 @@ export const PLATFORM_FEE = {
 // Magicblock ER (Ephemeral Rollup) - Devnet validators
 export const MAGICBLOCK_ER = {
   DELEGATION_PROGRAM_ID: 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh',
-  /** Magic program ID for crank ScheduleTask CPI (see ephemeral_rollups_sdk consts) */
-  MAGIC_PROGRAM_ID: process.env.NEXT_PUBLIC_MAGIC_PROGRAM_ID || 'MPUxHCpNUy3K1CSVhebAmTbcTCKVxfk9YMDcUP2ZnEA',
-  /** Magic context PDA for commit/undelegate CPI; override via env if different on your cluster */
-  MAGIC_CONTEXT: process.env.NEXT_PUBLIC_MAGIC_CONTEXT || 'MPUxHCpNUy3K1CSVhebAmTbcTCKVxfk9YMDcUP2ZnEA',
+  /** Magic program ID for crank ScheduleTask CPI (matches ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID) */
+  MAGIC_PROGRAM_ID: process.env.NEXT_PUBLIC_MAGIC_PROGRAM_ID || 'Magic11111111111111111111111111111111111111',
+  /** Magic context PDA for commit/undelegate CPI */
+  MAGIC_CONTEXT: process.env.NEXT_PUBLIC_MAGIC_CONTEXT || 'Magic11111111111111111111111111111111111111',
   ROUTER_DEVNET: 'https://devnet-router.magicblock.app',
   ROUTER_WS: 'wss://devnet-router.magicblock.app',
   VALIDATOR_ASIA: 'MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57',
