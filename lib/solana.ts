@@ -501,7 +501,7 @@ export async function scheduleExecuteIntentViaTee(
     systemProgram: SystemProgram.programId,
     tokenProgram: TOKEN_PROGRAM_ID,
     feeConfig: feeConfigPDA,
-    platformFeeRecipient,
+    platformFeeRecipient: platformFeeRecipient || wallet.publicKey,
     vaultTokenAccount: null,
   }
 
@@ -511,7 +511,13 @@ export async function scheduleExecuteIntentViaTee(
   }
 
   const tx = await program.methods
-    .scheduleExecuteIntent({ args: { taskId, executionIntervalMillis, iterations } })
+    .scheduleExecuteIntent({
+      args: {
+        taskId,
+        executionIntervalMillis,
+        iterations,
+      },
+    })
     // @ts-ignore
     .accounts(accounts)
     .rpc()
