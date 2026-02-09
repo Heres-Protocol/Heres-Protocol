@@ -16,6 +16,7 @@ import {
   getBufferPDA,
   getDelegationRecordPDA,
   getDelegationMetadataPDA,
+  getPermissionPDA,
 } from './program'
 import { SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { TEE_AUTH } from './tee'
@@ -87,6 +88,14 @@ export async function createCapsule(
   if (!program) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
+  const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
+
+  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
+    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
+    : (wallet.publicKey as PublicKey)
 
   // Convert Uint8Array to Buffer for Anchor (required by Blob.encode)
   // In browser environment, use Buffer polyfill or convert to number array
@@ -102,35 +111,18 @@ export async function createCapsule(
   const maxRetries = 5
   let lastError: any
 
-  const [feeConfigPDA] = getFeeConfigPDA()
-  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
-  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
-    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
-    : null
-
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const accounts: {
-        capsule: PublicKey
-        vault: PublicKey
-        owner: PublicKey
-        feeConfig: PublicKey
-        platformFeeRecipient?: PublicKey
-        systemProgram: PublicKey
-        tokenProgram: PublicKey
-        mint: PublicKey | null
-        sourceTokenAccount: PublicKey | null
-        vaultTokenAccount: PublicKey | null
-      } = {
+      const accounts: any = {
         capsule: capsulePDA,
         vault: vaultPDA,
         owner: wallet.publicKey!,
         feeConfig: feeConfigPDA,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
-        mint: null,
-        sourceTokenAccount: null,
-        vaultTokenAccount: null,
+        permissionProgram: permissionProgramId,
+        permission: permissionPDA,
+        platformFeeRecipient: platformFeeRecipient || undefined,
       }
 
       if (mint) {
@@ -139,11 +131,8 @@ export async function createCapsule(
         accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
       }
 
-      if (platformFeeRecipient) accounts.platformFeeRecipient = platformFeeRecipient
-
       const tx = await program.methods
         .createCapsule(new BN(inactivityPeriodSeconds), intentDataBuffer)
-        // @ts-ignore
         .accounts(accounts)
         .rpc()
 
@@ -176,7 +165,7 @@ export async function createCapsule(
 
   // If all retries failed, throw with a user-friendly message
   if (lastError?.message?.includes('503') || lastError?.message?.includes('Service unavailable')) {
-    throw new Error('RPC ?쒕쾭媛 ?쇱떆?곸쑝濡??ъ슜 遺덇??ν빀?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄?댁＜?몄슂.\nRPC server is temporarily unavailable. Please try again in a few moments.')
+    throw new Error('RPC 서버가 일시적으로 사용 불가능합니다. 잠시 후 다시 시도해주세요.\nRPC server is temporarily unavailable. Please try again in a few moments.')
   }
 
   throw lastError
@@ -423,22 +412,10 @@ export async function scheduleExecuteIntent(
     : (wallet.publicKey as PublicKey)
 
   const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+  const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
+  const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
-  const accounts: {
-    magicProgram: PublicKey
-    payer: PublicKey
-    capsule: PublicKey
-    vault: PublicKey
-    owner: PublicKey
-    systemProgram: PublicKey
-    feeConfig: PublicKey
-    platformFeeRecipient: PublicKey
-    tokenProgram: PublicKey
-    mint: PublicKey | null
-    // @ts-ignore
-    sourceTokenAccount: PublicKey | null
-    vaultTokenAccount: PublicKey | null
-  } = {
+  const accounts: any = {
     magicProgram,
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
@@ -448,6 +425,8 @@ export async function scheduleExecuteIntent(
     feeConfig: feeConfigPDA,
     platformFeeRecipient,
     tokenProgram: TOKEN_PROGRAM_ID,
+    permissionProgram: permissionProgramId,
+    permission: permissionPDA,
     mint: null,
     sourceTokenAccount: null,
     vaultTokenAccount: null,

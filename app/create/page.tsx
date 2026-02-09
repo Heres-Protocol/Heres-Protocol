@@ -980,6 +980,16 @@ export default function CreatePage() {
 
               {capsuleType !== null && (
                 <>
+                  <div className="rounded-xl border border-Heres-accent/30 bg-Heres-accent/10 p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="w-4 h-4 text-Heres-accent" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-Heres-accent">Privacy Tier: PER (TEE)</span>
+                    </div>
+                    <p className="text-xs text-Heres-muted">
+                      This capsule will be protected by MagicBlock's Private Ephemeral Rollup.
+                      Hardware-secured (TEE) monitoring ensures your intent remains confidential until conditions are met.
+                    </p>
+                  </div>
                   <p className="text-xs text-Heres-muted">
                     Platform fee: {PLATFORM_FEE.CREATION_FEE_SOL} SOL (creation) + {PLATFORM_FEE.EXECUTION_FEE_BPS / 100}% (on execution)
                   </p>

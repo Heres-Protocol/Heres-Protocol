@@ -64,3 +64,14 @@ export function getDelegationMetadataPDA(pda: PublicKey, delegationProgramId: Pu
     delegationProgramId
   )
 }
+
+/**
+ * Derive Magicblock Permission PDA (seeds = ["permission", pda])
+ * Used for Private Ephemeral Rollups (PER) access control.
+ */
+export function getPermissionPDA(pda: PublicKey, permissionProgramId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('permission'), pda.toBuffer()],
+    permissionProgramId
+  )
+}

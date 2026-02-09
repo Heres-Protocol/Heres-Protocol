@@ -8,8 +8,11 @@ use anchor_lang::solana_program::{
 use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
 use ephemeral_rollups_sdk::cpi::DelegateConfig;
 use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
-// use ephemeral_rollups_sdk::cpi::delegate_accounts;
 use ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID;
+use ephemeral_rollups_sdk::access_control::{
+    instructions::CreatePermissionCpiBuilder,
+    structs::{Member, MembersArgs, AUTHORITY_FLAG, TX_LOGS_FLAG, TX_BALANCES_FLAG, TX_MESSAGE_FLAG, ACCOUNT_SIGNATURES_FLAG}
+};
 use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
 #[cfg(feature = "oracle")]
@@ -19,6 +22,9 @@ declare_id!("CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM");
 
 /// TEE validator for Private Ephemeral Rollup (PER). Used as default when no validator account is passed.
 pub const TEE_VALIDATOR: Pubkey = pubkey!("FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA");
+
+/// MagicBlock Permission Program ID for Access Control
+pub const PERMISSION_PROGRAM_ID: Pubkey = pubkey!("ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1");
 
 /// Discriminator for execute_intent (no args) ??from IDL
 const EXECUTE_INTENT_DISCRIMINATOR: [u8; 8] = [53, 130, 47, 154, 227, 220, 122, 212];
@@ -61,7 +67,7 @@ pub mod heres_program {
     }
 
     /// Initialize a new Intent Capsule (SOL locked in vault; anyone can execute when conditions are met).
-    /// PER: To restrict intent_data access to TEE only, add CPI to Magicblock Permission Program (CreatePermissionGroup / CreatePermission) when available.
+    /// PER: Uses Magicblock Permission Program to restrict intent_data access to TEE validator and Owner only.
     pub fn create_capsule(
         ctx: Context<CreateCapsule>,
         inactivity_period: i64,
@@ -134,7 +140,37 @@ pub mod heres_program {
             msg!("Locked {} lamports in vault for capsule {:?}", total_amount_lamports, capsule.key());
         }
 
-        msg!("Intent Capsule created: {:?}", capsule.key());
+        // Initialize access control via Permission Program (PER/TEE)
+        let capsule_bump = ctx.accounts.capsule.bump;
+        let owner_key = ctx.accounts.owner.key();
+        let capsule_seeds: &[&[u8]] = &[
+            b"intent_capsule",
+            owner_key.as_ref(),
+            &[capsule_bump],
+        ];
+        let signer_seeds = &[capsule_seeds];
+
+        let members = vec![
+            Member {
+                flags: AUTHORITY_FLAG | TX_LOGS_FLAG | TX_BALANCES_FLAG | TX_MESSAGE_FLAG | ACCOUNT_SIGNATURES_FLAG,
+                pubkey: owner_key,
+            },
+            Member {
+                flags: TX_LOGS_FLAG | TX_BALANCES_FLAG | TX_MESSAGE_FLAG | ACCOUNT_SIGNATURES_FLAG,
+                pubkey: crate::TEE_VALIDATOR,
+            },
+        ];
+
+        CreatePermissionCpiBuilder::new(&ctx.accounts.permission_program)
+            .permissioned_account(&ctx.accounts.capsule.to_account_info())
+            .permission(&ctx.accounts.permission.to_account_info())
+            .payer(&ctx.accounts.owner.to_account_info())
+            .system_program(&ctx.accounts.system_program.to_account_info())
+            .args(MembersArgs { members: Some(members) })
+            .invoke_signed(signer_seeds)?;
+
+        msg!("Access control (TEE) initialized for capsule: {:?}", ctx.accounts.capsule.key());
+        msg!("Intent Capsule created: {:?}", ctx.accounts.capsule.key());
         Ok(())
     }
 
@@ -414,25 +450,34 @@ pub mod heres_program {
             ];
 
         // 6. platform_fee_recipient (Option)
-        // If vault_token_account is present, we MUST provide a value for platform_fee_recipient (positional).
-        // If not present, we can provide it if it exists.
         if ctx.accounts.vault_token_account.is_some() {
              if let Some(recipient) = &ctx.accounts.platform_fee_recipient {
                  accounts.push(AccountMeta::new(recipient.key(), false));
              } else {
-                 // Placeholder: Use payer if recipient is missing but needed for position
                  accounts.push(AccountMeta::new(ctx.accounts.payer.key(), false));
              }
         } else if let Some(recipient) = &ctx.accounts.platform_fee_recipient {
              accounts.push(AccountMeta::new(recipient.key(), false));
+        } else {
+            // Placeholder if missing (ExecuteIntent expects Option)
+            accounts.push(AccountMeta::new_readonly(crate::ID, false));
         }
 
         // 7. vault_token_account (Option)
         if let Some(vta) = &ctx.accounts.vault_token_account {
             accounts.push(AccountMeta::new(vta.key(), false));
+        } else {
+            // Placeholder
+            accounts.push(AccountMeta::new_readonly(crate::ID, false));
         }
 
-        // 8. Beneficiaries (Remaining accounts)
+        // 8. permission_program
+        accounts.push(AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false));
+
+        // 9. permission
+        accounts.push(AccountMeta::new(ctx.accounts.permission.key(), false));
+
+        // 10. Beneficiaries (Remaining accounts)
         for acc in ctx.remaining_accounts.iter() {
             if acc.is_writable {
                 accounts.push(AccountMeta::new(acc.key(), acc.is_signer));
@@ -629,6 +674,18 @@ pub struct ScheduleExecuteIntent<'info> {
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
     /// CHECK: Vault ATA (optional; validated in execute_intent).
     pub vault_token_account: Option<AccountInfo<'info>>,
+    /// MagicBlock Permission Program
+    /// CHECK: Validated by address
+    #[account(address = PERMISSION_PROGRAM_ID)]
+    pub permission_program: AccountInfo<'info>,
+    /// CHECK: PDA for access control; seeds [b"permission", capsule]
+    #[account(
+        mut,
+        seeds = [b"permission", capsule.key().as_ref()],
+        bump,
+        seeds::program = PERMISSION_PROGRAM_ID
+    )]
+    pub permission: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -716,13 +773,22 @@ pub struct CreateCapsule<'info> {
     
     pub token_program: Program<'info, Token>,
     
-    pub mint: Option<Account<'info, Mint>>,
-    
-    #[account(mut)]
-    pub source_token_account: Option<Account<'info, TokenAccount>>,
-    
     #[account(mut)]
     pub vault_token_account: Option<Account<'info, TokenAccount>>,
+
+    /// MagicBlock Permission Program
+    /// CHECK: Validated by address
+    #[account(address = PERMISSION_PROGRAM_ID)]
+    pub permission_program: AccountInfo<'info>,
+
+    /// CHECK: PDA for access control; seeds [b"permission", capsule]
+    #[account(
+        mut,
+        seeds = [b"permission", capsule.key().as_ref()],
+        bump,
+        seeds::program = PERMISSION_PROGRAM_ID
+    )]
+    pub permission: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -768,6 +834,20 @@ pub struct ExecuteIntent<'info> {
 
     #[account(mut)]
     pub vault_token_account: Option<Account<'info, TokenAccount>>,
+
+    /// MagicBlock Permission Program
+    /// CHECK: Validated by address
+    #[account(address = PERMISSION_PROGRAM_ID)]
+    pub permission_program: AccountInfo<'info>,
+
+    /// CHECK: PDA for access control; seeds [b"permission", capsule]
+    #[account(
+        mut,
+        seeds = [b"permission", capsule.key().as_ref()],
+        bump,
+        seeds::program = PERMISSION_PROGRAM_ID
+    )]
+    pub permission: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]

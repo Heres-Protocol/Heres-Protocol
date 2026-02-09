@@ -53,6 +53,8 @@ export const MAGICBLOCK_ER = {
   VALIDATOR_US: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
   /** TEE validator for Private Ephemeral Rollup (PER); used by default when delegating for privacy */
   VALIDATOR_TEE: 'FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA',
+  /** MagicBlock Permission Program ID for Access Control (PER) */
+  PERMISSION_PROGRAM_ID: 'ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1',
 } as const
 
 /** Ephemeral Rollup (ER) - Devnet endpoint for delegation and scheduling */
