@@ -444,8 +444,13 @@ export async function scheduleExecuteIntent(
     accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
   }
 
+  // Default values for optional args
+  const taskId = args?.taskId ?? new BN(Date.now())
+  const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(CRANK_DEFAULT_INTERVAL_MS)
+  const iterations = args?.iterations ?? new BN(CRANK_DEFAULT_ITERATIONS)
+
   const tx = await program.methods
-    .scheduleExecuteIntent(args)
+    .scheduleExecuteIntent({ args: { taskId, executionIntervalMillis, iterations } })
     // @ts-ignore
     .accounts(accounts)
     .rpc()
