@@ -415,7 +415,8 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
 export async function scheduleExecuteIntent(
   wallet: WalletContextState,
   args?: { taskId?: BN; executionIntervalMillis?: BN; iterations?: BN },
-  mint?: PublicKey
+  mint?: PublicKey,
+  token?: string
 ): Promise<string> {
   const program = getProgram(wallet)
   if (!program) throw new Error('Wallet not connected')
@@ -454,7 +455,7 @@ export async function scheduleExecuteIntent(
   // IMPORTANT: For crank scheduling, we MUST use the TEE program instance
   // because the capsule has been delegated to the Ephemeral Rollup (ER).
   // Standard Devnet RPC will not find the delegated accounts.
-  const teeProgram = getTeeProgram(wallet);
+  const teeProgram = getTeeProgram(wallet, token);
   if (!teeProgram) throw new Error('Failed to initialize TEE program');
 
   const tx = await teeProgram.methods

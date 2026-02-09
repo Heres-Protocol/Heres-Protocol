@@ -138,23 +138,23 @@ export default function CapsuleDetailPage() {
     setIsTeeAuthenticated(false)
     setTeeAuthToken(null)
 
+    let currentToken: string | null = null;
+
     try {
-      // ===== STEP 1: Delegate capsule to PER (TEE) validator =====
-      // This transaction is sent to Solana Devnet to delegate the capsule account
-      // to the MagicBlock Ephemeral Rollup (ER) delegation program
+      // ===== STEP 1: Delegate and/or Authenticate with TEE =====
+      // We always need an auth token for the TEE RPC (ScheduleTask)
+      try {
+        console.log('[STEP 1] Fetching TEE authentication token...')
+        currentToken = await TEE_AUTH.getAuthToken(wallet)
+        setTeeAuthToken(currentToken)
+        setIsTeeAuthenticated(true)
+        console.log('[STEP 1] TEE Authentication successful')
+      } catch (authError) {
+        console.warn('[STEP 1] TEE Authentication failed, proceeding without token', authError)
+      }
+
       if (!isAlreadyDelegated) {
         console.log('[STEP 1] Delegating capsule to PER (TEE) validator...')
-
-        // Get TEE auth token first if it's a TEE validator
-        try {
-          const token = await TEE_AUTH.getAuthToken(wallet)
-          setTeeAuthToken(token)
-          setIsTeeAuthenticated(true)
-          console.log('[STEP 1] TEE Authentication successful')
-        } catch (authError) {
-          console.warn('[STEP 1] TEE Authentication failed, proceeding with basic delegation', authError)
-        }
-
         const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
         setDelegateTx(tx)
         console.log('[STEP 1] ✓ Delegation successful. Tx:', tx)
@@ -173,8 +173,13 @@ export default function CapsuleDetailPage() {
       // Retry logic for crank scheduling (ER may need time to sync)
       try {
         console.log('[STEP 2] Scheduling crank on devnet ER using TEE RPC...')
-        // We pass the auth token (if available) to ensure we can communicate with the TEE
-        const scheduleSig = await scheduleExecuteIntent(wallet);
+        // PASS the fetched token here to resolve "Missing token query param"
+        const scheduleSig = await scheduleExecuteIntent(
+          wallet,
+          undefined,
+          undefined,
+          currentToken || undefined
+        );
         setScheduleTx(scheduleSig)
         console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', scheduleSig)
       } catch (e: any) {
