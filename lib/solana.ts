@@ -76,6 +76,29 @@ export function getProgram(wallet: WalletContextState): Program | null {
 }
 
 /**
+ * Get Anchor program instance pointing to TEE RPC (Private Ephemeral Rollup)
+ */
+export function getTeeProgram(wallet: WalletContextState, token?: string): Program | null {
+  if (!wallet.publicKey || !wallet.signTransaction) return null
+
+  // Use TEE RPC with optional auth token
+  const url = token ? `${PER_TEE.RPC_URL}?token=${token}` : PER_TEE.RPC_URL
+  const connection = new Connection(url, 'confirmed')
+
+  const walletAdapter = {
+    publicKey: wallet.publicKey,
+    signTransaction: wallet.signTransaction,
+    signAllTransactions: wallet.signAllTransactions || (async (txs: any) => txs),
+  } as Wallet
+
+  const provider = new AnchorProvider(connection, walletAdapter, {
+    commitment: 'confirmed',
+  })
+
+  return new Program(idl as any, provider)
+}
+
+/**
  * Create a new Intent Capsule with retry logic for RPC errors
  */
 export async function createCapsule(
@@ -428,7 +451,13 @@ export async function scheduleExecuteIntent(
   const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_INTERVAL_MS || 60000);
   const iterations = args?.iterations ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_ITERATIONS || 0);
 
-  const tx = await program.methods
+  // IMPORTANT: For crank scheduling, we MUST use the TEE program instance
+  // because the capsule has been delegated to the Ephemeral Rollup (ER).
+  // Standard Devnet RPC will not find the delegated accounts.
+  const teeProgram = getTeeProgram(wallet);
+  if (!teeProgram) throw new Error('Failed to initialize TEE program');
+
+  const tx = await teeProgram.methods
     .scheduleExecuteIntent({
       taskId,
       executionIntervalMillis,

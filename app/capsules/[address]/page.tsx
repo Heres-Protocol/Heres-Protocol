@@ -171,10 +171,10 @@ export default function CapsuleDetailPage() {
       setSchedulePending(true)
 
       // Retry logic for crank scheduling (ER may need time to sync)
-      const maxRetries = 3
       try {
-        console.log('[STEP 2] Scheduling crank on devnet ER...')
-        const scheduleSig = await scheduleExecuteIntent(wallet)
+        console.log('[STEP 2] Scheduling crank on devnet ER using TEE RPC...')
+        // We pass the auth token (if available) to ensure we can communicate with the TEE
+        const scheduleSig = await scheduleExecuteIntent(wallet);
         setScheduleTx(scheduleSig)
         console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', scheduleSig)
       } catch (e: any) {

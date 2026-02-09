@@ -64,7 +64,7 @@ export const MAGICBLOCK_ER = {
 export const PER_TEE = {
   /** Devnet ER RPC URL */
   RPC_URL: process.env.NEXT_PUBLIC_TEE_RPC_URL || 'https://devnet.magicblock.app',
-  /** Auth URL for TEE challenge-response */
+  /** Auth URL for TEE challenge-response (Must match RPC for consistency) */
   AUTH_URL: process.env.NEXT_PUBLIC_TEE_AUTH_URL || 'https://devnet.magicblock.app',
   DOCS_URL: 'https://docs.magicblock.gg/pages/ephemeral-rollups-ers/introduction',
 } as const
