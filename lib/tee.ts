@@ -13,7 +13,7 @@ export async function getTeeAuthToken(wallet: WalletContextState): Promise<strin
 
     try {
         const { token } = await getAuthToken(
-            PER_TEE.RPC_URL,
+            PER_TEE.AUTH_URL,
             wallet.publicKey,
             wallet.signMessage
         )

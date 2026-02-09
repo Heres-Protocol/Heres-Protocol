@@ -55,12 +55,17 @@ export const MAGICBLOCK_ER = {
   VALIDATOR_TEE: 'FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA',
   /** MagicBlock Permission Program ID for Access Control (PER) */
   PERMISSION_PROGRAM_ID: 'ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1',
+  /** Default crank scheduling parameters */
+  CRANK_DEFAULT_INTERVAL_MS: 60000,
+  CRANK_DEFAULT_ITERATIONS: 0,
 } as const
 
 /** Ephemeral Rollup (ER) - Devnet endpoint for delegation and scheduling */
 export const PER_TEE = {
-  /** Devnet ER RPC URL (no auth required for scheduling) */
-  RPC_URL: 'https://devnet.magicblock.app',
+  /** Devnet ER RPC URL */
+  RPC_URL: process.env.NEXT_PUBLIC_TEE_RPC_URL || 'https://devnet.magicblock.app',
+  /** Auth URL for TEE challenge-response */
+  AUTH_URL: process.env.NEXT_PUBLIC_TEE_AUTH_URL || 'https://devnet.magicblock.app',
   DOCS_URL: 'https://docs.magicblock.gg/pages/ephemeral-rollups-ers/introduction',
 } as const
 

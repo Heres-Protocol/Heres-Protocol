@@ -515,6 +515,7 @@ pub mod heres_program {
         invoke_signed(
             &schedule_ix,
             &[
+                ctx.accounts.magic_program.to_account_info(),
                 ctx.accounts.payer.to_account_info(),
                 ctx.accounts.capsule.to_account_info(),
             ],

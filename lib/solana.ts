@@ -424,15 +424,19 @@ export async function scheduleExecuteIntent(
   }
 
   // Default values for optional args
-  const taskId = args?.taskId ?? new BN(Date.now())
-  const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(CRANK_DEFAULT_INTERVAL_MS)
-  const iterations = args?.iterations ?? new BN(CRANK_DEFAULT_ITERATIONS)
+  const taskId = args?.taskId ?? new BN(Date.now());
+  const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_INTERVAL_MS || 60000);
+  const iterations = args?.iterations ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_ITERATIONS || 0);
 
   const tx = await program.methods
-    .scheduleExecuteIntent({ args: { taskId, executionIntervalMillis, iterations } })
+    .scheduleExecuteIntent({
+      taskId,
+      executionIntervalMillis,
+      iterations,
+    })
     // @ts-ignore
     .accounts(accounts)
-    .rpc()
+    .rpc();
 
   return tx
 }
