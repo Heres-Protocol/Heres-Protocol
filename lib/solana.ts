@@ -2,7 +2,7 @@
  * Solana program interaction utilities
  */
 
-import { SystemProgram, PublicKey } from '@solana/web3.js'
+import { SystemProgram, PublicKey, Connection } from '@solana/web3.js'
 import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor'
 import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/HeresProgram.json'
