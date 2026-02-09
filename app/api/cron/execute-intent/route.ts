@@ -1,6 +1,6 @@
 /**
  * Cron endpoint: run crank to execute all eligible capsules (conditions met).
- * Call this at intervals (e.g. every 5–15 min) via Vercel Cron or external cron.
+ * Call this at intervals (e.g. every 5??5 min) via Vercel Cron or external cron.
  * Set CRANK_WALLET_PRIVATE_KEY (base58, base64, or JSON array of 64 bytes) and optionally
  * CRON_SECRET for auth.
  */

@@ -8,23 +8,24 @@ use anchor_lang::solana_program::{
 use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
 use ephemeral_rollups_sdk::cpi::DelegateConfig;
 use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
+// use ephemeral_rollups_sdk::cpi::delegate_accounts;
 use ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID;
 use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
 #[cfg(feature = "oracle")]
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-declare_id!("BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms");
+declare_id!("CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM");
 
 /// TEE validator for Private Ephemeral Rollup (PER). Used as default when no validator account is passed.
 pub const TEE_VALIDATOR: Pubkey = pubkey!("FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA");
 
-/// Discriminator for execute_intent (no args) — from IDL
+/// Discriminator for execute_intent (no args) ??from IDL
 const EXECUTE_INTENT_DISCRIMINATOR: [u8; 8] = [53, 130, 47, 154, 227, 220, 122, 212];
 
 #[ephemeral]
 #[program]
-pub mod lucid_program {
+pub mod heres_program {
     use super::*;
 
     /// Initialize platform fee config (call once after deploy; only authority can update later)
@@ -337,7 +338,46 @@ pub mod lucid_program {
 
     /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
     /// The #[delegate] macro handles this automatically for all fields marked with 'del'.
-    pub fn delegate_capsule(_ctx: Context<DelegateCapsuleInput>) -> Result<()> {
+    /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
+    /// The #[delegate] macro handles this automatically for all fields marked with 'del'.
+    pub fn delegate_capsule(ctx: Context<DelegateCapsuleInput>) -> Result<()> {
+        let owner_key = ctx.accounts.owner.key();
+        
+        // Prepare config
+        let validator_key = ctx.accounts.validator
+            .as_ref()
+            .map(|v| v.key())
+            .unwrap_or(crate::TEE_VALIDATOR);
+
+        let config = DelegateConfig {
+            commit_frequency_ms: 0,
+            validator: Some(validator_key),
+        };
+
+        msg!("Delegating capsule and vault to Ephemeral Rollup");
+        msg!("Owner: {:?}", owner_key);
+
+        // Delegate Capsule PDA
+        // NOTE: Pass base seeds WITHOUT bump - delegate_pda finds the bump internally
+        let pda_seeds: &[&[u8]] = &[
+            b"intent_capsule",
+            owner_key.as_ref(),
+        ];
+        
+        ctx.accounts.delegate_pda(&ctx.accounts.payer, pda_seeds, config)?;
+
+        // Delegate Vault PDA
+        let vault_seeds: &[&[u8]] = &[
+            b"capsule_vault",
+            owner_key.as_ref(),
+        ];
+        
+        let config_vault = DelegateConfig {
+            commit_frequency_ms: 0,
+            validator: Some(validator_key),
+        };
+        ctx.accounts.delegate_vault(&ctx.accounts.payer, vault_seeds, config_vault)?;
+
         msg!("Capsule and Vault delegated to Ephemeral Rollup");
         Ok(())
     }
@@ -454,7 +494,7 @@ pub mod lucid_program {
                 .map_err(|_| ErrorCode::InvalidPriceFeed)?;
 
             msg!(
-                "Price ({} ± {}) * 10^-{}",
+                "Price ({} 짹 {}) * 10^-{}",
                 price.price,
                 price.conf,
                 price.exponent
@@ -578,7 +618,7 @@ pub struct ScheduleExecuteIntent<'info> {
     pub capsule: AccountInfo<'info>,
     /// CHECK: Vault PDA that holds locked SOL for this capsule.
     pub vault: AccountInfo<'info>,
-    /// System program – only its key is used when constructing the execute_intent ix.
+    /// System program ??only its key is used when constructing the execute_intent ix.
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     /// CHECK: Fee config account (read-only for scheduling; validated inside execute_intent).

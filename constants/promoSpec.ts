@@ -1,10 +1,10 @@
 /**
- * Heres Promo Video Spec (15s) — Developer-Generatable Parameters
+ * Heres Promo Video Spec (15s) ??Developer-Generatable Parameters
  * Capsule Open + Execution Burst Version
  * Use for Three.js, Canvas 2D, GLSL, WebGPU, or GSAP timeline.
  */
 
-// ─── 0. Video Metadata ─────────────────────────────────────────────────────
+// ??? 0. Video Metadata ?????????????????????????????????????????????????????
 export const PROMO_VIDEO = {
   VIDEO_DURATION: 15.0,
   FPS: 60,
@@ -15,7 +15,7 @@ export const PROMO_VIDEO = {
   PRIMARY_ACCENT: 'cyan/purple glow',
 } as const
 
-// ─── 1. Timeline Scene Boundaries (seconds) ────────────────────────────────
+// ??? 1. Timeline Scene Boundaries (seconds) ????????????????????????????????
 export const PROMO_TIMELINE = {
   SCENE1_END: 2.0,
   SCENE2_END: 5.0,
@@ -24,7 +24,7 @@ export const PROMO_TIMELINE = {
   SCENE5_END: 15.0,
 } as const
 
-// ─── Scene 1 — Opening Title (0.0s → 2.0s) ─────────────────────────────────
+// ??? Scene 1 ??Opening Title (0.0s ??2.0s) ?????????????????????????????????
 export const PROMO_SCENE1 = {
   TEXT_TITLE: 'Unleash the Power of Heres',
   TEXT_SUB: 'People disappear. Intent should not.',
@@ -39,7 +39,7 @@ export const PROMO_SCENE1 = {
   GRID_OPACITY: 0.12,
 } as const
 
-// ─── Scene 2 — Define Capsule Intent (2.0s → 5.0s) ────────────────────────
+// ??? Scene 2 ??Define Capsule Intent (2.0s ??5.0s) ????????????????????????
 export const PROMO_SCENE2 = {
   TEXT_TITLE: 'Lock SOL. Set beneficiaries & inactivity.',
   TEXT_SUB: 'One capsule. Your rules. On Solana.',
@@ -54,7 +54,7 @@ export const PROMO_SCENE2 = {
   },
 } as const
 
-// ─── Scene 3 — Private Monitoring (5.0s → 8.5s) ───────────────────────────
+// ??? Scene 3 ??Private Monitoring (5.0s ??8.5s) ???????????????????????????
 export const PROMO_SCENE3 = {
   TEXT_TITLE: 'Conditions stay private in PER (TEE)',
   TEXT_SUB: 'No one sees until execution.',
@@ -67,9 +67,9 @@ export const PROMO_SCENE3 = {
   CAPSULE_EDGE_GLOW_INCREASE: 0.25,
 } as const
 
-// ─── Scene 4 — Capsule Opens + Execution Burst (8.5s → 12.0s) ─────────────
+// ??? Scene 4 ??Capsule Opens + Execution Burst (8.5s ??12.0s) ?????????????
 export const PROMO_SCENE4 = {
-  TEXT_TITLE: 'When silence becomes truth…',
+  TEXT_TITLE: 'When silence becomes truth.',
   TEXT_SUB: 'Execution is automatic on Solana.',
 
   // Capsule opening
@@ -87,7 +87,7 @@ export const PROMO_SCENE4 = {
     SHAPE: 'radialSphere',
     RADIUS_PX: 500,
     BLUR_PX: 20,
-    COLOR_GRADIENT: 'cyan → purple → transparent',
+    COLOR_GRADIENT: 'cyan, purple, transparent',
   },
 
   // Execution lines (transaction trigger)
@@ -117,7 +117,7 @@ export const PROMO_SCENE4 = {
   PARTICLE_FADE_OUT: true,
 } as const
 
-// ─── Scene 5 — Closing Statement (12.0s → 15.0s) ──────────────────────────
+// ??? Scene 5 ??Closing Statement (12.0s ??15.0s) ??????????????????????????
 export const PROMO_SCENE5 = {
   TEXT_TITLE: 'Zero trust executor. No keys held by anyone.',
   TEXT_SUB: 'heres.vercel.app',
@@ -129,7 +129,7 @@ export const PROMO_SCENE5 = {
   },
 } as const
 
-// ─── 2. Visual Style Controls (Developer Parameters) ────────────────────────
+// ??? 2. Visual Style Controls (Developer Parameters) ????????????????????????
 export const PROMO_STYLE = {
   // Rotation / movement
   GRID_ROTATION_SPEED_DEG_PER_SEC: 6,
@@ -142,7 +142,7 @@ export const PROMO_STYLE = {
     CYAN_PERCENT: 65,
     PURPLE_PERCENT: 35,
   },
-  BACKGROUND_BRIGHTNESS_PERCENT: 8, // 8–12%
+  BACKGROUND_BRIGHTNESS_PERCENT: 8, // 8??2%
   TEXT_COLOR: '#F8FAFF',
   HIGHLIGHT_GLOW_STRENGTH: 0.4, // +40%
 
@@ -161,7 +161,7 @@ export const PROMO_STYLE = {
   SHAPE_VARIANT: 'elongated' as 'elongated' | 'thick' | 'sharp',
 } as const
 
-// ─── 4. Output (for export / recording) ─────────────────────────────────────
+// ??? 4. Output (for export / recording) ?????????????????????????????????????
 export const PROMO_OUTPUT = {
   OUTPUT_FILE: 'heres_promo_15s.mp4',
   CODEC: 'H.264',

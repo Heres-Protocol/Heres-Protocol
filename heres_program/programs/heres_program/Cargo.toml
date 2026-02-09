@@ -1,12 +1,12 @@
 [package]
-name = "lucid_program"
+name = "heres_program"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "lucid_program"
+name = "heres_program"
 
 [features]
 default = []
@@ -25,7 +25,7 @@ custom-panic = []
 anchor-lang = "0.32.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-ephemeral-rollups-sdk = { version = "0.8", features = ["anchor"] }
+ephemeral-rollups-sdk = { version = "0.8.5", features = ["anchor"] }
 magicblock-magic-program-api = { version = "0.3", default-features = false }
 bincode = "1.3"
 pyth-solana-receiver-sdk = { version = "0.6", optional = true }

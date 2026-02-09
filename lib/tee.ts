@@ -11,7 +11,7 @@ const TEE_RPC_URL = PER_TEE.RPC_URL
 
 /**
  * Get Connection to TEE/PER RPC for sending transactions to the Ephemeral Rollup
- * (e.g. schedule_execute_intent after delegate → crank runs on-chain automatically).
+ * (e.g. schedule_execute_intent after delegate ??crank runs on-chain automatically).
  */
 export function getTeeConnection(authToken: string): Connection {
   const url = authToken ? `${TEE_RPC_URL}?token=${encodeURIComponent(authToken)}` : TEE_RPC_URL

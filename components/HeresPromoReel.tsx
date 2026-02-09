@@ -71,7 +71,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
         })
       }
 
-      // ─── Scene 1: Opening (0 → 2s) ─────────────────────────────────────
+      // ??? Scene 1: Opening (0 ??2s) ?????????????????????????????????????
       const textY = PROMO_SCENE1.TEXT_FADE_IN.TRANSLATE_Y_FROM
       const textDur = PROMO_SCENE1.TEXT_FADE_IN.DURATION
       tl.fromTo(
@@ -98,7 +98,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
         SEG1 - 0.4
       )
 
-      // ─── Scene 2: Define Capsule (2 → 5s) — 좌/우 텍스트 각 가운데 정렬 ─────
+      // ??? Scene 2: Define Capsule (2 ??5s) ??醫????띿뒪??媛?媛?대뜲 ?뺣젹 ?????
       tl.fromTo(
         capsuleWrapRef.current,
         { opacity: 0, scale: 0.8 },
@@ -114,7 +114,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
       tl.to([title2LeftRef.current, title2RightRef.current], { opacity: 0, duration: 0.35 }, SEG2 - 0.35)
       tl.to(capsuleWrapRef.current, { opacity: 0, duration: 0.35 }, SEG2 - 0.35)
 
-      // ─── Scene 3: Private Monitoring (5 → 8.5s) — 좌/우 텍스트 각 가운데 정렬 ─
+      // ??? Scene 3: Private Monitoring (5 ??8.5s) ??醫????띿뒪??媛?媛?대뜲 ?뺣젹 ?
       tl.fromTo(capsuleWrapRef.current, { opacity: 0 }, { opacity: 1, duration: 0.2 }, SEG2)
       tl.fromTo(
         scanRef.current,
@@ -131,7 +131,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
       tl.to([title3LeftRef.current, title3RightRef.current, scanRef.current], { opacity: 0, duration: 0.35 }, SEG3 - 0.35)
       tl.to(capsuleWrapRef.current, { opacity: 0, duration: 0.35 }, SEG3 - 0.35)
 
-      // ─── Scene 4: Capsule Open + Execution Burst (8.5 → 12s) ──────────────
+      // ??? Scene 4: Capsule Open + Execution Burst (8.5 ??12s) ??????????????
       tl.fromTo(capsuleWrapRef.current, { opacity: 0 }, { opacity: 1, duration: 0.2 }, SEG3)
       tl.fromTo(
         [title4LeftRef.current, title4RightRef.current],
@@ -144,7 +144,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
       tl.set(capsuleFullRef.current, { opacity: 1 }, SEG3)
       tl.set([capsuleLeftRef.current, capsuleRightRef.current], { opacity: 0, x: 0 }, SEG3)
 
-      // At OPEN_START: hide full, show halves at 0 then split to ±SPLIT_PX
+      // At OPEN_START: hide full, show halves at 0 then split to 짹SPLIT_PX
       tl.set(capsuleFullRef.current, { opacity: 0 }, OPEN_START)
       tl.set([capsuleLeftRef.current, capsuleRightRef.current], { opacity: 1, x: 0 }, OPEN_START)
       tl.to(capsuleLeftRef.current, {
@@ -158,7 +158,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
         ease: 'power2.out',
       }, OPEN_START)
 
-      // Execution burst light: 9.15 → 1, peak 9.25, fade by 9.8
+      // Execution burst light: 9.15 ??1, peak 9.25, fade by 9.8
       tl.fromTo(
         burstRef.current,
         { opacity: 0, scale: 0.8 },
@@ -207,7 +207,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
         duration: 0.35,
       }, SEG4 - 0.35)
 
-      // ─── Scene 5: Closing (12 → 15s) ────────────────────────────────────
+      // ??? Scene 5: Closing (12 ??15s) ????????????????????????????????????
       tl.fromTo(
         title5Ref.current,
         { opacity: 0, y: PROMO_STYLE.TEXT_SLIDE_DISTANCE_PX },
@@ -232,7 +232,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
       style={{ color: PROMO_STYLE.TEXT_COLOR }}
     >
 
-      {/* Background grid: 6°/s, opacity from spec */}
+      {/* Background grid: 6째/s, opacity from spec */}
       <div
         ref={gridRef}
         className="promo-grid absolute inset-0"
@@ -245,7 +245,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
         }}
       />
 
-      {/* Scene 1: 0–2s — 로고·텍스트 블록 세로 가운데 정렬 */}
+      {/* Scene 1: 0??s ??濡쒓퀬쨌?띿뒪??釉붾줉 ?몃줈 媛?대뜲 ?뺣젹 */}
       <div ref={logoRef} className="promo-abs center top-[20%] opacity-0">
         <Image src="/logo-white.png" alt="Heres" width={80} height={80} className="h-16 w-auto sm:h-20" />
       </div>
@@ -256,7 +256,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
         <p className="text-sm text-white/80 leading-relaxed">{PROMO_SCENE1.TEXT_SUB}</p>
       </div>
 
-      {/* Scene 2: 2–5s — 좌/우 각 가운데 정렬, 세로는 캡슐 중앙 */}
+      {/* Scene 2: 2??s ??醫???媛?媛?대뜲 ?뺣젹, ?몃줈??罹≪뒓 以묒븰 */}
       <div ref={title2LeftRef} className="promo-abs promo-half-left opacity-0">
         <p className="text-sm font-medium sm:text-base leading-snug text-center">{PROMO_SCENE2.TEXT_TITLE}</p>
       </div>
@@ -264,14 +264,14 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
         <p className="text-xs text-white/70 leading-relaxed text-center max-w-[85%]">{PROMO_SCENE2.TEXT_SUB}</p>
       </div>
 
-      {/* Capsule: wrapper holds full (scenes 2–3) and halves (scene 4 open) */}
+      {/* Capsule: wrapper holds full (scenes 2??) and halves (scene 4 open) */}
       <div ref={capsuleWrapRef} className="promo-abs promo-capsule-wrap opacity-0">
         <div ref={capsuleFullRef} className="promo-capsule promo-capsule-full" />
         <div ref={capsuleLeftRef} className="promo-capsule-half promo-capsule-left" />
         <div ref={capsuleRightRef} className="promo-capsule-half promo-capsule-right" />
       </div>
 
-      {/* Scene 3: 5–8.5s — 좌/우 각 가운데 정렬, 세로는 캡슐 중앙 */}
+      {/* Scene 3: 5??.5s ??醫???媛?媛?대뜲 ?뺣젹, ?몃줈??罹≪뒓 以묒븰 */}
       <div ref={title3LeftRef} className="promo-abs promo-half-left opacity-0">
         <p className="text-sm font-medium sm:text-base leading-snug text-center">{PROMO_SCENE3.TEXT_TITLE}</p>
       </div>
@@ -280,7 +280,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
       </div>
       <div ref={scanRef} className="promo-abs promo-scan opacity-0" />
 
-      {/* Scene 4: 8.5–12s — 좌/우 각 가운데 정렬 */}
+      {/* Scene 4: 8.5??2s ??醫???媛?媛?대뜲 ?뺣젹 */}
       <div ref={title4LeftRef} className="promo-abs promo-half-left opacity-0">
         <p className="text-sm font-medium sm:text-base leading-snug text-center max-w-[85%]">{PROMO_SCENE4.TEXT_TITLE}</p>
       </div>
@@ -303,7 +303,7 @@ export function HeresPromoReel({ className = '' }: { className?: string }) {
       <div ref={burstRef} className="promo-abs inset-0 promo-burst opacity-0 pointer-events-none" />
       <div ref={flashRef} className="promo-abs inset-0 promo-flash opacity-0 pointer-events-none" />
 
-      {/* Scene 5: 12–15s — 로고·타이틀·CTA 세로 간격 분리, 겹침 방지 */}
+      {/* Scene 5: 12??5s ??濡쒓퀬쨌??댄?쨌CTA ?몃줈 媛꾧꺽 遺꾨━, 寃뱀묠 諛⑹? */}
       <div ref={solanaLogoRef} className="promo-abs center top-[24%] opacity-0">
         <Image src="/logos/solana.svg" alt="Solana" width={64} height={64} className="h-12 w-auto sm:h-16" />
       </div>

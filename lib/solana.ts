@@ -5,7 +5,7 @@
 import { SystemProgram, PublicKey } from '@solana/web3.js'
 import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor'
 import { WalletContextState } from '@solana/wallet-adapter-react'
-import idl from '../idl/lucid_program.json'
+import idl from '../idl/HeresProgram.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
 import {
   getCapsulePDA,
@@ -175,7 +175,7 @@ export async function createCapsule(
 
   // If all retries failed, throw with a user-friendly message
   if (lastError?.message?.includes('503') || lastError?.message?.includes('Service unavailable')) {
-    throw new Error('RPC 서버가 일시적으로 사용 불가능합니다. 잠시 후 다시 시도해주세요.\nRPC server is temporarily unavailable. Please try again in a few moments.')
+    throw new Error('RPC ?쒕쾭媛 ?쇱떆?곸쑝濡??ъ슜 遺덇??ν빀?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄?댁＜?몄슂.\nRPC server is temporarily unavailable. Please try again in a few moments.')
   }
 
   throw lastError
@@ -316,7 +316,7 @@ export async function delegateCapsule(
   }
 
   if (!accountInfo.owner.equals(getProgramId())) {
-    throw new Error(`Capsule is not owned by the Lucid Program. Current owner: ${accountInfo.owner.toBase58()}`)
+    throw new Error(`Capsule is not owned by the Heres Program. Current owner: ${accountInfo.owner.toBase58()}`)
   }
 
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
@@ -521,7 +521,7 @@ export async function scheduleExecuteIntentViaTee(
 
 /**
  * Initialize platform fee config (call once after program deploy; authority can update later via updateFeeConfig).
- * 기본 수수료: 생성 0.05 SOL, 실행 3% → PLATFORM_FEE.CREATION_FEE_LAMPORTS, PLATFORM_FEE.EXECUTION_FEE_BPS 사용.
+ * 湲곕낯 ?섏닔猷? ?앹꽦 0.05 SOL, ?ㅽ뻾 3% ??PLATFORM_FEE.CREATION_FEE_LAMPORTS, PLATFORM_FEE.EXECUTION_FEE_BPS ?ъ슜.
  * @param creationFeeLamports - SOL lamports charged per capsule creation (0 to disable)
  * @param executionFeeBps - Execution fee in basis points (10000 = 100%; 300 = 3%)
  */
@@ -888,7 +888,7 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
       isActive,
       executedAt,
       capsuleAddress: capsulePda.toBase58(),
-      accountOwner: accountInfo.owner, // Return the actual account owner (Lucid or Delegation program)
+      accountOwner: accountInfo.owner, // Return the actual account owner (Heres or Delegation program)
       mint: undefined,
     }
 

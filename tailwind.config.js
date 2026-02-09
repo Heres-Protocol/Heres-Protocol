@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        lucid: {
+        Heres: {
           bg: '#030712',
           surface: '#0a0f1a',
           card: '#111827',

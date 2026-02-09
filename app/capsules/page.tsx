@@ -51,10 +51,10 @@ export default function CapsulesEntryPage() {
 
   if (loading && connected && publicKey) {
     return (
-      <div className="min-h-screen bg-hero text-lucid-white flex items-center justify-center">
+      <div className="min-h-screen bg-hero text-Heres-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-lucid-accent border-t-transparent" />
-          <p className="text-lucid-muted">Finding your capsule…</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-Heres-accent border-t-transparent" />
+          <p className="text-Heres-muted">Finding your capsule...</p>
         </div>
       </div>
     )
@@ -62,10 +62,10 @@ export default function CapsulesEntryPage() {
 
   if (connected && hasCapsule) {
     return (
-      <div className="min-h-screen bg-hero text-lucid-white flex items-center justify-center">
+      <div className="min-h-screen bg-hero text-Heres-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-lucid-accent border-t-transparent" />
-          <p className="text-lucid-muted">Redirecting to your capsule…</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-Heres-accent border-t-transparent" />
+          <p className="text-Heres-muted">Redirecting to your capsule...</p>
         </div>
       </div>
     )
@@ -75,10 +75,10 @@ export default function CapsulesEntryPage() {
     return (
       <div className="min-h-screen bg-hero pt-24 pb-16 px-4">
         <div className="mx-auto flex max-w-md flex-col items-center justify-center px-4 py-12">
-          <div className="card-lucid p-8 sm:p-12 text-center w-full">
-            <User className="mx-auto mb-6 h-14 w-14 text-lucid-accent" />
-            <h2 className="mb-3 text-2xl font-bold text-lucid-white">My Capsule</h2>
-            <p className="mb-6 text-lucid-muted">
+          <div className="card-Heres p-8 sm:p-12 text-center w-full">
+            <User className="mx-auto mb-6 h-14 w-14 text-Heres-accent" />
+            <h2 className="mb-3 text-2xl font-bold text-Heres-white">My Capsule</h2>
+            <p className="mb-6 text-Heres-muted">
               Connect your wallet to view your capsule or create a new one.
             </p>
             <div className="flex flex-col gap-3">
@@ -87,7 +87,7 @@ export default function CapsulesEntryPage() {
               </div>
               <Link
                 href="/create"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-lucid-border bg-lucid-card/80 px-4 py-3 text-sm font-medium text-lucid-muted hover:border-lucid-accent/40 hover:text-lucid-accent"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-Heres-border bg-Heres-card/80 px-4 py-3 text-sm font-medium text-Heres-muted hover:border-Heres-accent/40 hover:text-Heres-accent"
               >
                 Create Capsule
               </Link>
@@ -101,15 +101,15 @@ export default function CapsulesEntryPage() {
   return (
     <div className="min-h-screen bg-hero pt-24 pb-16 px-4">
       <div className="mx-auto flex max-w-md flex-col items-center justify-center px-4 py-12">
-        <div className="card-lucid p-8 sm:p-12 text-center w-full">
-          <Shield className="mx-auto mb-6 h-14 w-14 text-lucid-accent" />
-          <h2 className="mb-3 text-2xl font-bold text-lucid-white">No Capsule Found</h2>
-          <p className="mb-6 text-lucid-muted">
+        <div className="card-Heres p-8 sm:p-12 text-center w-full">
+          <Shield className="mx-auto mb-6 h-14 w-14 text-Heres-accent" />
+          <h2 className="mb-3 text-2xl font-bold text-Heres-white">No Capsule Found</h2>
+          <p className="mb-6 text-Heres-muted">
             You don&apos;t have a capsule yet. Create one to get started.
           </p>
           <Link
             href="/create"
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-lucid-accent bg-lucid-accent/10 px-6 py-3 text-sm font-semibold text-lucid-accent hover:bg-lucid-accent/20"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-Heres-accent bg-Heres-accent/10 px-6 py-3 text-sm font-semibold text-Heres-accent hover:bg-Heres-accent/20"
           >
             Create Capsule
           </Link>

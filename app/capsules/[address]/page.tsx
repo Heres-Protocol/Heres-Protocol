@@ -76,7 +76,7 @@ function CopyButton({ value }: { value: string }) {
     <button
       type="button"
       onClick={copy}
-      className="inline-flex shrink-0 items-center justify-center rounded p-1 text-lucid-muted transition-colors hover:bg-lucid-surface/80 hover:text-lucid-accent"
+      className="inline-flex shrink-0 items-center justify-center rounded p-1 text-Heres-muted transition-colors hover:bg-Heres-surface/80 hover:text-Heres-accent"
       title="Copy"
     >
       <Copy className="h-4 w-4" />
@@ -300,7 +300,7 @@ export default function CapsuleDetailPage() {
       })
       .catch(() => setChartData([]))
       .finally(() => setChartLoading(false))
-  }, [isToken, isNft, chartRange, rangeConfig.days, rangeConfig.hoursFilter])
+  }, [isToken, isNft, chartRange, rangeConfig.days, rangeConfig.hoursFilter, rangeConfig.key])
 
   // Current SOL price (live) and polling
   useEffect(() => {
@@ -349,10 +349,10 @@ export default function CapsuleDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-hero text-lucid-white flex items-center justify-center">
+      <div className="min-h-screen bg-hero text-Heres-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="h-8 w-8 animate-spin text-lucid-accent" />
-          <p className="text-lucid-muted">Loading capsule…</p>
+          <RefreshCw className="h-8 w-8 animate-spin text-Heres-accent" />
+          <p className="text-Heres-muted">Loading capsule…</p>
         </div>
       </div>
     )
@@ -360,12 +360,12 @@ export default function CapsuleDetailPage() {
 
   if (error || !capsule) {
     return (
-      <div className="min-h-screen bg-hero text-lucid-white pt-24 pb-16 px-4">
+      <div className="min-h-screen bg-hero text-Heres-white pt-24 pb-16 px-4">
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-red-400 mb-6">{error || 'Capsule not found'}</p>
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 rounded-lg border border-lucid-border bg-lucid-card/80 px-4 py-2 text-lucid-white hover:border-lucid-accent/40"
+            className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-card/80 px-4 py-2 text-Heres-white hover:border-Heres-accent/40"
           >
             <ArrowLeft className="h-4 w-4" />
             Dashboard
@@ -385,38 +385,38 @@ export default function CapsuleDetailPage() {
   const lastUpdatedMs = capsule.lastActivity ? capsule.lastActivity * 1000 : null
 
   return (
-    <div className="min-h-screen bg-hero text-lucid-white">
+    <div className="min-h-screen bg-hero text-Heres-white">
       <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 text-sm text-lucid-muted hover:text-lucid-accent mb-6"
+            className="inline-flex items-center gap-2 text-sm text-Heres-muted hover:text-Heres-accent mb-6"
           >
             <ArrowLeft className="h-4 w-4" />
             Dashboard
           </Link>
 
           {/* Graph Explorer style: header card */}
-          <section className="card-lucid p-6 sm:p-8 mb-6">
+          <section className="card-Heres p-6 sm:p-8 mb-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-baseline gap-3">
-                <h1 className="text-2xl font-bold text-lucid-white sm:text-3xl">
+                <h1 className="text-2xl font-bold text-Heres-white sm:text-3xl">
                   Capsule
                 </h1>
-                <span className="font-mono text-sm text-lucid-muted" title={capsule.capsuleAddress}>
+                <span className="font-mono text-sm text-Heres-muted" title={capsule.capsuleAddress}>
                   {maskAddress(capsule.capsuleAddress)}
                 </span>
-                <span className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-2.5 py-1 text-xs font-medium text-lucid-muted">
+                <span className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-2.5 py-1 text-xs font-medium text-Heres-muted">
                   v1.0
                 </span>
                 <span
                   className={`rounded-lg px-2.5 py-1 text-xs font-medium ${status === 'Active'
-                    ? 'bg-lucid-accent/20 text-lucid-accent'
+                    ? 'bg-Heres-accent/20 text-Heres-accent'
                     : status === 'Executed'
-                      ? 'bg-lucid-accent/20 text-lucid-accent'
+                      ? 'bg-Heres-accent/20 text-Heres-accent'
                       : status === 'Expired'
                         ? 'bg-red-500/20 text-red-400'
-                        : 'bg-lucid-purple/20 text-lucid-purple'
+                        : 'bg-Heres-purple/20 text-Heres-purple'
                     }`}
                 >
                   {status}
@@ -429,7 +429,7 @@ export default function CapsuleDetailPage() {
                       type="button"
                       onClick={handleExecute}
                       disabled={executePending || !wallet.connected}
-                      className="inline-flex items-center gap-2 rounded-lg bg-lucid-accent/20 border border-lucid-accent px-4 py-2 text-sm font-medium text-lucid-accent transition hover:bg-lucid-accent/30 disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-lg bg-Heres-accent/20 border border-Heres-accent px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
                     >
                       <Play className="h-4 w-4" />
                       {executePending ? 'Executing…' : 'Execute intent'}
@@ -439,7 +439,7 @@ export default function CapsuleDetailPage() {
                         href={`https://explorer.solana.com/tx/${executeTx}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-lucid-accent hover:underline"
+                        className="text-sm text-Heres-accent hover:underline"
                       >
                         View transaction
                       </a>
@@ -447,12 +447,12 @@ export default function CapsuleDetailPage() {
                     {executeError && <p className="text-sm text-amber-400">{executeError}</p>}
                   </>
                 )}
-                <p className="text-sm text-lucid-muted">
+                <p className="text-sm text-Heres-muted">
                   Updated {timeAgo(lastUpdatedMs)}
                 </p>
               </div>
             </div>
-            <p className="mt-3 text-sm text-lucid-muted max-w-xl">
+            <p className="mt-3 text-sm text-Heres-muted max-w-xl">
               {isNft ? 'NFT capsule' : 'Token (SOL) capsule'} · Inactivity period:{' '}
               {secondsToDays(capsule.inactivityPeriod)}d
             </p>
@@ -460,20 +460,20 @@ export default function CapsuleDetailPage() {
 
           {/* Metadata grid (Graph Explorer style) */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Network</p>
-              <p className="text-sm font-medium text-lucid-white">
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Network</p>
+              <p className="text-sm font-medium text-Heres-white">
                 Solana {SOLANA_CONFIG.NETWORK || 'devnet'}
               </p>
             </div>
-            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Capsule ID</p>
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Capsule ID</p>
               <div className="flex items-center gap-1">
                 <a
                   href={`https://explorer.solana.com/address/${capsule.capsuleAddress}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-mono text-lucid-accent truncate min-w-0 hover:underline"
+                  className="text-sm font-mono text-Heres-accent truncate min-w-0 hover:underline"
                   title={capsule.capsuleAddress}
                 >
                   {maskAddress(capsule.capsuleAddress)}
@@ -481,29 +481,29 @@ export default function CapsuleDetailPage() {
                 <CopyButton value={capsule.capsuleAddress} />
               </div>
             </div>
-            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Owner</p>
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Owner</p>
               <div className="flex items-center gap-1">
-                <p className="text-sm font-mono text-lucid-white truncate min-w-0" title={capsule.owner.toBase58()}>
+                <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={capsule.owner.toBase58()}>
                   {maskAddress(capsule.owner.toBase58())}
                 </p>
                 <CopyButton value={capsule.owner.toBase58()} />
               </div>
             </div>
-            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Program ID</p>
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Program ID</p>
               <div className="flex items-center gap-1">
-                <p className="text-sm font-mono text-lucid-white truncate min-w-0" title={getProgramId().toBase58()}>
+                <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={getProgramId().toBase58()}>
                   {maskAddress(getProgramId().toBase58())}
                 </p>
                 <CopyButton value={getProgramId().toBase58()} />
               </div>
             </div>
             {capsule.mint && (
-              <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Token Mint</p>
+              <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Token Mint</p>
                 <div className="flex items-center gap-1">
-                  <p className="text-sm font-mono text-lucid-white truncate min-w-0" title={capsule.mint.toBase58()}>
+                  <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={capsule.mint.toBase58()}>
                     {maskAddress(capsule.mint.toBase58())}
                   </p>
                   <CopyButton value={capsule.mint.toBase58()} />
@@ -513,19 +513,19 @@ export default function CapsuleDetailPage() {
           </section>
 
           {/* Privacy & Delegation (PER / TEE) */}
-          <section className="card-lucid p-6 mb-6 border-lucid-accent/20">
+          <section className="card-Heres p-6 mb-6 border-Heres-accent/20">
             <div className="flex flex-wrap items-center gap-3 mb-4">
-              <h2 className="text-lg font-semibold text-lucid-white">Privacy &amp; Delegation (PER / TEE)</h2>
-              <span className="rounded-lg border border-lucid-accent/50 bg-lucid-accent/10 px-2.5 py-1 text-xs font-medium text-lucid-accent">
+              <h2 className="text-lg font-semibold text-Heres-white">Privacy &amp; Delegation (PER / TEE)</h2>
+              <span className="rounded-lg border border-Heres-accent/50 bg-Heres-accent/10 px-2.5 py-1 text-xs font-medium text-Heres-accent">
                 PER (TEE) enabled
               </span>
             </div>
-            <p className="text-sm text-lucid-muted mb-4 w-full max-w-none">
+            <p className="text-sm text-Heres-muted mb-4 w-full max-w-none">
               This capsule uses the Private Ephemeral Rollup (PER) with TEE. When you delegate, it defaults to the TEE validator for confidential condition monitoring. Use TEE RPC with an auth token to query private state.
             </p>
-            <div className="rounded-xl border border-lucid-border/50 bg-lucid-surface/30 p-4 mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-lucid-accent mb-1">Where is private monitoring?</p>
-              <p className="text-sm text-lucid-muted">
+            <div className="rounded-xl border border-Heres-border/50 bg-Heres-surface/30 p-4 mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-Heres-accent mb-1">Where is private monitoring?</p>
+              <p className="text-sm text-Heres-muted">
                 Private monitoring runs inside the TEE after you delegate. Conditions (inactivity, intent) are checked confidentially and are not visible on the public chain. Delegate below to enable it. To query private state (what the TEE sees), use TEE RPC with an auth token. See the TEE docs link above.
               </p>
             </div>
@@ -536,7 +536,7 @@ export default function CapsuleDetailPage() {
                     type="button"
                     onClick={handleDelegate}
                     disabled={delegatePending || schedulePending}
-                    className="inline-flex items-center gap-2 rounded-lg border border-lucid-accent bg-lucid-accent/20 px-4 py-2 text-sm font-medium text-lucid-accent transition hover:bg-lucid-accent/30 disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg border border-Heres-accent bg-Heres-accent/20 px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
                   >
                     <Shield className="h-4 w-4" />
                     {delegatePending ? 'Step 1: Delegating to ER...' : schedulePending ? 'Step 2: Scheduling crank on ER...' : 'Delegate & Schedule Crank'}
@@ -545,14 +545,14 @@ export default function CapsuleDetailPage() {
 
                 {/* Step 1: Delegation Status */}
                 {delegateTx && (
-                  <div className="rounded-lg border border-lucid-accent/30 bg-lucid-accent/5 p-3">
-                    <p className="text-xs font-semibold text-lucid-accent mb-1">✓ Step 1: Delegation Complete</p>
-                    <p className="text-xs text-lucid-muted mb-2">Capsule delegated to Ephemeral Rollup (ER)</p>
+                  <div className="rounded-lg border border-Heres-accent/30 bg-Heres-accent/5 p-3">
+                    <p className="text-xs font-semibold text-Heres-accent mb-1">✓ Step 1: Delegation Complete</p>
+                    <p className="text-xs text-Heres-muted mb-2">Capsule delegated to Ephemeral Rollup (ER)</p>
                     <a
                       href={`https://explorer.solana.com/tx/${delegateTx}?cluster=devnet`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-lucid-accent hover:underline"
+                      className="text-xs text-Heres-accent hover:underline"
                     >
                       View delegation tx →
                     </a>
@@ -567,9 +567,9 @@ export default function CapsuleDetailPage() {
 
                 {/* Step 2: Crank Scheduling Status */}
                 {scheduleTx && (
-                  <div className="rounded-lg border border-lucid-accent/30 bg-lucid-accent/5 p-3">
-                    <p className="text-xs font-semibold text-lucid-accent mb-1">✓ Step 2: Crank Scheduled on ER</p>
-                    <p className="text-xs text-lucid-muted">When conditions are met, assets will be distributed automatically without anyone visiting.</p>
+                  <div className="rounded-lg border border-Heres-accent/30 bg-Heres-accent/5 p-3">
+                    <p className="text-xs font-semibold text-Heres-accent mb-1">✓ Step 2: Crank Scheduled on ER</p>
+                    <p className="text-xs text-Heres-muted">When conditions are met, assets will be distributed automatically without anyone visiting.</p>
                   </div>
                 )}
                 {scheduleError && (
@@ -581,68 +581,68 @@ export default function CapsuleDetailPage() {
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Privacy mode</p>
-                <p className="text-sm font-medium text-lucid-accent">PER (TEE)</p>
+              <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Privacy mode</p>
+                <p className="text-sm font-medium text-Heres-accent">PER (TEE)</p>
               </div>
-              <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Default validator</p>
-                <p className="text-sm font-medium text-lucid-white">TEE</p>
+              <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Default validator</p>
+                <p className="text-sm font-medium text-Heres-white">TEE</p>
               </div>
-              <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Validator address</p>
+              <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Validator address</p>
                 <div className="flex items-center gap-1">
-                  <p className="text-sm font-mono text-lucid-white truncate min-w-0" title={MAGICBLOCK_ER.VALIDATOR_TEE}>
+                  <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={MAGICBLOCK_ER.VALIDATOR_TEE}>
                     {maskAddress(MAGICBLOCK_ER.VALIDATOR_TEE)}
                   </p>
                   <CopyButton value={MAGICBLOCK_ER.VALIDATOR_TEE} />
                 </div>
               </div>
-              <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">TEE RPC</p>
+              <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">TEE RPC</p>
                 <div className="flex items-center gap-1 min-w-0">
                   <a
                     href={PER_TEE.DOCS_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-mono text-lucid-accent truncate hover:underline"
+                    className="text-sm font-mono text-Heres-accent truncate hover:underline"
                     title="Open TEE / PER docs"
                   >
                     {PER_TEE.RPC_URL.replace(/^https:\/\//, '')}
                   </a>
                   <CopyButton value={PER_TEE.RPC_URL} />
                 </div>
-                <p className="text-[10px] text-lucid-muted mt-1">RPC is API-only; link opens TEE docs</p>
+                <p className="text-[10px] text-Heres-muted mt-1">RPC is API-only; link opens TEE docs</p>
               </div>
             </div>
           </section>
 
           {/* Intent / Type summary */}
-          <section className="card-lucid p-6 mb-6">
-            <h2 className="text-lg font-semibold text-lucid-white mb-3">Intent</h2>
-            <p className="text-sm text-lucid-muted mb-4">
+          <section className="card-Heres p-6 mb-6">
+            <h2 className="text-lg font-semibold text-Heres-white mb-3">Intent</h2>
+            <p className="text-sm text-Heres-muted mb-4">
               {intentParsed?.intent || 'No intent decoded'}
             </p>
             {isToken && intentParsed && 'totalAmount' in intentParsed && intentParsed.totalAmount && (
-              <p className="text-sm text-lucid-accent">
+              <p className="text-sm text-Heres-accent">
                 Total amount: {intentParsed.totalAmount} SOL
               </p>
             )}
             {isNft && intentParsed && 'nftMints' in intentParsed && intentParsed.nftMints && (
-              <p className="text-sm text-lucid-accent">
+              <p className="text-sm text-Heres-accent">
                 NFTs: {intentParsed.nftMints.length} item(s)
               </p>
             )}
           </section>
 
           {/* Price / Value chart (Graph Explorer style) */}
-          <section className="card-lucid p-6 mb-6">
+          <section className="card-Heres p-6 mb-6">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <div>
-                <h2 className="text-lg font-semibold text-lucid-white">
+                <h2 className="text-lg font-semibold text-Heres-white">
                   {isToken ? 'SOL Price (USD)' : 'NFT Value (SOL / USD proxy)'}
                 </h2>
-                <p className="text-sm text-lucid-muted mt-1">
+                <p className="text-sm text-Heres-muted mt-1">
                   {isToken
                     ? 'Real-time SOL price (CoinGecko).'
                     : 'Representative value trend (SOL/USD) for reference.'}
@@ -650,10 +650,10 @@ export default function CapsuleDetailPage() {
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 {isToken && (
-                  <div className="rounded-lg border border-lucid-border/80 bg-lucid-card/80 px-2.5 py-1.5 flex items-center gap-2">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">1 SOL</span>
-                    <span className="text-sm font-semibold tabular-nums text-lucid-accent">${displayedSolPrice.toFixed(2)}</span>
-                    <span className="text-[10px] text-lucid-muted">USD</span>
+                  <div className="rounded-lg border border-Heres-border/80 bg-Heres-card/80 px-2.5 py-1.5 flex items-center gap-2">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">1 SOL</span>
+                    <span className="text-sm font-semibold tabular-nums text-Heres-accent">${displayedSolPrice.toFixed(2)}</span>
+                    <span className="text-[10px] text-Heres-muted">USD</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1">
@@ -663,8 +663,8 @@ export default function CapsuleDetailPage() {
                       type="button"
                       onClick={() => setChartRange(r.key)}
                       className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${chartRange === r.key
-                        ? 'border-lucid-accent bg-lucid-accent/20 text-lucid-accent'
-                        : 'border-lucid-border bg-lucid-card/80 text-lucid-muted hover:border-lucid-accent/40 hover:text-lucid-accent'
+                        ? 'border-Heres-accent bg-Heres-accent/20 text-Heres-accent'
+                        : 'border-Heres-border bg-Heres-card/80 text-Heres-muted hover:border-Heres-accent/40 hover:text-Heres-accent'
                         }`}
                     >
                       {r.label}
@@ -674,7 +674,7 @@ export default function CapsuleDetailPage() {
               </div>
             </div>
             {chartLoading ? (
-              <div className="relative h-64 flex items-center justify-center text-lucid-muted">
+              <div className="relative h-64 flex items-center justify-center text-Heres-muted">
                 <RefreshCw className="h-8 w-8 animate-spin" />
               </div>
             ) : chartData.length > 0 ? (
@@ -683,22 +683,22 @@ export default function CapsuleDetailPage() {
                   <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                     <defs>
                       <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--lucid-accent)" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="var(--lucid-accent)" stopOpacity={0} />
+                        <stop offset="0%" stopColor="var(--Heres-accent)" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="var(--Heres-accent)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.3)" />
                     <YAxis domain={[90, 'auto']} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.3)" tickFormatter={(v) => `$${v}`} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: 'var(--lucid-card)', border: '1px solid var(--lucid-border)' }}
-                      labelStyle={{ color: 'var(--lucid-white)' }}
+                      contentStyle={{ backgroundColor: 'var(--Heres-card)', border: '1px solid var(--Heres-border)' }}
+                      labelStyle={{ color: 'var(--Heres-white)' }}
                       formatter={(value: number | undefined) => [value != null ? `$${Number(value).toFixed(2)}` : '$0.00', 'USD']}
                     />
                     <Area
                       type="monotone"
                       dataKey="usd"
-                      stroke="var(--lucid-accent)"
+                      stroke="var(--Heres-accent)"
                       strokeWidth={2}
                       fill="url(#chartGradient)"
                     />
@@ -706,7 +706,7 @@ export default function CapsuleDetailPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-64 flex items-center justify-center text-lucid-muted text-sm">
+              <div className="h-64 flex items-center justify-center text-Heres-muted text-sm">
                 Chart data unavailable
               </div>
             )}

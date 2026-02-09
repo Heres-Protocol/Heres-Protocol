@@ -82,7 +82,7 @@ export function AsciiCapsule() {
     return () => clearInterval(t)
   }, [])
 
-  // 웹사이트 색상: 시안(accent) #22d3ee, 보라(purple) #a78bfa
+  // ?뱀궗?댄듃 ?됱긽: ?쒖븞(accent) #22d3ee, 蹂대씪(purple) #a78bfa
   const colorAccent = 'rgba(34, 211, 238, 0.95)'
   const colorAccentDim = 'rgba(34, 211, 238, 0.6)'
   const colorPurple = 'rgba(167, 139, 250, 0.9)'
@@ -94,9 +94,9 @@ export function AsciiCapsule() {
       style={{ maxWidth: 480 }}
       aria-hidden
     >
-      {/* 캡슐 = clip만 적용, 테두리 없음 → 테두리까지 전부 ASCII로 채워짐 */}
+      {/* 罹≪뒓 = clip留??곸슜, ?뚮몢由??놁쓬 ???뚮몢由ш퉴吏 ?꾨? ASCII濡?梨꾩썙吏?*/}
       <div
-        className="ascii-capsule relative overflow-hidden bg-[var(--lucid-bg)] shadow-[0_0_32px_rgba(34,211,238,0.15)]"
+        className="ascii-capsule relative overflow-hidden bg-[var(--Heres-bg)] shadow-[0_0_32px_rgba(34,211,238,0.15)]"
         style={{
           width: '100%',
           aspectRatio: '2.2 / 1',
@@ -136,7 +136,7 @@ export function AsciiCapsule() {
             )
           })}
         </div>
-        {/* 중앙 살짝 어두운 띠 “”) */}
+        {/* 以묒븰 ?댁쭩 ?대몢?????쒋? */}
         <div
           className="pointer-events-none absolute inset-0 opacity-15"
           style={{

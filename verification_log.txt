@@ -1,0 +1,13 @@
+Starting Verification at 2026-02-09T05:10:05.442Z
+RPC: https://devnet.helius-rpc.com/?api-key=a393269c-0295-485d-ba5f-0c8ffc828d0d
+Program ID: CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM
+Wallet: 8DzPUhZ8Jd6Rfu9R7QWuZ7gMBjdrnrjH22FHyfDUPeHW
+Balance: 3.23882312 SOL
+Checking Fee Config...
+Fee Config already exists.
+Checking for existing capsule at: 6Yf6jspXemmoHUoqXacrkMdFenAdSb4Pnv1Lokn9wmnK
+Capsule already exists. Using existing capsule.
+Capsule is currently owned by Program. Proceeding to Delegate...
+Delegation Transaction Sent! Tx: 2NQNunNAJs7pPoNSYpFCbny3RRQ6MCvnCBSe4YL4yd5hqYpD5y2swnJHyvwuTRbjwPVcAHcBwNYWumRpdDD8eDH5
+Capsule Owner after delegation: DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh
+SUCCESS: Capsule is now owned by MagicBlock Delegation Program.

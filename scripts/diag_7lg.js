@@ -9,7 +9,7 @@ const target = '7LG3jxWQA41qz3AVWnc63HhrKu1hiRXHUkmjpDxdfaBY';
 // Check if it's one of our PDAs for some common owners
 const testOwners = [
     'MPUxHCpNUy3K1CSVhebAmTbcTCKVxfk9YMDcUP2ZnEA', // TEE/Magic
-    'BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms', // Lucid
+    'BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms', // Heres
     'FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA', // TEE Validator
 ];
 

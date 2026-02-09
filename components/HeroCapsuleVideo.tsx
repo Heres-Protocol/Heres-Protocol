@@ -21,7 +21,7 @@ type HeroCapsuleVideoProps = {
 export function HeroCapsuleVideo({
   videoMp4,
   videoWebm,
-  posterSrc = '/lucid-capsule-hero.png',
+  posterSrc = '/Heres-capsule-hero.png',
   alt = 'Heres capsule',
   className = '',
 }: HeroCapsuleVideoProps) {

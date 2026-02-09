@@ -118,8 +118,8 @@ Code: `lib/crank.ts` (eligible capsules, execute), `app/api/cron/execute-intent/
 
 | Partner | How we use it | Code & links |
 |--------|----------------|---------------|
-| **Solana** | We run the **Heres program** on Solana Devnet: capsule accounts (owner, vault, inactivity period, intent data), PDAs for vault and fee config, and all instructions (`create_capsule`, `execute_intent`, `delegate_capsule`, etc.) are executed on-chain. The frontend uses the Solana connection (via Helius RPC) and Anchor to build and sign transactions. | **Contract:** [lucid_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/lucid_program/programs/lucid_program/src/lib.rs) · **Program on Devnet:** [Explorer](https://explorer.solana.com/address/BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms?cluster=devnet) · **App:** [config/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/config/solana.ts), [lib/program.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/program.ts), [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) |
-| **Magicblock** | We use **Ephemeral Rollups (ER)** and **Private Ephemeral Rollup (PER / TEE)** for private condition monitoring. The capsule PDA is delegated to Magicblock via `delegate_capsule` (default validator: TEE). The private runtime checks inactivity and beneficiaries; only execution results are committed to Devnet via Magic Actions. TEE auth uses `getAuthToken` and optional `verifyTeeRpcIntegrity` from the Magicblock SDK. | **Contract (delegate):** [lucid_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/lucid_program/programs/lucid_program/src/lib.rs) · **App:** [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) (`delegateCapsule`, `undelegateCapsule`), [lib/tee.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/tee.ts) (TEE auth), [constants/index.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/constants/index.ts) (`MAGICBLOCK_ER`, `PER_TEE`) |
+| **Solana** | We run the **Heres program** on Solana Devnet: capsule accounts (owner, vault, inactivity period, intent data), PDAs for vault and fee config, and all instructions (`create_capsule`, `execute_intent`, `delegate_capsule`, etc.) are executed on-chain. The frontend uses the Solana connection (via Helius RPC) and Anchor to build and sign transactions. | **Contract:** [heres_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/heres_program/programs/heres_program/src/lib.rs) · **Program on Devnet:** [Explorer](https://explorer.solana.com/address/BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms?cluster=devnet) · **App:** [config/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/config/solana.ts), [lib/program.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/program.ts), [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) |
+| **Magicblock** | We use **Ephemeral Rollups (ER)** and **Private Ephemeral Rollup (PER / TEE)** for private condition monitoring. The capsule PDA is delegated to Magicblock via `delegate_capsule` (default validator: TEE). The private runtime checks inactivity and beneficiaries; only execution results are committed to Devnet via Magic Actions. TEE auth uses `getAuthToken` and optional `verifyTeeRpcIntegrity` from the Magicblock SDK. | **Contract (delegate):** [heres_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/heres_program/programs/heres_program/src/lib.rs) · **App:** [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) (`delegateCapsule`, `undelegateCapsule`), [lib/tee.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/tee.ts) (TEE auth), [constants/index.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/constants/index.ts) (`MAGICBLOCK_ER`, `PER_TEE`) |
 | **Helius** | We use Helius for **RPC** (primary Solana connection with fallback to public RPC), **Enhanced Transactions API** for the dashboard (parsed capsule create/execute events and history), and **DAS API** for NFT listing when creating NFT capsules. | **Config:** [config/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/config/solana.ts) (`getSolanaConnection`), [constants/index.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/constants/index.ts) (`HELIUS_CONFIG`) · **App:** [lib/helius.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/helius.ts) (`getEnhancedTransactions`, `getNftsByOwner`) |
 
 - **Contract (Devnet):** Program ID `BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms` → [View on Solana Explorer (Devnet)](https://explorer.solana.com/address/BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms?cluster=devnet).
@@ -191,14 +191,14 @@ Landing (/)
 ## Project Structure
 
 ```
-Lucid_solana/
+Heres_solana/
 ├── app/                 # Next.js app (landing, create, capsules, dashboard)
 ├── components/          # Navbar, Footer, AsciiCapsule, CapsuleMediaBlock
 ├── config/              # Solana connection (getSolanaConnection, getProgramId)
 ├── constants/           # Program ID, Magicblock ER/PER, storage keys
 ├── lib/                 # solana.ts, helius.ts, program.ts, tee.ts
-├── lucid_program/       # Anchor program (Rust) – source only
-├── idl/                 # lucid_program.json
+├── heres_program/       # Anchor program (Rust) – source only
+├── idl/                 # heres_program.json
 ├── types/               # IntentCapsule, Beneficiary, WalletActivity
 └── utils/               # intent encoding, validation
 ```
@@ -209,7 +209,7 @@ Lucid_solana/
 
 1. **Clone and install**
    ```bash
-   cd Lucid_solana
+   cd Heres_solana
    npm install
    ```
 

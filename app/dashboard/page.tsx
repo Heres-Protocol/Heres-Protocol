@@ -55,7 +55,7 @@ type CapsuleRow = {
 const formatNumber = (value: number) => value.toLocaleString('en-US')
 
 const formatDuration = (seconds: number | null) => {
-  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—'
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '...'
   const days = seconds / (60 * 60 * 24)
   if (days < 1) return `${Math.max(1, Math.round(seconds / 3600))}h`
   if (days < 30) return `${Math.round(days)}d`
@@ -63,12 +63,12 @@ const formatDuration = (seconds: number | null) => {
 }
 
 const formatDateTime = (timestampMs: number | null) => {
-  if (!timestampMs) return '—'
+  if (!timestampMs) return '...'
   return new Date(timestampMs).toLocaleString()
 }
 
 const timeAgo = (timestampMs: number | null) => {
-  if (!timestampMs) return '—'
+  if (!timestampMs) return '...'
   const diff = Math.max(0, Date.now() - timestampMs)
   const minutes = Math.floor(diff / 60000)
   if (minutes < 1) return 'just now'
@@ -93,7 +93,7 @@ function CopyButton({ value, className }: { value: string; className?: string })
     <button
       type="button"
       onClick={() => copyToClipboard(value)}
-      className={`inline-flex shrink-0 items-center justify-center rounded p-1 text-lucid-muted transition-colors hover:bg-lucid-surface/80 hover:text-lucid-accent ${className ?? ''}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded p-1 text-Heres-muted transition-colors hover:bg-Heres-surface/80 hover:text-Heres-accent ${className || ''}`}
       title="Copy"
       aria-label="Copy to clipboard"
     >
@@ -136,16 +136,16 @@ const instructionLabel = (instruction: string) => {
 const statusTone = (status: string, kind: CapsuleRow['kind']) => {
   const normalized = status.toLowerCase()
   if (kind === 'event') {
-    if (normalized.includes('executed')) return 'bg-lucid-accent/20 text-lucid-accent'
-    if (normalized.includes('created')) return 'bg-lucid-accent/20 text-lucid-accent'
-    if (normalized.includes('updated')) return 'bg-lucid-purple/20 text-lucid-purple'
+    if (normalized.includes('executed')) return 'bg-Heres-accent/20 text-Heres-accent'
+    if (normalized.includes('created')) return 'bg-Heres-accent/20 text-Heres-accent'
+    if (normalized.includes('updated')) return 'bg-Heres-purple/20 text-Heres-purple'
     if (normalized.includes('deactivated')) return 'bg-red-500/20 text-red-400'
-    return 'bg-lucid-surface text-lucid-muted'
+    return 'bg-Heres-surface text-Heres-muted'
   }
-  if (normalized.includes('active')) return 'bg-lucid-accent/20 text-lucid-accent'
+  if (normalized.includes('active')) return 'bg-Heres-accent/20 text-Heres-accent'
   if (normalized.includes('expired')) return 'bg-red-500/20 text-red-400'
-  if (normalized.includes('executed')) return 'bg-lucid-accent/20 text-lucid-accent'
-  return 'bg-lucid-surface text-lucid-muted'
+  if (normalized.includes('executed')) return 'bg-Heres-accent/20 text-Heres-accent'
+  return 'bg-Heres-surface text-Heres-muted'
 }
 
 const statusFromInstruction = (instruction: string) => {
@@ -290,7 +290,7 @@ const getSignatureFromTx = (tx: any) =>
   ''
 
 const getBlockTimeFromTx = (tx: any) => {
-  const timestamp = tx?.timestamp ?? tx?.blockTime ?? tx?.tx?.blockTime ?? tx?.transaction?.blockTime
+  const timestamp = tx?.timestamp || tx?.blockTime || tx?.tx?.blockTime || tx?.transaction?.blockTime
   if (!timestamp) return null
   return typeof timestamp === 'number' ? timestamp : parseInt(String(timestamp), 10)
 }
@@ -312,8 +312,8 @@ const fetchAllEnhancedTransactions = async (address: string, pageSize = 100, max
 
 const toTxRecordFromRpc = (info: any, tx: any) => ({
   signature: info.signature,
-  blockTime: info.blockTime ?? null,
-  err: info.err ?? tx?.meta?.err ?? null,
+  blockTime: info.blockTime || null,
+  err: info.err || tx?.meta?.err || null,
   logs: tx?.meta?.logMessages || [],
   message: tx?.transaction?.message || null,
   meta: tx?.meta || null,
@@ -322,7 +322,7 @@ const toTxRecordFromRpc = (info: any, tx: any) => ({
 const toTxRecordFromEnhanced = (tx: any) => ({
   signature: getSignatureFromTx(tx),
   blockTime: getBlockTimeFromTx(tx),
-  err: tx?.err ?? tx?.meta?.err ?? tx?.transactionError ?? null,
+  err: tx?.err || tx?.meta?.err || tx?.transactionError || null,
   logs: tx?.meta?.logMessages || tx?.logs || [],
   message: tx?.transaction?.message || tx?.tx?.message || tx?.message || null,
   meta: tx?.meta || null,
@@ -414,7 +414,7 @@ export default function DashboardPage() {
     setZkPublicInputsHash(localStorage.getItem(erCommitKey) || localStorage.getItem(legacyInputsKey))
   }, [])
 
-  // Check if fee_config PDA exists (배포 후 1회 초기화 여부)
+  // Check if fee_config PDA exists (諛고룷 ...1...珥덇린...?щ?)
   useEffect(() => {
     let cancelled = false
     const check = async () => {
@@ -444,7 +444,7 @@ export default function DashboardPage() {
     } catch (e: any) {
       const msg = e?.message || String(e)
       if (/already in use|AccountDidNotSerialize|0x0/i.test(msg)) {
-        setInitFeeError('이미 초기화됨 (Fee config already initialized).')
+        setInitFeeError('?대? 珥덇린?붾맖 (Fee config already initialized).')
         setFeeConfigExists(true)
       } else {
         setInitFeeError(msg)
@@ -519,9 +519,9 @@ export default function DashboardPage() {
                 signatureInfos.push({
                   signature: sig,
                   err: null,
-                  blockTime: getBlockTimeFromTx(tx) ?? undefined,
+                  blockTime: getBlockTimeFromTx(tx) || undefined,
                   memo: null,
-                  slot: (tx?.slot ?? tx?.transaction?.slot ?? 0) as number,
+                  slot: (tx?.slot || tx?.transaction?.slot || 0) as number,
                 })
               }
             }
@@ -610,7 +610,7 @@ export default function DashboardPage() {
 
             const event: CapsuleEvent = {
               signature: record.signature,
-              blockTime: record.blockTime ?? null,
+              blockTime: record.blockTime || null,
               status: record.err ? 'failed' : 'success',
               label: instructionLabel(instruction),
               logs,
@@ -697,8 +697,8 @@ export default function DashboardPage() {
           totalProofsSubmitted > 0 ? (verifiedProofs / totalProofsSubmitted) * 100 : 0
 
         const combinedRows: CapsuleRow[] = [...capsuleRows, ...eventRows].sort((a, b) => {
-          const aTime = a.lastActivityMs ?? a.executedAtMs ?? 0
-          const bTime = b.lastActivityMs ?? b.executedAtMs ?? 0
+          const aTime = a.lastActivityMs || a.executedAtMs || 0
+          const bTime = b.lastActivityMs || b.executedAtMs || 0
           return bTime - aTime
         })
 
@@ -763,17 +763,17 @@ export default function DashboardPage() {
   const pagedCapsules = filteredCapsules.slice(pageStart, pageStart + pageSize)
 
   const statCards = [
-    { label: 'Total Capsules', value: formatNumber(summary.total), tone: 'text-lucid-accent' },
-    { label: 'Active Capsules', value: formatNumber(summary.active), tone: 'text-lucid-accent' },
-    { label: 'Executed Capsules', value: formatNumber(summary.executed), tone: 'text-lucid-purple' },
-    { label: 'PER (TEE) Verified', value: formatNumber(summary.proofs), tone: 'text-lucid-accent' },
+    { label: 'Total Capsules', value: formatNumber(summary.total), tone: 'text-Heres-accent' },
+    { label: 'Active Capsules', value: formatNumber(summary.active), tone: 'text-Heres-accent' },
+    { label: 'Executed Capsules', value: formatNumber(summary.executed), tone: 'text-Heres-purple' },
+    { label: 'PER (TEE) Verified', value: formatNumber(summary.proofs), tone: 'text-Heres-accent' },
   ]
 
   const programIdStr = SOLANA_CONFIG.PROGRAM_ID
   const rpcLabel = SOLANA_CONFIG.HELIUS_API_KEY ? 'Helius Devnet' : 'Solana Devnet'
 
   return (
-    <div className="min-h-screen bg-hero text-lucid-white">
+    <div className="min-h-screen bg-hero text-Heres-white">
       <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {error && (
@@ -783,23 +783,23 @@ export default function DashboardPage() {
           )}
 
           {/* Explorer-style: single header card (name + version + stats + Updated) */}
-          <section className="card-lucid p-6 sm:p-8 mb-6">
+          <section className="card-Heres p-6 sm:p-8 mb-6">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-baseline gap-4">
-                <h1 className="text-2xl font-bold text-lucid-white sm:text-3xl">
+                <h1 className="text-2xl font-bold text-Heres-white sm:text-3xl">
                   Heres Capsules
                 </h1>
-                <span className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-2.5 py-1 text-xs font-medium text-lucid-muted">
+                <span className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-2.5 py-1 text-xs font-medium text-Heres-muted">
                   v1.0
                 </span>
-                <span className="text-lucid-accent font-semibold">
+                <span className="text-Heres-accent font-semibold">
                   {formatNumber(summary.total)} Capsules
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <Link
                   href="/capsules"
-                  className="inline-flex items-center gap-2 rounded-lg border border-lucid-border bg-lucid-card/80 px-4 py-2 text-sm font-medium text-lucid-muted transition-colors hover:border-lucid-accent/40 hover:text-lucid-accent"
+                  className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-card/80 px-4 py-2 text-sm font-medium text-Heres-muted transition-colors hover:border-Heres-accent/40 hover:text-Heres-accent"
                 >
                   <User className="h-4 w-4" />
                   My Capsule
@@ -808,30 +808,30 @@ export default function DashboardPage() {
                   type="button"
                   onClick={() => setRefreshKey((k) => k + 1)}
                   disabled={isRefreshing}
-                  className="flex items-center gap-3 rounded-lg border border-lucid-border bg-lucid-card/80 px-4 py-2 text-sm text-lucid-muted transition-colors hover:border-lucid-accent/40 hover:text-lucid-accent disabled:opacity-70"
+                  className="flex items-center gap-3 rounded-lg border border-Heres-border bg-Heres-card/80 px-4 py-2 text-sm text-Heres-muted transition-colors hover:border-Heres-accent/40 hover:text-Heres-accent disabled:opacity-70"
                 >
                   <RefreshCw className={`h-4 w-4 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />
                   {isRefreshing ? 'Syncing...' : lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : 'Syncing'}
                 </button>
               </div>
             </div>
-            <p className="mt-3 text-sm text-lucid-muted max-w-xl">
+            <p className="mt-3 text-sm text-Heres-muted max-w-xl">
               Track capsule status, PER (TEE) execution, and verification on Solana Devnet.
             </p>
           </section>
 
-          {/* 수수료 설정 초기화: Fee config가 없을 때만 표시 (배포 후 1회만 필요) */}
+          {/* ?섏닔猷...ㅼ젙 珥덇린... Fee config媛 ?놁쓣 ?뚮쭔 ?쒖떆 (諛고룷 ...1?뚮쭔 ?꾩슂) */}
           {wallet.connected && feeConfigExists === false && (
-            <section className="card-lucid p-6 mb-6 border-lucid-accent/30">
+            <section className="card-Heres p-6 mb-6 border-Heres-accent/30">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-lucid-accent/10 border border-lucid-accent/40 flex items-center justify-center">
-                    <Settings className="w-5 h-5 text-lucid-accent" />
+                  <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-accent/40 flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-Heres-accent" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-lucid-white">수수료 설정 (배포 후 1회)</h2>
-                    <p className="text-sm text-lucid-muted mt-0.5">
-                      Fee config가 없으면 한 번만 실행하세요. 생성 0.05 SOL, 실행 3%.
+                    <h2 className="text-lg font-semibold text-Heres-white">?섏닔猷...ㅼ젙 (諛고룷 ...1...</h2>
+                    <p className="text-sm text-Heres-muted mt-0.5">
+                      Fee config媛 ?놁쑝硫...?踰덈쭔 ?ㅽ뻾?섏꽭... ?앹꽦 0.05 SOL, ?ㅽ뻾 3%.
                     </p>
                   </div>
                 </div>
@@ -839,21 +839,21 @@ export default function DashboardPage() {
                   type="button"
                   onClick={handleInitFeeConfig}
                   disabled={initFeePending}
-                  className="rounded-lg border border-lucid-accent bg-lucid-accent/20 px-4 py-2 text-sm font-medium text-lucid-accent transition hover:bg-lucid-accent/30 disabled:opacity-60"
+                  className="rounded-lg border border-Heres-accent bg-Heres-accent/20 px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
                 >
-                  {initFeePending ? '처리 중...' : 'Initialize Fee Config'}
+                  {initFeePending ? '泥섎━ 以?..' : 'Initialize Fee Config'}
                 </button>
               </div>
               {initFeeTx && (
-                <p className="mt-3 text-sm text-lucid-accent">
-                  성공:{' '}
+                <p className="mt-3 text-sm text-Heres-accent">
+                  ?깃났:{' '}
                   <a
                     href={`https://explorer.solana.com/tx/${initFeeTx}?cluster=devnet`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline"
                   >
-                    트랜잭션 보기
+                    ?몃옖...뀡 蹂닿린
                   </a>
                 </p>
               )}
@@ -865,28 +865,28 @@ export default function DashboardPage() {
 
           {/* Explorer-style: metadata grid (Network, Program ID, Query URL) */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Network</p>
-              <p className="text-sm font-medium text-lucid-white truncate">
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Network</p>
+              <p className="text-sm font-medium text-Heres-white truncate">
                 {SOLANA_CONFIG.NETWORK ? `Solana ${SOLANA_CONFIG.NETWORK}` : 'Solana Devnet'}
               </p>
             </div>
-            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Program ID</p>
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Program ID</p>
               <div className="flex items-center gap-1">
-                <p className="text-sm font-mono text-lucid-white truncate min-w-0" title={programIdStr}>
+                <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={programIdStr}>
                   {maskAddress(programIdStr)}
                 </p>
                 <CopyButton value={programIdStr} />
               </div>
             </div>
-            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">RPC</p>
-              <p className="text-sm font-medium text-lucid-white truncate">{rpcLabel}</p>
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">RPC</p>
+              <p className="text-sm font-medium text-Heres-white truncate">{rpcLabel}</p>
             </div>
-            <div className="rounded-xl border border-lucid-border bg-lucid-card/80 p-4 sm:col-span-2 lg:col-span-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-lucid-muted mb-1">Index Status</p>
-              <p className="text-sm font-medium text-lucid-accent">Live</p>
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4 sm:col-span-2 lg:col-span-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Index Status</p>
+              <p className="text-sm font-medium text-Heres-accent">Live</p>
             </div>
           </section>
 
@@ -895,22 +895,22 @@ export default function DashboardPage() {
             {statCards.map((card) => (
               <div
                 key={card.label}
-                className="card-lucid p-5 transition-all hover:border-lucid-accent/30"
+                className="card-Heres p-5 transition-all hover:border-Heres-accent/30"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium uppercase tracking-wider text-lucid-muted">{card.label}</p>
-                  <Sparkles className="w-4 h-4 text-lucid-accent" />
+                  <p className="text-xs font-medium uppercase tracking-wider text-Heres-muted">{card.label}</p>
+                  <Sparkles className="w-4 h-4 text-Heres-accent" />
                 </div>
                 <div className={`mt-3 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
-                <p className="mt-1 text-xs text-lucid-muted">Protocol health</p>
+                <p className="mt-1 text-xs text-Heres-muted">Protocol health</p>
               </div>
             ))}
           </section>
 
           {/* Explorer-style: tab bar + content */}
-          <section className="card-lucid overflow-hidden">
+          <section className="card-Heres overflow-hidden">
             {/* Tab bar - Explorer "Query | Curators" style */}
-            <div className="border-b border-lucid-border">
+            <div className="border-b border-Heres-border">
               <div className="flex flex-wrap gap-0 overflow-x-auto">
                 {[
                   { key: 'all', label: 'All' },
@@ -924,8 +924,8 @@ export default function DashboardPage() {
                     type="button"
                     onClick={() => setFilterMode(option.key as typeof filterMode)}
                     className={`min-w-[80px] px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${filterMode === option.key
-                      ? 'border-lucid-accent text-lucid-accent'
-                      : 'border-transparent text-lucid-muted hover:text-lucid-white'
+                      ? 'border-Heres-accent text-Heres-accent'
+                      : 'border-transparent text-Heres-muted hover:text-Heres-white'
                       }`}
                   >
                     {option.label}
@@ -936,8 +936,8 @@ export default function DashboardPage() {
 
             <div className="p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                <div className="flex items-center gap-2 text-sm text-lucid-muted">
-                  <Database className="w-4 h-4 text-lucid-accent" />
+                <div className="flex items-center gap-2 text-sm text-Heres-muted">
+                  <Database className="w-4 h-4 text-Heres-accent" />
                   {formatNumber(filteredCapsules.length)} records
                 </div>
                 <div className="flex items-center gap-2">
@@ -945,12 +945,12 @@ export default function DashboardPage() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search by address, owner, or signature"
-                    className="w-full sm:w-72 rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-2 text-sm text-lucid-white placeholder-lucid-muted focus:outline-none focus:border-lucid-accent/50 transition"
+                    className="w-full sm:w-72 rounded-lg border border-Heres-border bg-Heres-surface/80 px-3 py-2 text-sm text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50 transition"
                   />
                   <button
                     type="button"
                     onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
-                    className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-2 text-xs text-lucid-muted whitespace-nowrap transition hover:border-lucid-accent/40 hover:text-lucid-white"
+                    className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-3 py-2 text-xs text-Heres-muted whitespace-nowrap transition hover:border-Heres-accent/40 hover:text-Heres-white"
                   >
                     {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
                   </button>
@@ -959,7 +959,7 @@ export default function DashboardPage() {
 
               <div className="mt-6 space-y-3">
                 {filteredCapsules.length === 0 && (
-                  <div className="rounded-xl border border-lucid-border bg-lucid-surface/50 px-4 py-8 text-center text-sm text-lucid-muted">
+                  <div className="rounded-xl border border-Heres-border bg-Heres-surface/50 px-4 py-8 text-center text-sm text-Heres-muted">
                     No capsules found. Try syncing again or adjust the search query.
                   </div>
                 )}
@@ -968,14 +968,14 @@ export default function DashboardPage() {
                   <div
                     key={capsule.id}
                     className={`rounded-xl border px-4 py-4 transition-colors ${capsule.kind === 'event'
-                      ? 'border-lucid-accent/30 bg-lucid-accent/5'
-                      : 'border-lucid-border bg-lucid-card/50'
+                      ? 'border-Heres-accent/30 bg-Heres-accent/5'
+                      : 'border-Heres-border bg-Heres-card/50'
                       }`}
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-3 text-sm text-lucid-muted">
-                          <span className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-lucid-muted">
+                        <div className="flex items-center gap-3 text-sm text-Heres-muted">
+                          <span className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-Heres-muted">
                             {capsule.kind === 'event' ? 'Event' : 'Capsule'}
                           </span>
                           <span
@@ -986,35 +986,35 @@ export default function DashboardPage() {
                           >
                             {capsule.status}
                           </span>
-                          <span className="font-mono text-lucid-muted break-all max-w-full min-w-0">
-                            {capsule.signature ? maskAddress(capsule.signature) : '—'}
+                          <span className="font-mono text-Heres-muted break-all max-w-full min-w-0">
+                            {capsule.signature ? maskAddress(capsule.signature) : '...'}
                           </span>
                           {capsule.signature && <CopyButton value={capsule.signature} />}
                         </div>
-                        <div className="grid gap-2 text-xs text-lucid-muted md:grid-cols-3">
+                        <div className="grid gap-2 text-xs text-Heres-muted md:grid-cols-3">
                           <div>
-                            <p className="uppercase tracking-wider text-lucid-muted text-[10px] font-medium">Capsule</p>
+                            <p className="uppercase tracking-wider text-Heres-muted text-[10px] font-medium">Capsule</p>
                             <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-lucid-white break-all truncate">
+                              <p className="font-mono text-Heres-white break-all truncate">
                                 {maskAddress(capsule.capsuleAddress)}
                               </p>
                               <CopyButton value={capsule.capsuleAddress} />
                             </div>
                           </div>
                           <div>
-                            <p className="uppercase tracking-wider text-lucid-muted text-[10px] font-medium">Owner</p>
+                            <p className="uppercase tracking-wider text-Heres-muted text-[10px] font-medium">Owner</p>
                             <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-lucid-white break-all truncate">
-                                {capsule.owner ? maskAddress(capsule.owner) : '—'}
+                              <p className="font-mono text-Heres-white break-all truncate">
+                                {capsule.owner ? maskAddress(capsule.owner) : '...'}
                               </p>
                               {capsule.owner && <CopyButton value={capsule.owner} />}
                             </div>
                           </div>
                           <div>
-                            <p className="uppercase tracking-wider text-lucid-muted text-[10px] font-medium">
+                            <p className="uppercase tracking-wider text-Heres-muted text-[10px] font-medium">
                               {capsule.kind === 'event' ? 'Created' : 'Inactivity'}
                             </p>
-                            <p className="text-lucid-white">
+                            <p className="text-Heres-white">
                               {capsule.kind === 'event'
                                 ? timeAgo(capsule.lastActivityMs)
                                 : formatDuration(capsule.inactivitySeconds)}
@@ -1022,12 +1022,12 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         {capsule.kind === 'event' && (capsule.tokenDelta != null || capsule.solDelta != null || capsule.proofBytes != null) && (
-                          <div className="flex flex-wrap gap-3 text-[11px] text-lucid-muted">
+                          <div className="flex flex-wrap gap-3 text-[11px] text-Heres-muted">
                             {capsule.tokenDelta != null && (
-                              <span className="font-mono">Token Δ: {capsule.tokenDelta}</span>
+                              <span className="font-mono">Token ?: {capsule.tokenDelta}</span>
                             )}
                             {capsule.solDelta != null && (
-                              <span className="font-mono">SOL Δ: {capsule.solDelta.toFixed(4)}</span>
+                              <span className="font-mono">SOL ?: {capsule.solDelta.toFixed(4)}</span>
                             )}
                             {capsule.proofBytes != null && (
                               <span>PER (TEE) tx: {capsule.proofBytes} bytes</span>
@@ -1038,7 +1038,7 @@ export default function DashboardPage() {
                       <button
                         type="button"
                         onClick={() => setExpandedId(expandedId === capsule.id ? null : capsule.id)}
-                        className="inline-flex items-center gap-2 rounded-lg border border-lucid-border bg-lucid-surface/80 px-4 py-2 text-xs text-lucid-muted transition hover:border-lucid-accent/50 hover:text-lucid-accent"
+                        className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-surface/80 px-4 py-2 text-xs text-Heres-muted transition hover:border-Heres-accent/50 hover:text-Heres-accent"
                       >
                         Details
                         {expandedId === capsule.id ? (
@@ -1050,118 +1050,118 @@ export default function DashboardPage() {
                     </div>
 
                     {expandedId === capsule.id && (
-                      <div className="mt-4 w-full min-w-0 rounded-xl border border-lucid-border bg-lucid-surface/80 px-4 py-4 text-xs text-lucid-muted space-y-4 overflow-hidden">
+                      <div className="mt-4 w-full min-w-0 rounded-xl border border-Heres-border bg-Heres-surface/80 px-4 py-4 text-xs text-Heres-muted space-y-4 overflow-hidden">
                         <div className="grid gap-3 md:grid-cols-2 max-w-full">
                           <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Capsule</p>
+                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Capsule</p>
                             <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-lucid-white break-all truncate">{capsule.capsuleAddress}</p>
+                              <p className="font-mono text-Heres-white break-all truncate">{capsule.capsuleAddress}</p>
                               <CopyButton value={capsule.capsuleAddress} />
                             </div>
                           </div>
                           <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Owner</p>
+                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Owner</p>
                             <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-lucid-white break-all truncate">{capsule.owner || '—'}</p>
+                              <p className="font-mono text-Heres-white break-all truncate">{capsule.owner || '...'}</p>
                               {capsule.owner && <CopyButton value={capsule.owner} />}
                             </div>
                           </div>
                           <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Last Activity</p>
-                            <p className="text-lucid-white">{formatDateTime(capsule.lastActivityMs)}</p>
+                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Last Activity</p>
+                            <p className="text-Heres-white">{formatDateTime(capsule.lastActivityMs)}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Executed At</p>
-                            <p className="text-lucid-white">{formatDateTime(capsule.executedAtMs)}</p>
+                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Executed At</p>
+                            <p className="text-Heres-white">{formatDateTime(capsule.executedAtMs)}</p>
                           </div>
                           {capsule.kind === 'capsule' ? (
                             <>
                               <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Inactivity Seconds</p>
-                                <p className="text-lucid-white">{capsule.inactivitySeconds ?? '—'}</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Inactivity Seconds</p>
+                                <p className="text-Heres-white">{capsule.inactivitySeconds || '...'}</p>
                               </div>
                               <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Payload Size</p>
-                                <p className="text-lucid-white">{capsule.payloadSize ? `${capsule.payloadSize} bytes` : '—'}</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Payload Size</p>
+                                <p className="text-Heres-white">{capsule.payloadSize ? `${capsule.payloadSize} bytes` : '...'}</p>
                               </div>
                               <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Is Active</p>
-                                <p className="text-lucid-white">{capsule.isActive == null ? '—' : capsule.isActive ? 'Yes' : 'No'}</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Is Active</p>
+                                <p className="text-Heres-white">{capsule.isActive == null ? '...' : capsule.isActive ? 'Yes' : 'No'}</p>
                               </div>
                             </>
                           ) : (
                             <>
                               <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Token Delta</p>
-                                <p className="text-lucid-white">{capsule.tokenDelta || '—'}</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Token Delta</p>
+                                <p className="text-Heres-white">{capsule.tokenDelta || '...'}</p>
                               </div>
                               <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">SOL Delta</p>
-                                <p className="text-lucid-white">{capsule.solDelta == null ? '—' : `${capsule.solDelta.toFixed(4)} SOL`}</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">SOL Delta</p>
+                                <p className="text-Heres-white">{capsule.solDelta == null ? '...' : `${capsule.solDelta.toFixed(4)} SOL`}</p>
                               </div>
                               <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">PER (TEE) Tx Bytes</p>
-                                <p className="text-lucid-white">{capsule.proofBytes ? `${capsule.proofBytes} bytes` : '—'}</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">PER (TEE) Tx Bytes</p>
+                                <p className="text-Heres-white">{capsule.proofBytes ? `${capsule.proofBytes} bytes` : '...'}</p>
                               </div>
                               <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">PER (TEE) Context</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">PER (TEE) Context</p>
                                 <div className="flex items-center gap-1 min-w-0">
-                                  <p className="font-mono text-lucid-white break-all truncate">{zkProofHash || '—'}</p>
+                                  <p className="font-mono text-Heres-white break-all truncate">{zkProofHash || '...'}</p>
                                   {zkProofHash && <CopyButton value={zkProofHash} />}
                                 </div>
                               </div>
                               <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">PER (TEE) Commit Hash</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">PER (TEE) Commit Hash</p>
                                 <div className="flex items-center gap-1 min-w-0">
-                                  <p className="font-mono text-lucid-white break-all truncate">{zkPublicInputsHash || '—'}</p>
+                                  <p className="font-mono text-Heres-white break-all truncate">{zkPublicInputsHash || '...'}</p>
                                   {zkPublicInputsHash && <CopyButton value={zkPublicInputsHash} />}
                                 </div>
                               </div>
                             </>
                           )}
                           <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted">Latest Signature</p>
+                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Latest Signature</p>
                             <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-lucid-white break-all truncate">{capsule.signature || '—'}</p>
+                              <p className="font-mono text-Heres-white break-all truncate">{capsule.signature || '...'}</p>
                               {capsule.signature && <CopyButton value={capsule.signature} />}
                             </div>
                           </div>
                         </div>
 
                         <div>
-                          <p className="text-[10px] font-medium uppercase tracking-wider text-lucid-muted mb-2">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted mb-2">
                             Capsule Events
                           </p>
                           {capsule.events.length === 0 ? (
-                            <p className="text-lucid-muted">No transaction events found for this capsule.</p>
+                            <p className="text-Heres-muted">No transaction events found for this capsule.</p>
                           ) : (
                             <div className="space-y-2">
                               {capsule.events.map((event) => (
                                 <div
                                   key={`${capsule.id}-${event.signature}`}
-                                  className="rounded-lg border border-lucid-border bg-lucid-card/80 px-3 py-3"
+                                  className="rounded-lg border border-Heres-border bg-Heres-card/80 px-3 py-3"
                                 >
                                   <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="text-lucid-white">{event.label}</span>
-                                    <span className="text-[10px] text-lucid-muted">
-                                      {event.blockTime ? timeAgo(event.blockTime * 1000) : '—'}
+                                    <span className="text-Heres-white">{event.label}</span>
+                                    <span className="text-[10px] text-Heres-muted">
+                                      {event.blockTime ? timeAgo(event.blockTime * 1000) : '...'}
                                     </span>
                                   </div>
-                                  <div className="mt-2 flex items-start justify-between gap-2 text-[11px] text-lucid-muted">
+                                  <div className="mt-2 flex items-start justify-between gap-2 text-[11px] text-Heres-muted">
                                     <div className="flex min-w-0 items-center gap-1">
                                       <span className="font-mono break-all truncate">{event.signature}</span>
                                       <CopyButton value={event.signature} className="shrink-0" />
                                     </div>
-                                    <span className={`shrink-0 ${event.status === 'success' ? 'text-lucid-accent' : 'text-red-400'}`}>
+                                    <span className={`shrink-0 ${event.status === 'success' ? 'text-Heres-accent' : 'text-red-400'}`}>
                                       {event.status}
                                     </span>
                                   </div>
                                   {event.logs.length > 0 && (
-                                    <div className="mt-2 max-h-48 overflow-y-auto space-y-1 text-[11px] text-lucid-muted font-mono break-all whitespace-pre-wrap overflow-x-hidden">
+                                    <div className="mt-2 max-h-48 overflow-y-auto space-y-1 text-[11px] text-Heres-muted font-mono break-all whitespace-pre-wrap overflow-x-hidden">
                                       {event.logs.map((log, index) => (
                                         <div key={`${event.signature}-${index}`}>{log}</div>
                                       ))}
-                                      <p className="text-[10px] text-lucid-muted pt-1">
+                                      <p className="text-[10px] text-Heres-muted pt-1">
                                         {event.logs.length} log{event.logs.length !== 1 ? 's' : ''} total
                                       </p>
                                     </div>
@@ -1178,12 +1178,12 @@ export default function DashboardPage() {
               </div>
 
               {filteredCapsules.length > pageSize && (
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-lucid-muted">
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-Heres-muted">
                   <button
                     type="button"
                     onClick={() => setCurrentPage(1)}
                     disabled={currentPage === 1}
-                    className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-lucid-accent/40 transition"
+                    className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-Heres-accent/40 transition"
                   >
                     First
                   </button>
@@ -1191,26 +1191,24 @@ export default function DashboardPage() {
                     type="button"
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-lucid-accent/40 transition"
+                    className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-Heres-accent/40 transition"
                   >
-                    ‹
-                  </button>
-                  <span className="rounded-lg border border-lucid-border bg-lucid-card/80 px-3 py-1.5 text-lucid-white">
+                    ...                  </button>
+                  <span className="rounded-lg border border-Heres-border bg-Heres-card/80 px-3 py-1.5 text-Heres-white">
                     Page {currentPage} of {totalPages}
                   </span>
                   <button
                     type="button"
                     onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     disabled={currentPage >= totalPages}
-                    className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-lucid-accent/40 transition"
+                    className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-Heres-accent/40 transition"
                   >
-                    ›
-                  </button>
+                    ...                  </button>
                   <button
                     type="button"
                     onClick={() => setCurrentPage(totalPages)}
                     disabled={currentPage >= totalPages}
-                    className="rounded-lg border border-lucid-border bg-lucid-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-lucid-accent/40 transition"
+                    className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-3 py-1.5 disabled:opacity-40 hover:border-Heres-accent/40 transition"
                   >
                     Last
                   </button>

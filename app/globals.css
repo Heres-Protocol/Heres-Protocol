@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --lucid-bg: #030712;
-  --lucid-surface: #0a0f1a;
-  --lucid-card: #111827;
-  --lucid-accent: #22d3ee;
-  --lucid-purple: #a78bfa;
-  --lucid-cyan: #22d3ee;
-  --lucid-border: rgba(34, 211, 238, 0.2);
+  --Heres-bg: #030712;
+  --Heres-surface: #0a0f1a;
+  --Heres-card: #111827;
+  --Heres-accent: #22d3ee;
+  --Heres-purple: #a78bfa;
+  --Heres-cyan: #22d3ee;
+  --Heres-border: rgba(34, 211, 238, 0.2);
 }
 
 html {
@@ -18,7 +18,7 @@ html {
 
 body {
   color: #f9fafb;
-  background: var(--lucid-bg);
+  background: var(--Heres-bg);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
   padding-top: env(safe-area-inset-top);
@@ -54,7 +54,7 @@ a {
   touch-action: manipulation;
 }
 
-/* Mobile menu: wallet button must not overflow – stay inside menu box */
+/* Mobile menu: wallet button must not overflow ??stay inside menu box */
 .mobile-menu-wallet-wrap {
   overflow: hidden;
 }
@@ -78,7 +78,7 @@ a {
   min-width: 0;
 }
 
-/* Mobile: wallet adapter – min touch target 44px, modal fits viewport */
+/* Mobile: wallet adapter ??min touch target 44px, modal fits viewport */
 @media (max-width: 640px) {
   .wallet-adapter-button {
     min-height: 44px !important;
@@ -99,25 +99,25 @@ a {
 .bg-hero {
   background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.12), transparent 50%),
     radial-gradient(ellipse 60% 40% at 80% 60%, rgba(167, 139, 250, 0.1), transparent 50%),
-    var(--lucid-bg);
+    var(--Heres-bg);
 }
 
 /* Card with hover lift */
-.card-lucid {
-  @apply rounded-2xl border border-lucid-border bg-lucid-card/80 backdrop-blur-xl transition-all duration-300;
+.card-Heres {
+  @apply rounded-2xl border border-Heres-border bg-Heres-card/80 backdrop-blur-xl transition-all duration-300;
 }
 
-.card-lucid:hover {
-  @apply -translate-y-1 border-lucid-accent/30 shadow-glow-cyan;
+.card-Heres:hover {
+  @apply -translate-y-1 border-Heres-accent/30 shadow-glow-cyan;
 }
 
 /* CTA button */
 .btn-primary {
-  @apply inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-lucid-cyan to-lucid-purple px-6 py-3 font-semibold text-lucid-bg shadow-glow-cyan transition-all duration-300 hover:opacity-90 hover:shadow-glow-purple;
+  @apply inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-Heres-cyan to-Heres-purple px-6 py-3 font-semibold text-Heres-bg shadow-glow-cyan transition-all duration-300 hover:opacity-90 hover:shadow-glow-purple;
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center rounded-xl border border-lucid-border bg-lucid-surface/80 px-6 py-3 font-semibold text-lucid-white backdrop-blur-sm transition-all duration-300 hover:border-lucid-accent/50 hover:bg-lucid-card;
+  @apply inline-flex items-center justify-center rounded-xl border border-Heres-border bg-Heres-surface/80 px-6 py-3 font-semibold text-Heres-white backdrop-blur-sm transition-all duration-300 hover:border-Heres-accent/50 hover:bg-Heres-card;
 }
 
 /* Scroll-triggered reveal (use with JS or Intersection Observer) */
@@ -173,7 +173,7 @@ a {
 
 /* Navbar glass */
 .nav-glass {
-  @apply fixed left-0 right-0 top-0 z-50 border-b border-lucid-border/50 bg-lucid-bg/80 backdrop-blur-xl;
+  @apply fixed left-0 right-0 top-0 z-50 border-b border-Heres-border/50 bg-Heres-bg/80 backdrop-blur-xl;
   padding-top: env(safe-area-inset-top);
   height: calc(4rem + env(safe-area-inset-top));
   /* 4rem is h-16 */
@@ -189,16 +189,16 @@ a {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--lucid-surface);
+  background: var(--Heres-surface);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--lucid-muted);
+  background: var(--Heres-muted);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--lucid-accent);
+  background: var(--Heres-accent);
 }
 
 /* Capsule 3D motion */
@@ -327,7 +327,7 @@ a {
   50% { box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.4), 0 0 32px rgba(167, 139, 250, 0.2), inset 0 0 50px rgba(34, 211, 238, 0.1); }
 }
 
-/* Heres Promo Reel (15s timeline) — 위아래 잘림 방지용 최소 높이 */
+/* Heres Promo Reel (15s timeline) ???꾩븘???섎┝ 諛⑹???理쒖냼 ?믪씠 */
 .promo-reel {
   --promo-cyan: rgba(34, 211, 238, 0.65);
   --promo-purple: rgba(167, 139, 250, 0.35);
@@ -351,12 +351,12 @@ a {
   justify-content: center;
   align-items: center;
 }
-/* top 클래스가 있으면 위쪽 기준 정렬로 텍스트 겹침 방지 */
+/* top ?대옒?ㅺ? ?덉쑝硫??꾩そ 湲곗? ?뺣젹濡??띿뒪??寃뱀묠 諛⑹? */
 .promo-abs.center[class*="top-"] {
   align-items: flex-start;
   padding-top: 0;
 }
-/* Scene 2·3·4: 좌/우 각 50% 영역 가운데 정렬, 세로는 조금 위로(아래 치우침 방지) */
+/* Scene 2쨌3쨌4: 醫???媛?50% ?곸뿭 媛?대뜲 ?뺣젹, ?몃줈??議곌툑 ?꾨줈(?꾨옒 移섏슦移?諛⑹?) */
 .promo-half-left {
   left: 0;
   width: 50%;
@@ -385,7 +385,7 @@ a {
   justify-content: center;
   align-items: center;
 }
-/* Capsule: 가로로 누운 pill — 크기 확대, 아래 짤리지 않게 높이 제한 */
+/* Capsule: 媛濡쒕줈 ?꾩슫 pill ???ш린 ?뺣?, ?꾨옒 吏ㅻ━吏 ?딄쾶 ?믪씠 ?쒗븳 */
 .promo-capsule-full {
   position: absolute;
   left: 50%;
@@ -406,7 +406,7 @@ a {
     height: 104px;
   }
 }
-/* Scene 4: 가로 pill이 세로로 짤림(좌/우 절반으로 분리) — 각 절반 폭 확대 */
+/* Scene 4: 媛濡?pill???몃줈濡?吏ㅻ┝(醫????덈컲?쇰줈 遺꾨━) ??媛??덈컲 ???뺣? */
 .promo-capsule-half {
   position: absolute;
   left: 50%;
@@ -462,7 +462,7 @@ a {
   0%, 100% { opacity: 0.4; transform: translateX(-50%) translateY(-20%); }
   50% { opacity: 0.6; transform: translateX(-50%) translateY(20%); }
 }
-/* Execution lines: 6 lines at 0/60/120/180/240/300°, expand from center (--line-length) */
+/* Execution lines: 6 lines at 0/60/120/180/240/300째, expand from center (--line-length) */
 .promo-txlines {
   inset: 0;
   display: flex;
@@ -482,7 +482,7 @@ a {
   filter: blur(1px);
   box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
 }
-/* Execution burst: radial 500px, blur 20px, cyan→purple */
+/* Execution burst: radial 500px, blur 20px, cyan?뭦urple */
 .promo-burst {
   background: radial-gradient(
     circle at center,
@@ -554,7 +554,7 @@ a {
   }
 }
 
-/* Partners orbit – wide rings, smaller logos */
+/* Partners orbit ??wide rings, smaller logos */
 .partners-orbit {
   position: relative;
 }
@@ -582,7 +582,7 @@ a {
   }
 }
 
-/* Why Build With Lucid – match Unleash section image: #0d101a + cyan/teal borders */
+/* Why Build With Heres ??match Unleash section image: #0d101a + cyan/teal borders */
 .why-build-section {
   background: #0d101a;
   border-top: 1px solid #00b8d4;
@@ -590,11 +590,11 @@ a {
 }
 
 .why-build-section .why-build-subtitle {
-  color: var(--lucid-accent);
+  color: var(--Heres-accent);
 }
 
 .why-build-section .why-build-desc {
-  color: var(--lucid-muted, #9ca3af);
+  color: var(--Heres-muted, #9ca3af);
 }
 
 .why-build-section .why-build-card[data-active="true"] {
@@ -603,13 +603,13 @@ a {
 }
 
 .why-build-section .why-visual-secondary {
-  background-color: var(--lucid-card);
-  border-color: var(--lucid-border);
+  background-color: var(--Heres-card);
+  border-color: var(--Heres-border);
 }
 
 .why-build-section .why-visual-main {
-  background-color: var(--lucid-card);
-  border-color: var(--lucid-border);
+  background-color: var(--Heres-card);
+  border-color: var(--Heres-border);
 }
 
 .why-left-cards [data-gsap-why-card] {
@@ -656,7 +656,7 @@ a {
   animation: whyDashedLineMove 1.2s linear infinite;
 }
 
-/* Moving accent segment (flow indicator) – travels full line height */
+/* Moving accent segment (flow indicator) ??travels full line height */
 @keyframes whyFlowSegment {
   from {
     top: 0%;

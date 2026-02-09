@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import Image from 'next/image'
@@ -13,7 +13,7 @@ const AsciiCapsule = dynamic(() => import('@/components/AsciiCapsule').then((m) 
 
 const HeroCapsuleVideo = dynamic(() => import('@/components/HeroCapsuleVideo').then((m) => ({ default: m.HeroCapsuleVideo })), {
   ssr: false,
-  loading: () => <div className="aspect-video w-full animate-pulse rounded-2xl bg-lucid-surface/50" aria-hidden />,
+  loading: () => <div className="aspect-video w-full animate-pulse rounded-2xl bg-Heres-surface/50" aria-hidden />,
 })
 
 function DashedLine({
@@ -48,14 +48,14 @@ function DashedLine({
       </svg>
       {filled && (
         <div
-          className="absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 bg-lucid-accent rounded-full"
+          className="absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 bg-Heres-accent rounded-full"
           aria-hidden
           style={{ height }}
         />
       )}
       {active && !filled && (
         <div
-          className="why-flow-segment absolute left-1/2 top-0 h-3 w-0.5 -translate-x-1/2 bg-lucid-accent rounded-full"
+          className="why-flow-segment absolute left-1/2 top-0 h-3 w-0.5 -translate-x-1/2 bg-Heres-accent rounded-full"
           aria-hidden
         />
       )}
@@ -105,14 +105,14 @@ function ParallelDashedLines({
         Array.from({ length: count }).map((_, i) => (
           <div
             key={i}
-            className="absolute top-0 h-full w-0.5 -translate-x-1/2 bg-lucid-accent rounded-full"
+            className="absolute top-0 h-full w-0.5 -translate-x-1/2 bg-Heres-accent rounded-full"
             style={{ left: `${step + i * step}px`, height }}
             aria-hidden
           />
         ))}
       {active && !filled && (
         <div
-          className="why-flow-segment absolute left-1/2 top-0 h-3 w-0.5 -translate-x-1/2 bg-lucid-accent rounded-full"
+          className="why-flow-segment absolute left-1/2 top-0 h-3 w-0.5 -translate-x-1/2 bg-Heres-accent rounded-full"
           aria-hidden
         />
       )}
@@ -120,45 +120,26 @@ function ParallelDashedLines({
   )
 }
 
-const features = [
-  {
-    title: 'Zero Latency',
-    description:
-      'Fast execution thanks to Magicblock PER (TEE) / Ephemeral Rollups. Conditions are checked privately in TEE and execution is triggered when silence becomes truth.',
-    icon: '⚡',
-  },
-  {
-    title: 'Zero Trust',
-    description:
-      'No third-party executor. Your capsule lives on Solana; Magicblock PER (TEE) monitors privately. Execution is automatic when conditions are met.',
-    icon: '🔒',
-  },
-  {
-    title: 'Compliant Privacy',
-    description:
-      'Conditions stay private inside PER (TEE) / Private Ephemeral Rollups. Only execution results are committed to Devnet. Built for Solana with Helius & Phantom.',
-    icon: '🛡️',
-  },
-]
+const features: any[] = []
 
-/* Why Heres – benefit-focused cards (non-technical, why you need Heres) */
+/* Why Heres ??benefit-focused cards (non-technical, why you need Heres) */
 const whyHeresCards = [
   {
     title: 'Your intent, executed when it matters',
     description: 'Leave instructions that run only when the time is right. No one can execute early. Your conditions stay yours until the moment you chose.',
-    image: '/why-lucid-1.png',
+    image: '/why-Heres-1.png',
     href: '/create',
   },
   {
     title: 'Privacy by design',
     description: 'Your conditions stay private. Only the outcome is visible on-chain. No third party sees your rules. Just the result when silence becomes truth.',
-    image: '/why-lucid-2.png',
+    image: '/why-Heres-2.png',
     href: '/dashboard',
   },
   {
-    title: 'Set it once. It runs when you’re silent.',
+    title: "Set it once. It runs when you're silent.",
     description: 'Define your intent once. No bridges, no middlemen. When your conditions are met, execution happens automatically, the way you wanted.',
-    image: '/why-lucid-3.png',
+    image: '/why-Heres-3.png',
     href: '/create',
   },
 ]
@@ -296,22 +277,22 @@ export default function HomePage() {
         className="relative overflow-hidden px-4 pt-32 pb-28 sm:px-6 sm:pt-40 sm:pb-36 lg:px-8"
       >
         <div className="mx-auto max-w-4xl text-center">
-          <p className="mb-4 text-sm font-medium uppercase tracking-wider text-lucid-accent">
+          <p className="mb-4 text-sm font-medium uppercase tracking-wider text-Heres-accent">
             Privacy-Preserving Capsule Protocol
           </p>
-          <h1 className="text-4xl font-bold tracking-tight text-lucid-white sm:text-5xl lg:text-6xl">
+          <h1 className="text-4xl font-bold tracking-tight text-Heres-white sm:text-5xl lg:text-6xl">
             Your intent. Your rules.{' '}
-            <span className="bg-gradient-to-r from-lucid-cyan to-lucid-purple bg-clip-text text-transparent">
-              Executed when you’re silent.
+            <span className="bg-gradient-to-r from-Heres-cyan to-Heres-purple bg-clip-text text-transparent">
+              Executed when you're silent.
             </span>
           </h1>
-          {/* ASCII capsule animation – capsule-shaped ASCII art */}
+          {/* ASCII capsule animation ??capsule-shaped ASCII art */}
           <div className="mt-10 sm:mt-12" data-hero-ascii>
             <AsciiCapsule />
           </div>
-          {/* 캡슐 아래 문구 + Get Started 버튼 */}
+          {/* 筌╈돦???袁⑥삋 ?얜㈇??+ Get Started 甕곌쑵??*/}
           <div className="mt-10 sm:mt-12 text-center" data-hero-below-capsule>
-            <p className="mx-auto max-w-2xl text-base sm:text-lg text-lucid-muted leading-relaxed">
+            <p className="mx-auto max-w-2xl text-base sm:text-lg text-Heres-muted leading-relaxed">
               Define once. Delegate to Magicblock PER (TEE). Execution runs on Solana when conditions are met. No bridges, no third party.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3 sm:gap-4">
@@ -333,14 +314,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Why Build With Heres – Your development environment (layout + scroll like The Graph subgraphs) */}
+      {/* Why Build With Heres ??Your development environment (layout + scroll like The Graph subgraphs) */}
       <section ref={whySectionRef} className="why-build-section py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 ref={whyTitleRef} className="text-center text-3xl font-bold text-white sm:text-4xl">
             Why Build With Heres?
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted hidden">
-            Capsules on Solana, private logic in Magicblock PER (TEE), execution when you’re silent.
+          <p className="mx-auto mt-4 max-w-2xl text-center text-Heres-muted hidden">
+            Capsules on Solana, private logic in Magicblock PER (TEE), execution when you're silent.
           </p>
 
           <div data-why-heading className="mx-auto mt-3 max-w-2xl text-center">
@@ -349,7 +330,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-16 grid gap-10 lg:grid-cols-2 lg:gap-16 lg:items-center">
-            {/* Left: Why Heres steps – vertical list with left border (Firehose-style) */}
+            {/* Left: Why Heres steps ??vertical list with left border (Firehose-style) */}
             <div ref={whyLeftRef} className="why-left-cards flex flex-col">
               {whyHeresCards.map((card, i) => {
                 const isActive = activeWhyIndex === i
@@ -373,7 +354,7 @@ export default function HomePage() {
                       {isActive && (
                         <div
                           key={`step-bar-${i}`}
-                          className="why-build-step-bar absolute left-0 top-0 w-0.5 bg-lucid-accent"
+                          className="why-build-step-bar absolute left-0 top-0 w-0.5 bg-Heres-accent"
                           aria-hidden
                           onAnimationEnd={() => setActiveWhyIndex((prev) => (prev + 1) % whyHeresCards.length)}
                         />
@@ -394,10 +375,10 @@ export default function HomePage() {
                 )
               })}
             </div>
-            {/* Right: Heres flow diagram – no outer box, widened to the right (reference image) */}
+            {/* Right: Heres flow diagram ??no outer box, widened to the right (reference image) */}
             <div ref={whyVisualMainRef} className="relative w-full md:min-w-0 md:flex-1 lg:max-w-[900px]">
               <div className="why-build-flow-wrap relative flex flex-col md:flex-row md:items-stretch md:gap-0 md:pl-2 md:pr-4">
-                {/* Left flow only: Solana Devnet → … → MONITORING → Helius RPC → Execution */}
+                {/* Left flow only: Solana Devnet ??????MONITORING ??Helius RPC ??Execution */}
                 <div className="relative mt-4 flex w-full flex-col items-center text-white md:mt-0 md:w-full md:scale-100">
                   {/* 1. Solana Devnet */}
                   <div
@@ -417,10 +398,10 @@ export default function HomePage() {
                       <path stroke="currentColor" strokeDasharray="5 5" strokeLinecap="square" strokeOpacity={0.5} strokeWidth={1.5} d="M1 1v48" />
                     </svg>
                     {activeWhyIndex > 0 && (
-                      <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-lucid-accent rounded-full" aria-hidden style={{ height: 50 }} />
+                      <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-Heres-accent rounded-full" aria-hidden style={{ height: 50 }} />
                     )}
                     {activeWhyIndex === 0 && (
-                      <div className="why-flow-segment absolute left-1/2 h-6 w-[1.5px] -translate-x-1/2 rounded-full bg-lucid-accent" aria-hidden style={{ top: 0 }} />
+                      <div className="why-flow-segment absolute left-1/2 h-6 w-[1.5px] -translate-x-1/2 rounded-full bg-Heres-accent" aria-hidden style={{ top: 0 }} />
                     )}
                   </div>
                   {/* 2. Heres Capsules */}
@@ -432,14 +413,14 @@ export default function HomePage() {
                       <div className="font-mono text-[13px] md:text-base text-white">Heres Capsules</div>
                     </div>
                   </div>
-                  {/* Ref: 5 separate parallel dashed lines (each 2×30) */}
+                  {/* Ref: 5 separate parallel dashed lines (each 2??0) */}
                   <div className="relative -z-10 flex w-full justify-center gap-2 md:gap-6" style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transition: 'opacity 0.3s' }}>
                     {[0, 1, 2, 3, 4].map((i) => (
                       <div key={i} className="relative flex justify-center" style={{ opacity: 1 }}>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 2 30" width={2} height={30} className="shrink-0 text-white">
                           <path stroke="currentColor" strokeDasharray="5 5" strokeLinecap="square" strokeOpacity={0.5} strokeWidth={1.5} d="M1 1v28" />
                         </svg>
-                        {activeWhyIndex > 1 && <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-lucid-accent rounded-full" style={{ height: 30 }} aria-hidden />}
+                        {activeWhyIndex > 1 && <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-Heres-accent rounded-full" style={{ height: 30 }} aria-hidden />}
                       </div>
                     ))}
                   </div>
@@ -459,7 +440,7 @@ export default function HomePage() {
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 2 30" width={2} height={30} className="shrink-0 text-white">
                           <path stroke="currentColor" strokeDasharray="5 5" strokeLinecap="square" strokeOpacity={0.5} strokeWidth={1.5} d="M1 1v28" />
                         </svg>
-                        {activeWhyIndex > 1 && <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-lucid-accent rounded-full" style={{ height: 30 }} aria-hidden />}
+                        {activeWhyIndex > 1 && <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-Heres-accent rounded-full" style={{ height: 30 }} aria-hidden />}
                       </div>
                     ))}
                   </div>
@@ -495,15 +476,15 @@ export default function HomePage() {
                   <div className="relative flex justify-center">
                     <DashedLine height={28} segmentIndex={2} activeWhyIndex={activeWhyIndex} />
                   </div>
-                  {/* 5. Execution – blue fill by STEP 1/2/3 (activeWhyIndex 0/1/2) */}
+                  {/* 5. Execution ??blue fill by STEP 1/2/3 (activeWhyIndex 0/1/2) */}
                   <div
                     className="z-10 flex w-full justify-center"
                     style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transform: activeWhyIndex >= 0 ? 'scale(1)' : 'scale(0.98)', transition: 'opacity 0.3s, transform 0.3s' }}
                   >
-                    <div className="relative overflow-hidden rounded-lg border border-lucid-accent/30 bg-[#242236] p-3.5 text-center w-[220px] min-w-[220px]">
-                      {/* Blue fill: STEP 1 → 33%, STEP 2 → 66%, STEP 3 → 100% */}
+                    <div className="relative overflow-hidden rounded-lg border border-Heres-accent/30 bg-[#242236] p-3.5 text-center w-[220px] min-w-[220px]">
+                      {/* Blue fill: STEP 1 ??33%, STEP 2 ??66%, STEP 3 ??100% */}
                       <div
-                        className="absolute inset-0 rounded-lg bg-lucid-accent/25 transition-all duration-500 ease-out"
+                        className="absolute inset-0 rounded-lg bg-Heres-accent/25 transition-all duration-500 ease-out"
                         style={{ width: `${((activeWhyIndex + 1) / 3) * 100}%` }}
                         aria-hidden
                       />
@@ -520,28 +501,28 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it works – 3-step cards (Discover / Query / Serve style) */}
-      <section className="border-y border-lucid-border/30 bg-lucid-surface/30 py-20 sm:py-28">
+      {/* How it works ??3-step cards (Discover / Query / Serve style) */}
+      <section className="border-y border-Heres-border/30 bg-Heres-surface/30 py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 ref={howTitleRef} className="text-center text-3xl font-bold text-lucid-white sm:text-4xl">
+          <h2 ref={howTitleRef} className="text-center text-3xl font-bold text-Heres-white sm:text-4xl">
             How It Works
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted">
+          <p className="mx-auto mt-4 max-w-2xl text-center text-Heres-muted">
             With Heres, define your intent once on Solana. Magicblock PER (TEE) monitors privately; execution runs on Devnet when conditions are met.
           </p>
           <div ref={stepsRef} className="mt-16 grid gap-8 lg:grid-cols-3 lg:items-stretch">
-            {/* STEP 1 Create – capsule/create page card */}
-            <div data-gsap-step className="card-lucid flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-lucid-accent/40 sm:min-h-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-lucid-accent">Step 1</p>
-              <h3 className="mt-1 text-xl font-bold text-lucid-white">Create</h3>
-              <p className="mt-3 text-sm text-lucid-muted">
+            {/* STEP 1 Create ??capsule/create page card */}
+            <div data-gsap-step className="card-Heres flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-Heres-accent/40 sm:min-h-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-Heres-accent">Step 1</p>
+              <h3 className="mt-1 text-xl font-bold text-Heres-white">Create</h3>
+              <p className="mt-3 text-sm text-Heres-muted">
                 Create a capsule to define beneficiaries, amounts, and inactivity period on Solana Devnet.
               </p>
-              <div className="mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-lucid-border/50 bg-lucid-card/80 sm:min-h-[180px]">
+              <div className="mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-Heres-border/50 bg-Heres-card/80 sm:min-h-[180px]">
                 <div className="relative h-full min-h-[180px] w-full">
                   <Image
                     src="/how-it-works-step1.png"
-                    alt="Create Capsule – intent, beneficiaries, asset type"
+                    alt="Create Capsule ??intent, beneficiaries, asset type"
                     fill
                     className="object-cover object-top"
                     sizes="(max-width: 768px) 100vw, 33vw"
@@ -549,19 +530,19 @@ export default function HomePage() {
                   />
                 </div>
               </div>
-              <Link href="/create" className="mt-4 text-sm font-medium text-lucid-accent hover:underline">
-                View the create page →
+              <Link href="/create" className="mt-4 text-sm font-medium text-Heres-accent hover:underline">
+                View the create page ??
               </Link>
             </div>
 
-            {/* STEP 2 Delegate – real code from lib/solana.ts */}
-            <div data-gsap-step className="card-lucid flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-lucid-accent/40 sm:min-h-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-lucid-accent">Step 2</p>
-              <h3 className="mt-1 text-xl font-bold text-lucid-white">Delegate</h3>
-              <p className="mt-3 text-sm text-lucid-muted">
+            {/* STEP 2 Delegate ??real code from lib/solana.ts */}
+            <div data-gsap-step className="card-Heres flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-Heres-accent/40 sm:min-h-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-Heres-accent">Step 2</p>
+              <h3 className="mt-1 text-xl font-bold text-Heres-white">Delegate</h3>
+              <p className="mt-3 text-sm text-Heres-muted">
                 Create and delegate your capsule with Anchor. Capsule PDA is derived from owner; delegate to Magicblock PER (TEE) for private monitoring.
               </p>
-              <div className="how-it-works-code mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-lucid-border/50 bg-[#0d1117] p-3 font-mono text-xs leading-relaxed sm:min-h-[180px]">
+              <div className="how-it-works-code mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-Heres-border/50 bg-[#0d1117] p-3 font-mono text-xs leading-relaxed sm:min-h-[180px]">
                 <pre className="whitespace-pre-wrap break-words text-[11px] sm:text-xs">
                   <code>
                     <span className="text-slate-400">const tx = await program.methods</span>{'\n'}
@@ -578,23 +559,23 @@ export default function HomePage() {
                   </code>
                 </pre>
               </div>
-              <Link href="/create" className="mt-4 text-sm font-medium text-lucid-accent hover:underline">
-                View the code (lib/solana.ts) →
+              <Link href="/create" className="mt-4 text-sm font-medium text-Heres-accent hover:underline">
+                View the code (lib/solana.ts) ??
               </Link>
             </div>
 
-            {/* STEP 3 Serve – dashboard preview */}
-            <div data-gsap-step className="card-lucid flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-lucid-accent/40 sm:min-h-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-lucid-accent">Step 3</p>
-              <h3 className="mt-1 text-xl font-bold text-lucid-white">Serve</h3>
-              <p className="mt-3 text-sm text-lucid-muted">
+            {/* STEP 3 Serve ??dashboard preview */}
+            <div data-gsap-step className="card-Heres flex min-h-[420px] flex-col overflow-hidden p-6 transition-all duration-300 hover:border-Heres-accent/40 sm:min-h-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-Heres-accent">Step 3</p>
+              <h3 className="mt-1 text-xl font-bold text-Heres-white">Serve</h3>
+              <p className="mt-3 text-sm text-Heres-muted">
                 View and manage your capsules. Execution runs on Devnet when inactivity is met. No third party.
               </p>
-              <div className="mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-lucid-border/50 bg-lucid-card/80 sm:min-h-[180px]">
+              <div className="mt-6 min-h-[200px] flex-1 overflow-hidden rounded-xl border border-Heres-border/50 bg-Heres-card/80 sm:min-h-[180px]">
                 <div className="relative h-full min-h-[180px] w-full">
                   <Image
                     src="/how-it-works-step3.png"
-                    alt="Heres Capsules dashboard – status, PER (TEE) execution, verification"
+                    alt="Heres Capsules dashboard ??status, PER (TEE) execution, verification"
                     fill
                     className="object-cover object-top"
                     sizes="(max-width: 768px) 100vw, 33vw"
@@ -602,24 +583,24 @@ export default function HomePage() {
                   />
                 </div>
               </div>
-              <Link href="/dashboard" className="mt-4 text-sm font-medium text-lucid-accent hover:underline">
-                View the dashboard →
+              <Link href="/dashboard" className="mt-4 text-sm font-medium text-Heres-accent hover:underline">
+                View the dashboard ??
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Heres on Solana Mobile – card left, copy right; storytelling title + APK CTA (distinct bg from How it works) */}
-      <section className="relative border-y border-lucid-border/30 bg-[#0d1220] py-20 sm:py-28">
+      {/* Heres on Solana Mobile ??card left, copy right; storytelling title + APK CTA (distinct bg from How it works) */}
+      <section className="relative border-y border-Heres-border/30 bg-[#0d1220] py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-            {/* Left: composite image only – no box-in-box, display as-is like reference */}
+            {/* Left: composite image only ??no box-in-box, display as-is like reference */}
             <div className="flex flex-col items-center justify-center order-2 lg:order-1">
-              <div className="relative w-full max-w-xl lg:max-w-2xl rounded-xl overflow-hidden border border-lucid-border/50">
+              <div className="relative w-full max-w-xl lg:max-w-2xl rounded-xl overflow-hidden border border-Heres-border/50">
                 <Image
                   src="/solana-mobile-hero.png"
-                  alt="Heres – web dashboard and mobile Create Capsule"
+                  alt="Heres ??web dashboard and mobile Create Capsule"
                   width={800}
                   height={600}
                   className="w-full h-auto"
@@ -630,23 +611,23 @@ export default function HomePage() {
             </div>
             {/* Right: copy + CTA */}
             <div className="order-1 lg:order-2">
-              <h2 className="text-3xl font-bold leading-tight text-lucid-white sm:text-4xl">
+              <h2 className="text-3xl font-bold leading-tight text-Heres-white sm:text-4xl">
                 Set it once. It runs forever.
               </h2>
-              <p className="mt-4 text-sm font-medium uppercase tracking-wider text-lucid-accent">
+              <p className="mt-4 text-sm font-medium uppercase tracking-wider text-Heres-accent">
                 Heres on Solana Mobile Seeker
               </p>
               <p className="mt-6 text-lg leading-relaxed text-slate-300">
                 Download the APK, tap a few times, and leave a will-like intent: who gets your assets and after how long of inactivity. Your capsule lives on Solana. Delete the app tomorrow. Execution still runs and distributes to your beneficiaries.
               </p>
-              <p className="mt-4 text-base leading-relaxed text-lucid-muted">
+              <p className="mt-4 text-base leading-relaxed text-Heres-muted">
                 The future is uncertain. Set your capsule while you hold the keys.
               </p>
               <Link
                 href="https://seeker.solanamobile.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-lucid-accent/20 border border-lucid-accent px-6 py-3 font-medium text-lucid-accent transition hover:bg-lucid-accent/30"
+                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-Heres-accent/20 border border-Heres-accent px-6 py-3 font-medium text-Heres-accent transition hover:bg-Heres-accent/30"
               >
                 Download APK
               </Link>
@@ -661,23 +642,23 @@ export default function HomePage() {
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
             <div data-gsap-unleash-text className="max-w-xl">
-              <h2 className="text-3xl font-bold leading-tight text-lucid-white sm:text-4xl lg:text-5xl">
+              <h2 className="text-3xl font-bold leading-tight text-Heres-white sm:text-4xl lg:text-5xl">
                 Unleash the Power of Heres
               </h2>
               <p className="mt-6 text-lg leading-relaxed text-slate-300">
                 Define your intent once: beneficiaries, amounts, inactivity period. Your capsule lives on Solana; Magicblock PER (TEE) monitors privately. When silence becomes truth, execution runs on Devnet. No third party, no bridges.
               </p>
-              <Link href="/create" className="mt-8 inline-block rounded-xl bg-gradient-to-r from-lucid-cyan to-lucid-purple px-8 py-4 font-semibold text-lucid-bg shadow-glow-cyan transition-opacity hover:opacity-90">
+              <Link href="/create" className="mt-8 inline-block rounded-xl bg-gradient-to-r from-Heres-cyan to-Heres-purple px-8 py-4 font-semibold text-Heres-bg shadow-glow-cyan transition-opacity hover:opacity-90">
                 Create Your Capsule
               </Link>
             </div>
             <div
               data-gsap-unleash-3d
-              className="relative aspect-video max-w-lg overflow-hidden rounded-2xl border border-lucid-border/50 bg-lucid-surface/80 shadow-xl"
+              className="relative aspect-video max-w-lg overflow-hidden rounded-2xl border border-Heres-border/50 bg-Heres-surface/80 shadow-xl"
             >
               <HeroCapsuleVideo
-                posterSrc="/lucid-capsule-hero.png"
-                alt="Heres capsule – privacy-preserving intent on Solana"
+                posterSrc="/Heres-capsule-hero.png"
+                alt="Heres capsule ??privacy-preserving intent on Solana"
                 className="absolute inset-0 h-full w-full"
               />
             </div>
@@ -685,25 +666,25 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Partners – The Possibilities Are Limitless + orbit + partner logos grid */}
-      <section ref={partnersSectionRef} className="partners-section relative border-y border-lucid-border/30 bg-lucid-surface/30 py-20 sm:py-28">
+      {/* Partners ??The Possibilities Are Limitless + orbit + partner logos grid */}
+      <section ref={partnersSectionRef} className="partners-section relative border-y border-Heres-border/30 bg-Heres-surface/30 py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center text-3xl font-bold text-lucid-white sm:text-4xl">
+          <h2 className="text-center text-3xl font-bold text-Heres-white sm:text-4xl">
             The Possibilities Are Limitless, All On Solana
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-center text-lucid-muted">
+          <p className="mx-auto mt-4 max-w-2xl text-center text-Heres-muted">
             Heres uses Solana for persistence, Magicblock PER (TEE) for private execution, Helius for RPC, Phantom and Backpack for wallets, and Solana Mobile Seeker for the APK.
           </p>
         </div>
         <div className="partners-content relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="partners-orbit relative flex min-h-[420px] sm:min-h-[520px] items-center justify-center overflow-hidden">
-            {/* Faint orbit paths – elliptical: wider left-right, shorter top-bottom */}
+            {/* Faint orbit paths ??elliptical: wider left-right, shorter top-bottom */}
             <div className="partners-orbit-rings absolute inset-0 flex items-center justify-center" aria-hidden>
               <div className="absolute h-[320px] w-[480px] rounded-full border border-white/[0.06]" />
               <div className="absolute h-[440px] w-[660px] rounded-full border border-white/[0.06]" />
               <div className="absolute h-[560px] w-[840px] rounded-full border border-white/[0.06]" />
             </div>
-            {/* Orbiting logos – elliptical path (radiusX > radiusY) + spin animation */}
+            {/* Orbiting logos ??elliptical path (radiusX > radiusY) + spin animation */}
             {[
               { radiusX: 240, radiusY: 160, count: 4, duration: 22, reverse: false },
               { radiusX: 330, radiusY: 220, count: 8, duration: 28, reverse: true },
@@ -738,7 +719,7 @@ export default function HomePage() {
                         href={p.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="partners-orbit-item absolute left-0 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-xl border bg-lucid-surface/80 backdrop-blur-sm transition-all hover:scale-110 hover:border-lucid-accent/50 hover:bg-lucid-card"
+                        className="partners-orbit-item absolute left-0 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-xl border bg-Heres-surface/80 backdrop-blur-sm transition-all hover:scale-110 hover:border-Heres-accent/50 hover:bg-Heres-card"
                         style={{
                           transform: `translate(${x}px, ${y}px) rotate(${-angleDeg}deg)`,
                           borderColor: `${p.color}50`,
@@ -758,7 +739,7 @@ export default function HomePage() {
                 })()}
               </div>
             ))}
-            {/* Central content – higher contrast font */}
+            {/* Central content ??higher contrast font */}
             <div className="relative z-10 max-w-lg text-center">
               <h2 className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
                 5+

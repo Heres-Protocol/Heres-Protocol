@@ -13,10 +13,10 @@ type CapsuleMediaBlockProps = {
 }
 
 export function CapsuleMediaBlock({
-  posterSrc = '/lucid-capsule-hero.png',
+  posterSrc = '/Heres-capsule-hero.png',
   videoMp4,
   videoWebm,
-  alt = 'Lucid capsule',
+  alt = 'Heres capsule',
   className = '',
   objectFit = 'cover',
   withMotion = true,

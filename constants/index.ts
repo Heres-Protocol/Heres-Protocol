@@ -4,10 +4,10 @@
 
 // Solana Configuration
 export const SOLANA_CONFIG = {
-  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms',
+  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM',
   NETWORK: process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet',
   HELIUS_API_KEY: process.env.NEXT_PUBLIC_HELIUS_API_KEY || '',
-  /** Platform wallet for creation/execution fees (수수료 수령 지갑) */
+  /** Platform wallet for creation/execution fees (?섏닔猷??섎졊 吏媛? */
   PLATFORM_FEE_RECIPIENT: process.env.NEXT_PUBLIC_PLATFORM_FEE_RECIPIENT || 'Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb',
 } as const
 
@@ -16,7 +16,7 @@ export const HELIUS_CONFIG = {
   // Devnet Enhanced Transactions API
   BASE_URL: 'https://api-devnet.helius-rpc.com/v0',
   // Devnet RPC endpoint
-  RPC_URL: SOLANA_CONFIG.HELIUS_API_KEY 
+  RPC_URL: SOLANA_CONFIG.HELIUS_API_KEY
     ? `https://devnet.helius-rpc.com/?api-key=${SOLANA_CONFIG.HELIUS_API_KEY}`
     : 'https://api.devnet.solana.com',
   // Alternative RPC endpoints for fallback
@@ -29,12 +29,12 @@ export const DEFAULT_VALUES = {
   DELAY_DAYS: '30',
 } as const
 
-/** Platform fee: creation = 0.05 SOL, execution = 3% of transferred amount (init_fee_config 시 사용) */
+/** Platform fee: creation = 0.05 SOL, execution = 3% of transferred amount (init_fee_config ???ъ슜) */
 export const PLATFORM_FEE = {
-  /** 캡슐 생성 수수료: 0.05 SOL (lamports) */
+  /** 罹≪뒓 ?앹꽦 ?섏닔猷? 0.05 SOL (lamports) */
   CREATION_FEE_SOL: 0.05,
   CREATION_FEE_LAMPORTS: 50_000_000, // 0.05 * 1e9
-  /** 실행 수수료: 3% (basis points, 10000 = 100%) */
+  /** ?ㅽ뻾 ?섏닔猷? 3% (basis points, 10000 = 100%) */
   EXECUTION_FEE_BPS: 300, // 3%
 } as const
 

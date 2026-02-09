@@ -1,5 +1,5 @@
 /**
- * Type definitions for Lucid project
+ * Type definitions for Heres project
  */
 
 import { PublicKey } from '@solana/web3.js'
