@@ -471,7 +471,8 @@ export async function scheduleExecuteIntentViaTee(
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
 
-  const connection = getTeeConnection(teeAuthToken)
+  // Use regular devnet ER endpoint instead of TEE for scheduling
+  const connection = new Connection('https://devnet.magicblock.app', 'confirmed')
   const walletAdapter = {
     publicKey: wallet.publicKey,
     signTransaction: wallet.signTransaction,
