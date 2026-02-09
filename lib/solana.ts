@@ -15,8 +15,8 @@ import {
   getDelegationRecordPDA,
   getDelegationMetadataPDA,
 } from './program'
-import { SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
-import { MAGICBLOCK_ER } from '@/constants'
+import { SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, PER_TEE } from '@/constants'
+import { TEE_AUTH } from './tee'
 import type { IntentCapsule } from '@/types'
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
@@ -297,6 +297,18 @@ export async function delegateCapsule(
   if (!wallet.publicKey) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey)
+
+  // Get TEE auth token if delegating to TEE
+  let teeToken: string | undefined
+  if (!validatorPubkey || validatorPubkey.equals(new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))) {
+    try {
+      console.log('Fetching TEE auth token for delegation...')
+      teeToken = await TEE_AUTH.getAuthToken(wallet)
+      console.log('TEE auth token obtained successfully')
+    } catch (error) {
+      console.warn('Failed to obtain TEE auth token. Basic delegation will proceed without PER features.', error)
+    }
+  }
 
   // Verify capsule account exists and is owned by our program
   const connection = getSolanaConnection()

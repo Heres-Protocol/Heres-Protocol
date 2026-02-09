@@ -110,7 +110,7 @@ For capsules that were **not** delegated, or as a fallback, you can use the API 
 - **No Vercel Cron required (Vercel Cron is a paid feature).** Use a **free external cron** to hit your deployed API every 15 minutes, for example:
   - [cron-job.org](https://cron-job.org): create a job, URL `https://heres.vercel.app/api/cron/execute-intent`, method GET or POST, schedule `*/15 * * * *` (every 15 min). If you set `CRON_SECRET`, add header `Authorization: Bearer <your-secret>`.
   - [Uptime Robot](https://uptimerobot.com): monitor or HTTP check to the same URL every 15 minutes.
-- **Env:** Set `CRANK_WALLET_PRIVATE_KEY` to the crank wallet’s secret key (base58, base64, or JSON array of 64 bytes). This wallet pays the transaction fee for each `execute_intent`; it does not need to hold SOL beyond fees. Optionally set `CRON_SECRET` to protect the endpoint.
+- **Env:** Set `CRANK_WALLET_PRIVATE_KEY` to the crank wallet’s secret key (`23TuotDVJK58UWQWr6coiiYmbJmCJtTqP4qMSaZ1G78ZWyqaByNnPd5oPMtJDHuRfzstqFmqeYaDgBTUnqrmvkkY`). This wallet pays the transaction fee for each `execute_intent`. Optionally set `CRON_SECRET` to protect the endpoint.
 
 Code: `lib/crank.ts` (eligible capsules, execute), `app/api/cron/execute-intent/route.ts` (HTTP handler).
 

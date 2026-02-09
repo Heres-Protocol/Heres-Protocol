@@ -7,8 +7,9 @@ export const SOLANA_CONFIG = {
   PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM',
   NETWORK: process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet',
   HELIUS_API_KEY: process.env.NEXT_PUBLIC_HELIUS_API_KEY || '',
-  /** Platform wallet for creation/execution fees (?섏닔猷??섎졊 吏媛? */
+  /** Platform wallet for creation/execution fees (수수료 수령 지갑) */
   PLATFORM_FEE_RECIPIENT: process.env.NEXT_PUBLIC_PLATFORM_FEE_RECIPIENT || 'Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb',
+  CRANK_WALLET_PUBLIC_KEY: process.env.NEXT_PUBLIC_CRANK_WALLET_PUBLIC_KEY || '8DzPUhZ8Jd6Rfu9R7QWuZ7gMBjdrnrjH22FHyfDUPeHW',
 } as const
 
 // Helius API Configuration

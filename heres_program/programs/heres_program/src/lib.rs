@@ -82,7 +82,9 @@ pub mod heres_program {
         let fee_config = &ctx.accounts.fee_config;
         if fee_config.creation_fee_lamports > 0 {
             let platform_recipient = ctx.accounts.platform_fee_recipient.as_mut().ok_or(ErrorCode::InvalidFeeConfig)?;
+            // Ensure the recipient matches the one provided in the config
             require!(platform_recipient.key() == fee_config.fee_recipient, ErrorCode::InvalidFeeConfig);
+            
             let cpi_accounts = system_program::Transfer {
                 from: ctx.accounts.owner.to_account_info(),
                 to: platform_recipient.clone(),
@@ -90,7 +92,7 @@ pub mod heres_program {
             let cpi_program = ctx.accounts.system_program.to_account_info();
             let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
             system_program::transfer(cpi_ctx, fee_config.creation_fee_lamports)?;
-            msg!("Creation fee {} lamports sent to platform", fee_config.creation_fee_lamports);
+            msg!("Creation fee {} lamports sent to platform recipient: {:?}", fee_config.creation_fee_lamports, platform_recipient.key());
         }
 
         let capsule = &mut ctx.accounts.capsule;

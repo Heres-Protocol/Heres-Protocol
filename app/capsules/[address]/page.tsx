@@ -13,7 +13,8 @@ import {
   scheduleExecuteIntent,
 } from '@/lib/solana'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
-import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
+import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE, PLATFORM_FEE } from '@/constants'
+import { TEE_AUTH } from '@/lib/tee'
 import { decodeIntentData, secondsToDays } from '@/utils/intent'
 import {
   XAxis,
@@ -117,6 +118,8 @@ export default function CapsuleDetailPage() {
   const [executePending, setExecutePending] = useState(false)
   const [executeTx, setExecuteTx] = useState<string | null>(null)
   const [executeError, setExecuteError] = useState<string | null>(null)
+  const [teeAuthToken, setTeeAuthToken] = useState<string | null>(null)
+  const [isTeeAuthenticated, setIsTeeAuthenticated] = useState(false)
 
   const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
 
@@ -132,6 +135,8 @@ export default function CapsuleDetailPage() {
     setDelegateTx(null)
     setScheduleTx(null)
     setScheduleError(null)
+    setIsTeeAuthenticated(false)
+    setTeeAuthToken(null)
 
     try {
       // ===== STEP 1: Delegate capsule to PER (TEE) validator =====
@@ -139,6 +144,17 @@ export default function CapsuleDetailPage() {
       // to the MagicBlock Ephemeral Rollup (ER) delegation program
       if (!isAlreadyDelegated) {
         console.log('[STEP 1] Delegating capsule to PER (TEE) validator...')
+
+        // Get TEE auth token first if it's a TEE validator
+        try {
+          const token = await TEE_AUTH.getAuthToken(wallet)
+          setTeeAuthToken(token)
+          setIsTeeAuthenticated(true)
+          console.log('[STEP 1] TEE Authentication successful')
+        } catch (authError) {
+          console.warn('[STEP 1] TEE Authentication failed, proceeding with basic delegation', authError)
+        }
+
         const tx = await delegateCapsule(wallet, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
         setDelegateTx(tx)
         console.log('[STEP 1] ✓ Delegation successful. Tx:', tx)
@@ -583,6 +599,11 @@ export default function CapsuleDetailPage() {
                   </a>
                   <CopyButton value={PER_TEE.RPC_URL} />
                 </div>
+                {isTeeAuthenticated && (
+                  <p className="text-[10px] text-Heres-accent mt-1 flex items-center gap-1">
+                    <Shield className="h-2 w-2" /> Authenticated
+                  </p>
+                )}
                 <p className="text-[10px] text-Heres-muted mt-1">RPC is API-only; link opens TEE docs</p>
               </div>
             </div>

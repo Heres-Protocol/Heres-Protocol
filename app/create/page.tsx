@@ -991,20 +991,30 @@ export default function CreatePage() {
                       <Eye className="w-5 h-5" />
                       Simulate Execution
                     </button>
-                    <button
-                      onClick={handleCreate}
-                      disabled={
-                        isPending ||
-                        !intent ||
-                        !inactivityDays ||
-                        parseInt(inactivityDays) <= 0 ||
-                        (capsuleType === 'token' && (beneficiaries.length === 0 || beneficiaries.some((b) => !b.address || !b.amount))) ||
-                        (capsuleType === 'nft' && (selectedNftMints.length === 0 || !nftRecipients.some((r) => r.address.trim()) || nftRecipients.every((r) => !r.address.trim())))
-                      }
-                      className="btn-primary flex-1 py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isPending ? 'Creating...' : 'Create Capsule'}
-                    </button>
+                    <div className="flex-1 flex flex-col gap-3">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-sm text-Heres-muted">Creation Fee</span>
+                        <span className="text-sm font-semibold text-Heres-accent">{PLATFORM_FEE.CREATION_FEE_SOL} SOL</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCreate}
+                        disabled={
+                          isPending ||
+                          existingCapsule ||
+                          !connected ||
+                          !publicKey ||
+                          !intent.trim() ||
+                          !inactivityDays ||
+                          parseInt(inactivityDays) <= 0 ||
+                          (capsuleType === 'token' && (beneficiaries.length === 0 || beneficiaries.some((b) => !b.address || !b.amount))) ||
+                          (capsuleType === 'nft' && (selectedNftMints.length === 0 || !nftRecipients.some((r) => r.address.trim()) || nftRecipients.every((r) => !r.address.trim())))
+                        }
+                        className="btn-primary w-full py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isPending ? 'Creating...' : 'Create Capsule'}
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
