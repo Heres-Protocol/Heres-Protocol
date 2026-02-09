@@ -672,6 +672,8 @@ pub struct ScheduleExecuteIntent<'info> {
     pub fee_config: AccountInfo<'info>,
     /// CHECK: Platform fee recipient (optional; validated in execute_intent).
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
+    /// CHECK: Optional mint for SPL tokens
+    pub mint: Option<AccountInfo<'info>>,
     /// CHECK: Vault ATA (optional; validated in execute_intent).
     pub vault_token_account: Option<AccountInfo<'info>>,
     /// MagicBlock Permission Program
@@ -772,9 +774,21 @@ pub struct CreateCapsule<'info> {
     pub system_program: Program<'info, System>,
     
     pub token_program: Program<'info, Token>,
-    
+
+    pub mint: Option<Account<'info, Mint>>,
+
     #[account(mut)]
+    pub source_token_account: Option<Account<'info, TokenAccount>>,
+    
+    #[account(
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = mint,
+        associated_token::authority = vault,
+    )]
     pub vault_token_account: Option<Account<'info, TokenAccount>>,
+    
+    pub associated_token_program: Program<'info, AssociatedToken>,
 
     /// MagicBlock Permission Program
     /// CHECK: Validated by address
@@ -831,6 +845,8 @@ pub struct ExecuteIntent<'info> {
     /// CHECK: validated against fee_config.fee_recipient in instruction
     #[account(mut)]
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
+
+    pub mint: Option<Account<'info, Mint>>,
 
     #[account(mut)]
     pub vault_token_account: Option<Account<'info, TokenAccount>>,

@@ -113,23 +113,26 @@ export async function createCapsule(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
+      const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
+      const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
+
       const accounts: any = {
         capsule: capsulePDA,
         vault: vaultPDA,
         owner: wallet.publicKey!,
         feeConfig: feeConfigPDA,
+        platformFeeRecipient: platformFeeRecipient || null,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
+        mint: mint || null,
+        sourceTokenAccount: mint ? getAssociatedTokenAddress(mint, wallet.publicKey!) : null,
+        vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
+        associatedTokenProgram: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
         permissionProgram: permissionProgramId,
         permission: permissionPDA,
-        platformFeeRecipient: platformFeeRecipient || undefined,
       }
 
-      if (mint) {
-        accounts.mint = mint
-        accounts.sourceTokenAccount = getAssociatedTokenAddress(mint, wallet.publicKey!)
-        accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
-      }
+      console.log('[createCapsule] Accounts:', Object.keys(accounts).map(k => `${k}: ${accounts[k]?.toString()}`))
 
       const tx = await program.methods
         .createCapsule(new BN(inactivityPeriodSeconds), intentDataBuffer)
@@ -223,21 +226,21 @@ export async function executeIntent(
     ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
     : null
 
-  const accounts: {
-    capsule: PublicKey
-    vault: PublicKey
-    systemProgram: PublicKey
-    tokenProgram: PublicKey
-    feeConfig: PublicKey
-    platformFeeRecipient?: PublicKey
-  } = {
+  const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
+  const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
+
+  const accounts: any = {
     capsule: capsulePDA,
     vault: vaultPDA,
     systemProgram: SystemProgram.programId,
     tokenProgram: TOKEN_PROGRAM_ID,
     feeConfig: feeConfigPDA,
+    platformFeeRecipient: platformFeeRecipient || null,
+    mint: mint || null,
+    vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
+    permissionProgram: permissionProgramId,
+    permission: permissionPDA,
   }
-  if (platformFeeRecipient) accounts.platformFeeRecipient = platformFeeRecipient
 
   const remainingAccounts = beneficiaries?.map(b => {
     const beneficiaryOwner = new PublicKey(b.address)
@@ -256,19 +259,9 @@ export async function executeIntent(
     }
   }) || []
 
-  // Add vaultTokenAccount if SPL
-  let vaultTokenAccount = null
-  if (mint && !mint.equals(PublicKey.default)) {
-    vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
-  }
-
   const tx = await program.methods
     .executeIntent()
-    .accounts({
-      ...accounts,
-      // @ts-ignore
-      vaultTokenAccount: vaultTokenAccount,
-    })
+    .accounts(accounts)
     .remainingAccounts(remainingAccounts)
     .rpc()
 
@@ -420,21 +413,14 @@ export async function scheduleExecuteIntent(
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
     vault: vaultPDA,
-    owner: wallet.publicKey as PublicKey,
     systemProgram: SystemProgram.programId,
-    feeConfig: feeConfigPDA,
-    platformFeeRecipient,
     tokenProgram: TOKEN_PROGRAM_ID,
+    feeConfig: feeConfigPDA,
+    platformFeeRecipient: platformFeeRecipient || null,
+    mint: mint || null,
+    vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
     permissionProgram: permissionProgramId,
     permission: permissionPDA,
-    mint: null,
-    sourceTokenAccount: null,
-    vaultTokenAccount: null,
-  }
-
-  if (mint) {
-    accounts.mint = mint
-    accounts.vaultTokenAccount = getAssociatedTokenAddress(mint, vaultPDA)
   }
 
   // Default values for optional args
