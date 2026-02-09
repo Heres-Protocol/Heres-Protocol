@@ -454,13 +454,12 @@ export async function scheduleExecuteIntent(
 }
 
 /**
- * Schedule crank on TEE/PER so execute_intent runs automatically at intervals (MagicBlock Crank).
+ * Schedule crank on devnet ER so execute_intent runs automatically at intervals (MagicBlock Crank).
  * Call this after delegate_capsule so execution happens on-chain without anyone visiting.
  * See: https://docs.magicblock.app/pages/tools/crank/introduction
  */
-export async function scheduleExecuteIntentViaTee(
+export async function scheduleExecuteIntent(
   wallet: WalletContextState,
-  teeAuthToken: string,
   args?: {
     taskId?: BN
     executionIntervalMillis?: BN
