@@ -76,9 +76,12 @@ export function getProgram(wallet: WalletContextState): Program | null {
   programIdl.address = programId.toBase58()
 
   console.log('[getProgram] Creating Program instance:')
-  console.log(' - Program ID:', programIdl.address)
+  console.log(' - Expected ID:', programId.toBase58())
 
-  return new Program(programIdl as any, provider)
+  // Robust initialization: pass programId as 3rd arg to ensure it's not mismatched from IDL
+  const program = new Program(programIdl as any, provider)
+  console.log(' - Actual Program ID from Anchor:', program.programId.toBase58())
+  return program
 }
 
 /**
@@ -107,10 +110,12 @@ export function getTeeProgram(wallet: WalletContextState, token?: string): Progr
   teeIdl.address = programId.toBase58()
 
   console.log('[getTeeProgram] Creating TEE Program instance:')
-  console.log(' - Program ID:', teeIdl.address)
+  console.log(' - Expected ID:', programId.toBase58())
   console.log(' - RPC URL:', url)
 
-  return new Program(teeIdl as any, provider)
+  const program = new Program(teeIdl as any, provider)
+  console.log(' - Actual TEE Program ID from Anchor:', program.programId.toBase58())
+  return program
 }
 
 /**
@@ -466,17 +471,24 @@ export async function scheduleExecuteIntent(
     permission: permissionPDA.toBase58(),
   })
 
-  const tx = await teeProgram.methods
-    .scheduleExecuteIntent({
-      taskId,
-      executionIntervalMillis,
-      iterations,
-    })
-    // @ts-ignore
-    .accounts(accounts)
-    .rpc();
+  try {
+    const tx = await teeProgram.methods
+      .scheduleExecuteIntent({
+        taskId,
+        executionIntervalMillis,
+        iterations,
+      })
+      // @ts-ignore
+      .accounts(accounts)
+      .rpc();
 
-  return tx
+    return tx
+  } catch (err: any) {
+    console.error('[scheduleExecuteIntent] ✗ Rpc Error:', err);
+    if (err.stack) console.error('[scheduleExecuteIntent] ✗ Stack:', err.stack);
+    if (err.logs) console.error('[scheduleExecuteIntent] ✗ Logs:', err.logs);
+    throw err;
+  }
 }
 
 /**
