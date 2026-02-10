@@ -70,17 +70,19 @@ export function getProgram(wallet: WalletContextState): Program | null {
   const provider = getProvider(wallet)
   if (!provider) return null
 
-  const programId = getProgramId()
+  // FORCE use the hardcoded program ID from our program's declare_id!
+  // This prevents issues if environment variables on Vercel are set to old/wrong IDs
+  const programId = new PublicKey('CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM')
+
   // Ensure we have a fresh, mutable IDL object
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
 
   console.log('[getProgram] Creating Program instance:')
-  console.log(' - Expected ID:', programId.toBase58())
+  console.log(' - Program ID (Forced):', programId.toBase58())
+  console.log(' - Env Context:', SOLANA_CONFIG.NETWORK)
 
-  // Robust initialization: pass programId as 3rd arg to ensure it's not mismatched from IDL
   const program = new Program(programIdl as any, provider)
-  console.log(' - Actual Program ID from Anchor:', program.programId.toBase58())
   return program
 }
 
@@ -104,17 +106,18 @@ export function getTeeProgram(wallet: WalletContextState, token?: string): Progr
     commitment: 'confirmed',
   })
 
-  const programId = getProgramId()
+  // FORCE use the hardcoded program ID from our program's declare_id!
+  const programId = new PublicKey('CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM')
+
   // Ensure we have a fresh, mutable IDL object
   const teeIdl = JSON.parse(JSON.stringify(idl))
   teeIdl.address = programId.toBase58()
 
   console.log('[getTeeProgram] Creating TEE Program instance:')
-  console.log(' - Expected ID:', programId.toBase58())
+  console.log(' - Program ID (Forced):', programId.toBase58())
   console.log(' - RPC URL:', url)
 
   const program = new Program(teeIdl as any, provider)
-  console.log(' - Actual TEE Program ID from Anchor:', program.programId.toBase58())
   return program
 }
 
