@@ -71,6 +71,7 @@ export function getProgram(wallet: WalletContextState): Program | null {
   if (!provider) return null
 
   const programId = getProgramId()
+  // Explicitly set program ID in IDL and pass as 3rd arg for maximum compatibility
   const programIdl = { ...idl, address: programId.toString() }
   console.log('[getProgram] Using Program ID:', programId.toString())
   return new Program(programIdl as any, provider)
@@ -97,6 +98,7 @@ export function getTeeProgram(wallet: WalletContextState, token?: string): Progr
   })
 
   const programId = getProgramId()
+  // Explicitly set program ID in IDL and pass as 3rd arg for maximum compatibility
   const teeIdl = { ...idl, address: programId.toString() }
   console.log('[getTeeProgram] Using Program ID on TEE:', programId.toString())
   return new Program(teeIdl as any, provider)
@@ -412,19 +414,15 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
  */
 export async function scheduleExecuteIntent(
   wallet: WalletContextState,
+  ownerPublicKey: PublicKey,
   args?: { taskId?: BN; executionIntervalMillis?: BN; iterations?: BN },
-  mint?: PublicKey,
   token?: string
 ): Promise<string> {
-  const program = getProgram(wallet)
-  if (!program) throw new Error('Wallet not connected')
+  const connection = getSolanaConnection()
+  if (!wallet.publicKey) throw new Error('Wallet not connected')
 
-  const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
-  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
-  const [feeConfigPDA] = getFeeConfigPDA()
-  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
-    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
-    : (wallet.publicKey as PublicKey)
+  const [capsulePDA] = getCapsulePDA(ownerPublicKey)
+  const [vaultPDA] = getCapsuleVaultPDA(ownerPublicKey)
 
   const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
   const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
@@ -445,10 +443,19 @@ export async function scheduleExecuteIntent(
   const iterations = args?.iterations ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_ITERATIONS || 0);
 
   // IMPORTANT: For crank scheduling, we MUST use the TEE program instance
-  // because the capsule has been delegated to the Ephemeral Rollup (ER).
-  // Standard Devnet RPC will not find the delegated accounts.
   const teeProgram = getTeeProgram(wallet, token);
   if (!teeProgram) throw new Error('Failed to initialize TEE program');
+
+  console.log('[scheduleExecuteIntent] Scheduling on TEE RPC for capsule:', capsulePDA.toBase58())
+  console.log('[scheduleExecuteIntent] Program ID:', teeProgram.programId.toBase58())
+  console.log('[scheduleExecuteIntent] Accounts:', {
+    payer: wallet.publicKey.toBase58(),
+    capsule: capsulePDA.toBase58(),
+    vault: vaultPDA.toBase58(),
+    magicProgram: magicProgram.toBase58(),
+    permissionProgram: permissionProgramId.toBase58(),
+    permission: permissionPDA.toBase58(),
+  })
 
   const tx = await teeProgram.methods
     .scheduleExecuteIntent({

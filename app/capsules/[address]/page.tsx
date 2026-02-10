@@ -182,10 +182,10 @@ export default function CapsuleDetailPage() {
       // Retry logic for crank scheduling (ER may need time to sync)
       try {
         console.log('[STEP 2] Scheduling crank on devnet ER using TEE RPC...')
-        // PASS the fetched token here to resolve "Missing token query param"
+        // PASS the owner and token here
         const scheduleSig = await scheduleExecuteIntent(
           wallet,
-          undefined,
+          capsule.owner,
           undefined,
           currentToken || undefined
         );
