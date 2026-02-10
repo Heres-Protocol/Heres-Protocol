@@ -71,9 +71,13 @@ export function getProgram(wallet: WalletContextState): Program | null {
   if (!provider) return null
 
   const programId = getProgramId()
-  // Explicitly set program ID in IDL and pass as 3rd arg for maximum compatibility
-  const programIdl = { ...idl, address: programId.toString() }
-  console.log('[getProgram] Using Program ID:', programId.toString())
+  // Ensure we have a fresh, mutable IDL object
+  const programIdl = JSON.parse(JSON.stringify(idl))
+  programIdl.address = programId.toBase58()
+
+  console.log('[getProgram] Creating Program instance:')
+  console.log(' - Program ID:', programIdl.address)
+
   return new Program(programIdl as any, provider)
 }
 
@@ -98,9 +102,14 @@ export function getTeeProgram(wallet: WalletContextState, token?: string): Progr
   })
 
   const programId = getProgramId()
-  // Explicitly set program ID in IDL and pass as 3rd arg for maximum compatibility
-  const teeIdl = { ...idl, address: programId.toString() }
-  console.log('[getTeeProgram] Using Program ID on TEE:', programId.toString())
+  // Ensure we have a fresh, mutable IDL object
+  const teeIdl = JSON.parse(JSON.stringify(idl))
+  teeIdl.address = programId.toBase58()
+
+  console.log('[getTeeProgram] Creating TEE Program instance:')
+  console.log(' - Program ID:', teeIdl.address)
+  console.log(' - RPC URL:', url)
+
   return new Program(teeIdl as any, provider)
 }
 
@@ -418,7 +427,6 @@ export async function scheduleExecuteIntent(
   args?: { taskId?: BN; executionIntervalMillis?: BN; iterations?: BN },
   token?: string
 ): Promise<string> {
-  const connection = getSolanaConnection()
   if (!wallet.publicKey) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(ownerPublicKey)
@@ -428,12 +436,13 @@ export async function scheduleExecuteIntent(
   const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
   const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
+  // Use snake_case keys to match IDL exactly
   const accounts: any = {
+    magic_program: magicProgram,
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
     vault: vaultPDA,
-    magicProgram,
-    permissionProgram: permissionProgramId,
+    permission_program: permissionProgramId,
     permission: permissionPDA,
   }
 
