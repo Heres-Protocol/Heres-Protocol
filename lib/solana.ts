@@ -70,9 +70,10 @@ export function getProgram(wallet: WalletContextState): Program | null {
   const provider = getProvider(wallet)
   if (!provider) return null
 
-  // Anchor 0.30.0+: Program constructor only needs idl and provider
-  // The programId is included in the IDL's address field
-  return new Program(idl as any, provider)
+  const programId = getProgramId()
+  const programIdl = { ...idl, address: programId.toString() }
+  console.log('[getProgram] Using Program ID:', programId.toString())
+  return new Program(programIdl as any, provider)
 }
 
 /**
@@ -95,7 +96,10 @@ export function getTeeProgram(wallet: WalletContextState, token?: string): Progr
     commitment: 'confirmed',
   })
 
-  return new Program(idl as any, provider)
+  const programId = getProgramId()
+  const teeIdl = { ...idl, address: programId.toString() }
+  console.log('[getTeeProgram] Using Program ID on TEE:', programId.toString())
+  return new Program(teeIdl as any, provider)
 }
 
 /**
