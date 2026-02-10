@@ -66,7 +66,7 @@ export function Footer() {
         {/* Bottom section: copyright | powered by (no Privacy / Terms) */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-Heres-muted">
-            짤 {new Date().getFullYear()} Heres. All rights reserved.
+            © {new Date().getFullYear()} Heres. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <a
