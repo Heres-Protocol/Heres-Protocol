@@ -15,6 +15,7 @@ use ephemeral_rollups_sdk::access_control::{
 };
 use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
+use anchor_spl::associated_token::AssociatedToken;
 #[cfg(feature = "oracle")]
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
@@ -191,9 +192,10 @@ pub mod heres_program {
     }
 
     /// Execute the intent when inactivity period is met. Anyone can call (no owner signature required).
-    /// SOL is transferred from the capsule vault to platform (fee) and beneficiaries.
-    pub fn execute_intent<'info>(
-        ctx: Context<'_, '_, '_, 'info, ExecuteIntent<'info>>,
+    /// This instruction is optimized for ER/TEE: it only updates the capsule state.
+    /// Actual distribution happens on the base layer via distribute_assets.
+    pub fn execute_intent(
+        ctx: Context<ExecuteIntent>,
     ) -> Result<()> {
         let capsule = &mut ctx.accounts.capsule;
         require!(capsule.is_active, ErrorCode::CapsuleInactive);
@@ -205,6 +207,27 @@ pub mod heres_program {
             time_since_activity >= capsule.inactivity_period,
             ErrorCode::InactivityPeriodNotMet
         );
+        
+        capsule.is_active = false;
+        capsule.executed_at = Some(current_time);
+        
+        msg!("Intent executed (state updated) for capsule: {:?}", capsule.key());
+        emit!(IntentExecuted {
+            capsule: capsule.key(),
+            owner: capsule.owner,
+            executed_at: current_time,
+        });
+        
+        Ok(())
+    }
+
+    /// Distribute assets from the vault to beneficiaries. Call on base layer after execute_intent.
+    pub fn distribute_assets<'info>(
+        ctx: Context<'_, '_, '_, 'info, DistributeAssets<'info>>,
+    ) -> Result<()> {
+        let capsule = &ctx.accounts.capsule;
+        require!(!capsule.is_active, ErrorCode::CapsuleActive);
+        require!(capsule.executed_at.is_some(), ErrorCode::CapsuleNotExecuted);
         
         // Parse intent data
         let intent_data_str = String::from_utf8(capsule.intent_data.clone())
@@ -232,10 +255,9 @@ pub mod heres_program {
         ];
         let signer_seeds = &[vault_seeds];
         
-        // Platform execution fee (from vault)
+        // Platform execution fee
         let fee_config = &ctx.accounts.fee_config;
         let mut remaining_for_beneficiaries = total_amount_lamports;
-        
         let is_spl = capsule.mint != Pubkey::default();
 
         if fee_config.execution_fee_bps > 0 {
@@ -252,14 +274,13 @@ pub mod heres_program {
                      let vault_ata = ctx.accounts.vault_token_account.as_ref().ok_or(ErrorCode::InvalidTokenAccount)?;
                      let cpi_accounts = Transfer {
                         from: vault_ata.to_account_info(),
-                        to: platform_recipient.to_account_info(), // For SPL this should be an ATA
+                        to: platform_recipient.to_account_info(),
                         authority: ctx.accounts.vault.to_account_info(),
                      };
                      let cpi_program = ctx.accounts.token_program.to_account_info();
                      let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
                      token::transfer(cpi_ctx, execution_fee)?;
                 } else {
-                    // Direct lamport transfer for PDA vault
                     **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= execution_fee;
                     **platform_recipient.to_account_info().try_borrow_mut_lamports()? += execution_fee;
                 }
@@ -268,7 +289,7 @@ pub mod heres_program {
             }
         }
         
-        // Distribute from vault to each beneficiary
+        // Distribute to beneficiaries
         let total_for_ratio = total_amount_lamports;
         let mut distributed: u64 = 0;
         let beneficiary_count = beneficiaries.len();
@@ -298,7 +319,6 @@ pub mod heres_program {
                     .map_err(|_| ErrorCode::InvalidIntentData)?
             };
             
-            // Proportional amount logic
             let to_send = if total_for_ratio == 0 {
                 0u64
             } else if idx == beneficiary_count.saturating_sub(1) {
@@ -312,10 +332,9 @@ pub mod heres_program {
             distributed = distributed.saturating_add(to_send);
             
             if to_send > 0 {
-                // For SPL, we expect the remaining accounts to contain the Beneficiary ATAs
                 let beneficiary_account = ctx.remaining_accounts
                     .iter()
-                    .find(|acc| acc.key() == beneficiary_pubkey) // This finds the account passed in remaining_accounts
+                    .find(|acc| acc.key() == beneficiary_pubkey)
                     .ok_or(ErrorCode::InvalidBeneficiaryAddress)?;
                 
                 if is_spl {
@@ -328,25 +347,13 @@ pub mod heres_program {
                      let cpi_program = ctx.accounts.token_program.to_account_info();
                      let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
                      token::transfer(cpi_ctx, to_send)?;
-
                 } else {
-                    // Direct lamport transfer for PDA vault
                     **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= to_send;
                     **beneficiary_account.to_account_info().try_borrow_mut_lamports()? += to_send;
                 }
                 msg!("Transferred {} to beneficiary: {}", to_send, beneficiary_pubkey);
             }
         }
-        
-        capsule.is_active = false;
-        capsule.executed_at = Some(current_time);
-        
-        msg!("Intent executed for capsule: {:?}", capsule.key());
-        emit!(IntentExecuted {
-            capsule: capsule.key(),
-            owner: capsule.owner,
-            executed_at: current_time,
-        });
         
         Ok(())
     }
@@ -441,50 +448,12 @@ pub mod heres_program {
         ctx: Context<ScheduleExecuteIntent>,
         args: ScheduleExecuteIntentArgs,
     ) -> Result<()> {
-        let mut accounts = vec![
+        let accounts = vec![
                 AccountMeta::new(ctx.accounts.capsule.key(), false),
-                AccountMeta::new(ctx.accounts.vault.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.fee_config.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.vault.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.permission.key(), false),
             ];
-
-        // 6. platform_fee_recipient (Option)
-        if ctx.accounts.vault_token_account.is_some() {
-             if let Some(recipient) = &ctx.accounts.platform_fee_recipient {
-                 accounts.push(AccountMeta::new(recipient.key(), false));
-             } else {
-                 accounts.push(AccountMeta::new(ctx.accounts.payer.key(), false));
-             }
-        } else if let Some(recipient) = &ctx.accounts.platform_fee_recipient {
-             accounts.push(AccountMeta::new(recipient.key(), false));
-        } else {
-            // Placeholder if missing (ExecuteIntent expects Option)
-            accounts.push(AccountMeta::new_readonly(crate::ID, false));
-        }
-
-        // 7. vault_token_account (Option)
-        if let Some(vta) = &ctx.accounts.vault_token_account {
-            accounts.push(AccountMeta::new(vta.key(), false));
-        } else {
-            // Placeholder
-            accounts.push(AccountMeta::new_readonly(crate::ID, false));
-        }
-
-        // 8. permission_program
-        accounts.push(AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false));
-
-        // 9. permission
-        accounts.push(AccountMeta::new(ctx.accounts.permission.key(), false));
-
-        // 10. Beneficiaries (Remaining accounts)
-        for acc in ctx.remaining_accounts.iter() {
-            if acc.is_writable {
-                accounts.push(AccountMeta::new(acc.key(), acc.is_signer));
-            } else {
-                accounts.push(AccountMeta::new_readonly(acc.key(), acc.is_signer));
-            }
-        }
 
         let execute_ix = Instruction {
             program_id: crate::ID,
@@ -659,31 +628,17 @@ pub struct ScheduleExecuteIntent<'info> {
     /// Payer who signs the schedule transaction (on PER/TEE RPC)
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// CHECK: Capsule PDA delegated to PER/ER. Passed as AccountInfo to avoid
-    /// Anchor owner checks and re-serialization after CPI, as recommended in
-    /// MagicBlock crank examples.
+    /// CHECK: Capsule PDA delegated to PER/ER.
     #[account(mut)]
     pub capsule: AccountInfo<'info>,
-    /// CHECK: Vault PDA that holds locked SOL for this capsule.
+    /// CHECK: Vault PDA
     pub vault: AccountInfo<'info>,
-    /// System program ??only its key is used when constructing the execute_intent ix.
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
-    /// CHECK: Fee config account (read-only for scheduling; validated inside execute_intent).
-    pub fee_config: AccountInfo<'info>,
-    /// CHECK: Platform fee recipient (optional; validated in execute_intent).
-    pub platform_fee_recipient: Option<AccountInfo<'info>>,
-    /// CHECK: Optional mint for SPL tokens
-    pub mint: Option<AccountInfo<'info>>,
-    /// CHECK: Vault ATA (optional; validated in execute_intent).
-    pub vault_token_account: Option<AccountInfo<'info>>,
     /// MagicBlock Permission Program
     /// CHECK: Validated by address
     #[account(address = PERMISSION_PROGRAM_ID)]
     pub permission_program: AccountInfo<'info>,
-    /// CHECK: PDA for access control; seeds [b"permission", capsule]
+    /// CHECK: PDA for access control
     #[account(
-        mut,
         seeds = [b"permission", capsule.key().as_ref()],
         bump,
         seeds::program = PERMISSION_PROGRAM_ID
@@ -827,12 +782,40 @@ pub struct ExecuteIntent<'info> {
     )]
     pub capsule: Account<'info, IntentCapsule>,
     
+    /// CHECK: Vault PDA (read-only for state check)
+    #[account(
+        seeds = [b"capsule_vault", capsule.owner.as_ref()],
+        bump = capsule.vault_bump
+    )]
+    pub vault: AccountInfo<'info>,
+
+    /// MagicBlock Permission Program
+    /// CHECK: Validated by address
+    #[account(address = PERMISSION_PROGRAM_ID)]
+    pub permission_program: AccountInfo<'info>,
+
+    /// CHECK: PDA for access control; seeds [b"permission", capsule]
+    #[account(
+        seeds = [b"permission", capsule.key().as_ref()],
+        bump,
+        seeds::program = PERMISSION_PROGRAM_ID
+    )]
+    pub permission: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct DistributeAssets<'info> {
+    #[account(
+        seeds = [b"intent_capsule", capsule.owner.as_ref()],
+        bump = capsule.bump
+    )]
+    pub capsule: Account<'info, IntentCapsule>,
+    
     #[account(
         mut,
         seeds = [b"capsule_vault", capsule.owner.as_ref()],
         bump = capsule.vault_bump
     )]
-    /// CHECK: Vault, signer for SOL or authority for Spl
     pub vault: Account<'info, CapsuleVault>,
     
     pub system_program: Program<'info, System>,
@@ -842,8 +825,7 @@ pub struct ExecuteIntent<'info> {
     #[account(seeds = [b"fee_config"], bump)]
     pub fee_config: Account<'info, FeeConfig>,
     
-    /// Platform fee recipient (must match fee_config.fee_recipient when execution_fee_bps > 0)
-    /// CHECK: validated against fee_config.fee_recipient in instruction
+    /// Platform fee recipient
     #[account(mut)]
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
 
@@ -851,20 +833,6 @@ pub struct ExecuteIntent<'info> {
 
     #[account(mut)]
     pub vault_token_account: Option<Account<'info, TokenAccount>>,
-
-    /// MagicBlock Permission Program
-    /// CHECK: Validated by address
-    #[account(address = PERMISSION_PROGRAM_ID)]
-    pub permission_program: AccountInfo<'info>,
-
-    /// CHECK: PDA for access control; seeds [b"permission", capsule]
-    #[account(
-        mut,
-        seeds = [b"permission", capsule.key().as_ref()],
-        bump,
-        seeds::program = PERMISSION_PROGRAM_ID
-    )]
-    pub permission: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]

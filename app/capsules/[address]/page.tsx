@@ -144,11 +144,16 @@ export default function CapsuleDetailPage() {
       // ===== STEP 1: Delegate and/or Authenticate with TEE =====
       // We always need an auth token for the TEE RPC (ScheduleTask)
       try {
-        console.log('[STEP 1] Fetching TEE authentication token...')
-        currentToken = await TEE_AUTH.getAuthToken(wallet)
-        setTeeAuthToken(currentToken)
-        setIsTeeAuthenticated(true)
-        console.log('[STEP 1] TEE Authentication successful')
+        if (!teeAuthToken) {
+          console.log('[STEP 1] Fetching TEE authentication token...')
+          currentToken = await TEE_AUTH.getAuthToken(wallet)
+          setTeeAuthToken(currentToken)
+          setIsTeeAuthenticated(true)
+          console.log('[STEP 1] TEE Authentication successful')
+        } else {
+          console.log('[STEP 1] Reusing existing TEE authentication token')
+          currentToken = teeAuthToken
+        }
       } catch (authError) {
         console.warn('[STEP 1] TEE Authentication failed, proceeding without token', authError)
       }
