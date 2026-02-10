@@ -16,6 +16,8 @@ const HeroCapsuleVideo = dynamic(() => import('@/components/HeroCapsuleVideo').t
   loading: () => <div className="aspect-video w-full animate-pulse rounded-2xl bg-Heres-surface/50" aria-hidden />,
 })
 
+
+
 function DashedLine({
   height = 50,
   segmentIndex,
@@ -654,13 +656,9 @@ export default function HomePage() {
             </div>
             <div
               data-gsap-unleash-3d
-              className="relative aspect-video max-w-lg overflow-hidden rounded-2xl border border-Heres-border/50 bg-Heres-surface/80 shadow-xl"
+              className="relative aspect-video max-w-lg overflow-hidden"
             >
-              <HeroCapsuleVideo
-                posterSrc="/Heres-capsule-hero.png"
-                alt="Heres capsule ??privacy-preserving intent on Solana"
-                className="absolute inset-0 h-full w-full"
-              />
+              <AsciiCapsule bgColor="transparent" />
             </div>
           </div>
         </div>

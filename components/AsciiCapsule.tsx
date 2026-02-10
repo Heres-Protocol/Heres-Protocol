@@ -32,7 +32,7 @@ function getInitialGrid(): string[] {
   })
 }
 
-export function AsciiCapsule() {
+export function AsciiCapsule({ className = '', bgColor = 'var(--Heres-bg)' }: { className?: string, bgColor?: string }) {
   const [grid, setGrid] = useState<string[]>(getInitialGrid)
   const rafRef = useRef<number>(0)
   const lastTick = useRef(0)
@@ -90,16 +90,17 @@ export function AsciiCapsule() {
 
   return (
     <div
-      className="ascii-capsule-wrapper relative mx-auto flex items-center justify-center py-4"
+      className={`ascii-capsule-wrapper relative mx-auto flex items-center justify-center py-4 ${className}`}
       style={{ maxWidth: 480 }}
       aria-hidden
     >
       {/* 罹≪뒓 = clip留??곸슜, ?뚮몢由??놁쓬 ???뚮몢由ш퉴吏 ?꾨? ASCII濡?梨꾩썙吏?*/}
       <div
-        className="ascii-capsule relative overflow-hidden bg-[var(--Heres-bg)] shadow-[0_0_32px_rgba(34,211,238,0.15)]"
+        className="ascii-capsule relative overflow-hidden shadow-[0_0_32px_rgba(34,211,238,0.15)]"
         style={{
           width: '100%',
           aspectRatio: '2.2 / 1',
+          backgroundColor: bgColor,
           maxHeight: 220,
           borderRadius: 9999,
           clipPath: 'inset(0 round 9999px)',
