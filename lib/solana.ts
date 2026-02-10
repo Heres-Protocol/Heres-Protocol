@@ -436,13 +436,13 @@ export async function scheduleExecuteIntent(
   const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
   const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
-  // Use snake_case keys to match IDL exactly
+  // Use camelCase keys as expected by the Anchor TypeScript client
   const accounts: any = {
-    magic_program: magicProgram,
+    magicProgram: magicProgram,
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
     vault: vaultPDA,
-    permission_program: permissionProgramId,
+    permissionProgram: permissionProgramId,
     permission: permissionPDA,
   }
 
