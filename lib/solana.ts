@@ -255,12 +255,6 @@ export async function executeIntent(
   const accounts: any = {
     capsule: capsulePDA,
     vault: vaultPDA,
-    systemProgram: SystemProgram.programId,
-    tokenProgram: TOKEN_PROGRAM_ID,
-    feeConfig: feeConfigPDA,
-    platformFeeRecipient: platformFeeRecipient || null,
-    mint: mint || null,
-    vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
     permissionProgram: permissionProgramId,
     permission: permissionPDA,
   }
@@ -433,16 +427,10 @@ export async function scheduleExecuteIntent(
   const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
   const accounts: any = {
-    magicProgram,
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
     vault: vaultPDA,
-    systemProgram: SystemProgram.programId,
-    tokenProgram: TOKEN_PROGRAM_ID,
-    feeConfig: feeConfigPDA,
-    platformFeeRecipient: platformFeeRecipient || null,
-    mint: mint || null,
-    vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
+    magicProgram,
     permissionProgram: permissionProgramId,
     permission: permissionPDA,
   }
@@ -467,6 +455,64 @@ export async function scheduleExecuteIntent(
     // @ts-ignore
     .accounts(accounts)
     .rpc();
+
+  return tx
+}
+
+/**
+ * Distribute assets from vault to beneficiaries after execute_intent has been called (ER commit to base).
+ */
+export async function distributeAssets(
+  wallet: WalletContextState,
+  ownerPublicKey: PublicKey,
+  beneficiaries?: Array<{ address: string; amount: string; amountType: string }>,
+  mint?: PublicKey
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+
+  const [capsulePDA] = getCapsulePDA(ownerPublicKey)
+  const [vaultPDA] = getCapsuleVaultPDA(ownerPublicKey)
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
+    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
+    : null
+
+  const accounts: any = {
+    capsule: capsulePDA,
+    vault: vaultPDA,
+    systemProgram: SystemProgram.programId,
+    tokenProgram: TOKEN_PROGRAM_ID,
+    feeConfig: feeConfigPDA,
+    platformFeeRecipient: platformFeeRecipient || null,
+    mint: mint || null,
+    vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
+  }
+
+  const remainingAccounts = beneficiaries?.map(b => {
+    const beneficiaryOwner = new PublicKey(b.address)
+    if (mint && !mint.equals(PublicKey.default)) {
+      const beneficiaryAta = getAssociatedTokenAddress(mint, beneficiaryOwner)
+      return {
+        pubkey: beneficiaryAta,
+        isSigner: false,
+        isWritable: true,
+      }
+    }
+    return {
+      pubkey: beneficiaryOwner,
+      isSigner: false,
+      isWritable: true,
+    }
+  }) || []
+
+  console.log('[distributeAssets] Calling with beneficiaries:', beneficiaries?.length || 0)
+
+  const tx = await program.methods
+    .distributeAssets()
+    .accounts(accounts)
+    .remainingAccounts(remainingAccounts)
+    .rpc()
 
   return tx
 }

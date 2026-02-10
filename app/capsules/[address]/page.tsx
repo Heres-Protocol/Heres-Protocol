@@ -11,6 +11,7 @@ import {
   delegateCapsule,
   executeIntent,
   scheduleExecuteIntent,
+  distributeAssets,
 } from '@/lib/solana'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE, PLATFORM_FEE } from '@/constants'
@@ -118,6 +119,9 @@ export default function CapsuleDetailPage() {
   const [executePending, setExecutePending] = useState(false)
   const [executeTx, setExecuteTx] = useState<string | null>(null)
   const [executeError, setExecuteError] = useState<string | null>(null)
+  const [distributePending, setDistributePending] = useState(false)
+  const [distributeTx, setDistributeTx] = useState<string | null>(null)
+  const [distributeError, setDistributeError] = useState<string | null>(null)
   const [teeAuthToken, setTeeAuthToken] = useState<string | null>(null)
   const [isTeeAuthenticated, setIsTeeAuthenticated] = useState(false)
 
@@ -209,6 +213,29 @@ export default function CapsuleDetailPage() {
 
   const handleExecute = useCallback(async () => {
     if (!wallet.connected || !wallet.publicKey || !capsule) return
+
+    setExecutePending(true)
+    setExecuteError(null)
+    setExecuteTx(null)
+    try {
+      // Step 1: Execute intent (State update on ER/Base)
+      const tx = await executeIntent(wallet, capsule.owner, undefined, capsule.mint)
+      setExecuteTx(tx)
+      console.log('[executeIntent] ✓ State update successful. Tx:', tx)
+
+      // Refresh capsule data
+      const pubkey = new PublicKey(capsule.capsuleAddress)
+      const updated = await getCapsuleByAddress(pubkey)
+      if (updated) setCapsule(updated)
+    } catch (e: unknown) {
+      setExecuteError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setExecutePending(false)
+    }
+  }, [wallet, capsule])
+
+  const handleDistribute = useCallback(async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
     const beneficiaries = intentParsed && 'beneficiaries' in intentParsed && Array.isArray(intentParsed.beneficiaries)
       ? (intentParsed.beneficiaries as Array<{ address?: string; amount?: string; amountType?: string }>)
         .filter((b) => b?.address)
@@ -218,24 +245,29 @@ export default function CapsuleDetailPage() {
           amountType: b.amountType ?? 'fixed',
         }))
       : undefined
+
     if (!beneficiaries?.length) {
-      setExecuteError('No beneficiaries in intent data')
+      setDistributeError('No beneficiaries in intent data')
       return
     }
-    setExecutePending(true)
-    setExecuteError(null)
-    setExecuteTx(null)
+
+    setDistributePending(true)
+    setDistributeError(null)
+    setDistributeTx(null)
     try {
-      const tx = await executeIntent(wallet, capsule.owner, beneficiaries, capsule.mint)
-      setExecuteTx(tx)
+      // Step 2: Distribute assets (Base-layer payout)
+      const tx = await distributeAssets(wallet, capsule.owner, beneficiaries, capsule.mint)
+      setDistributeTx(tx)
+      console.log('[distributeAssets] ✓ Distribution successful. Tx:', tx)
+
+      // Refresh capsule data
       const pubkey = new PublicKey(capsule.capsuleAddress)
-      getCapsuleByAddress(pubkey).then((updated) => {
-        if (updated) setCapsule(updated)
-      }).catch(() => { })
+      const updated = await getCapsuleByAddress(pubkey)
+      if (updated) setCapsule(updated)
     } catch (e: unknown) {
-      setExecuteError(e instanceof Error ? e.message : String(e))
+      setDistributeError(e instanceof Error ? e.message : String(e))
     } finally {
-      setExecutePending(false)
+      setDistributePending(false)
     }
   }, [wallet, capsule, intentParsed])
 
@@ -421,7 +453,7 @@ export default function CapsuleDetailPage() {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 {status === 'Expired' && capsule.isActive && (
-                  <>
+                  <div className="flex flex-col gap-2">
                     <button
                       type="button"
                       onClick={handleExecute}
@@ -429,20 +461,45 @@ export default function CapsuleDetailPage() {
                       className="inline-flex items-center gap-2 rounded-lg bg-Heres-accent/20 border border-Heres-accent px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
                     >
                       <Play className="h-4 w-4" />
-                      {executePending ? 'Executing…' : 'Execute intent'}
+                      {executePending ? 'Executing…' : 'Execute (Update State)'}
                     </button>
                     {executeTx && (
                       <a
                         href={`https://explorer.solana.com/tx/${executeTx}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-Heres-accent hover:underline"
+                        className="text-xs text-Heres-accent hover:underline"
                       >
-                        View transaction
+                        ✓ Step 1 complete. View tx
                       </a>
                     )}
-                    {executeError && <p className="text-sm text-amber-400">{executeError}</p>}
-                  </>
+                    {executeError && <p className="text-xs text-red-400">{executeError}</p>}
+                  </div>
+                )}
+
+                {status === 'Executed' && (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDistribute}
+                      disabled={distributePending || !wallet.connected}
+                      className="inline-flex items-center gap-2 rounded-lg bg-Heres-purple/20 border border-Heres-purple px-4 py-2 text-sm font-medium text-Heres-purple transition hover:bg-Heres-purple/30 disabled:opacity-60"
+                    >
+                      <Shield className="h-4 w-4" />
+                      {distributePending ? 'Distributing…' : 'Distribute Assets'}
+                    </button>
+                    {distributeTx && (
+                      <a
+                        href={`https://explorer.solana.com/tx/${distributeTx}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-Heres-purple hover:underline"
+                      >
+                        ✓ Assets distributed. View tx
+                      </a>
+                    )}
+                    {distributeError && <p className="text-xs text-red-400">{distributeError}</p>}
+                  </div>
                 )}
                 <p className="text-sm text-Heres-muted">
                   Updated {timeAgo(lastUpdatedMs)}
