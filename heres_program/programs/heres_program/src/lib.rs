@@ -448,6 +448,15 @@ pub mod heres_program {
         ctx: Context<ScheduleExecuteIntent>,
         args: ScheduleExecuteIntentArgs,
     ) -> Result<()> {
+        msg!("Scheduling execute_intent on TEE");
+        msg!(" - Payer: {:?}", ctx.accounts.payer.key());
+        msg!(" - Capsule: {:?}", ctx.accounts.capsule.key());
+        msg!(" - Vault: {:?}", ctx.accounts.vault.key());
+        msg!(" - Magic Program: {:?}", ctx.accounts.magic_program.key());
+        msg!(" - SDK MAGIC_PROGRAM_ID: {:?}", MAGIC_PROGRAM_ID);
+        msg!(" - Permission Program: {:?}", ctx.accounts.permission_program.key());
+        msg!(" - Permission PDA: {:?}", ctx.accounts.permission.key());
+
         let accounts = vec![
                 AccountMeta::new(ctx.accounts.capsule.key(), false),
                 AccountMeta::new_readonly(ctx.accounts.vault.key(), false),

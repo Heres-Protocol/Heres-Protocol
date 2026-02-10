@@ -444,15 +444,24 @@ export async function scheduleExecuteIntent(
   const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
   const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
-  // Use camelCase keys as expected by the Anchor TypeScript client
+  // Explicitly map BOTH camelCase and snake_case for maximum compatibility
+  // Some versions of Anchor or TEE RPC might expect different formats
   const accounts: any = {
     magicProgram: magicProgram,
+    magic_program: magicProgram,
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
     vault: vaultPDA,
     permissionProgram: permissionProgramId,
+    permission_program: permissionProgramId,
     permission: permissionPDA,
   }
+
+  console.log('[scheduleExecuteIntent] 🚀 Scheduling on TEE RPC:')
+  console.log(' - Capsule:', capsulePDA.toBase58())
+  console.log(' - Magic Program:', magicProgram.toBase58())
+  console.log(' - Permission Program:', permissionProgramId.toBase58())
+  console.log(' - Payer:', wallet.publicKey.toBase58())
 
   // Default values for optional args
   const taskId = args?.taskId ?? new BN(Date.now());
