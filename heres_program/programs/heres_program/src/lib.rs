@@ -747,13 +747,9 @@ pub struct CreateCapsule<'info> {
     #[account(address = PERMISSION_PROGRAM_ID)]
     pub permission_program: AccountInfo<'info>,
 
-    /// CHECK: PDA for access control; seeds [b"permission", capsule]
-    #[account(
-        mut,
-        seeds = [b"permission", capsule.key().as_ref()],
-        bump,
-        seeds::program = PERMISSION_PROGRAM_ID
-    )]
+    /// CHECK: PDA for access control; created by Permission Program CPI
+    /// The Permission Program will derive and validate this PDA during CreatePermission
+    #[account(mut)]
     pub permission: AccountInfo<'info>,
 }
 
