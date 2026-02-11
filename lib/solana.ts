@@ -486,8 +486,8 @@ export async function scheduleExecuteIntent(
   try {
     const tx = await teeProgram.methods
       .scheduleExecuteIntent({
-        taskId,
-        executionIntervalMillis,
+        task_id: taskId,
+        execution_interval_millis: executionIntervalMillis,
         iterations,
       })
       // @ts-ignore
