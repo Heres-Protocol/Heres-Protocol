@@ -142,15 +142,7 @@ pub mod heres_program {
         }
 
         // Initialize access control via Permission Program (PER/TEE)
-        let capsule_bump = ctx.accounts.capsule.bump;
         let owner_key = ctx.accounts.owner.key();
-        let capsule_seeds: &[&[u8]] = &[
-            b"intent_capsule",
-            owner_key.as_ref(),
-            &[capsule_bump],
-        ];
-        let signer_seeds = &[capsule_seeds];
-
         let members = vec![
             Member {
                 flags: AUTHORITY_FLAG | TX_LOGS_FLAG | TX_BALANCES_FLAG | TX_MESSAGE_FLAG | ACCOUNT_SIGNATURES_FLAG,
@@ -168,7 +160,7 @@ pub mod heres_program {
             .payer(&ctx.accounts.owner.to_account_info())
             .system_program(&ctx.accounts.system_program.to_account_info())
             .args(MembersArgs { members: Some(members) })
-            .invoke_signed(signer_seeds)?;
+            .invoke()?;
 
         msg!("Access control (TEE) initialized for capsule: {:?}", ctx.accounts.capsule.key());
         msg!("Intent Capsule created: {:?}", ctx.accounts.capsule.key());
