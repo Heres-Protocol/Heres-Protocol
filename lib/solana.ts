@@ -136,8 +136,6 @@ export async function createCapsule(
   const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
   const [feeConfigPDA] = getFeeConfigPDA()
-  const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
-  const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
   const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
     ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
@@ -159,9 +157,6 @@ export async function createCapsule(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
-      const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
-
       const accounts: any = {
         capsule: capsulePDA,
         vault: vaultPDA,
@@ -174,8 +169,6 @@ export async function createCapsule(
         sourceTokenAccount: mint ? getAssociatedTokenAddress(mint, wallet.publicKey!) : null,
         vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
         associatedTokenProgram: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
-        permissionProgram: permissionProgramId,
-        permission: permissionPDA,
       }
 
       console.log('[createCapsule] Accounts:', Object.keys(accounts).map(k => `${k}: ${accounts[k]?.toString()}`))

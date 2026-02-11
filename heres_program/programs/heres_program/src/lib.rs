@@ -141,28 +141,7 @@ pub mod heres_program {
             msg!("Locked {} lamports in vault for capsule {:?}", total_amount_lamports, capsule.key());
         }
 
-        // Initialize access control via Permission Program (PER/TEE)
-        let owner_key = ctx.accounts.owner.key();
-        let members = vec![
-            Member {
-                flags: AUTHORITY_FLAG | TX_LOGS_FLAG | TX_BALANCES_FLAG | TX_MESSAGE_FLAG | ACCOUNT_SIGNATURES_FLAG,
-                pubkey: owner_key,
-            },
-            Member {
-                flags: TX_LOGS_FLAG | TX_BALANCES_FLAG | TX_MESSAGE_FLAG | ACCOUNT_SIGNATURES_FLAG,
-                pubkey: crate::TEE_VALIDATOR,
-            },
-        ];
 
-        CreatePermissionCpiBuilder::new(&ctx.accounts.permission_program)
-            .permissioned_account(&ctx.accounts.capsule.to_account_info())
-            .permission(&ctx.accounts.permission.to_account_info())
-            .payer(&ctx.accounts.owner.to_account_info())
-            .system_program(&ctx.accounts.system_program.to_account_info())
-            .args(MembersArgs { members: Some(members) })
-            .invoke()?;
-
-        msg!("Access control (TEE) initialized for capsule: {:?}", ctx.accounts.capsule.key());
         msg!("Intent Capsule created: {:?}", ctx.accounts.capsule.key());
         Ok(())
     }
@@ -740,17 +719,8 @@ pub struct CreateCapsule<'info> {
     )]
     pub vault_token_account: Option<Account<'info, TokenAccount>>,
     
+    
     pub associated_token_program: Program<'info, AssociatedToken>,
-
-    /// MagicBlock Permission Program
-    /// CHECK: Validated by address
-    #[account(address = PERMISSION_PROGRAM_ID)]
-    pub permission_program: AccountInfo<'info>,
-
-    /// CHECK: PDA for access control; created by Permission Program CPI
-    /// The Permission Program will derive and validate this PDA during CreatePermission
-    #[account(mut)]
-    pub permission: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
