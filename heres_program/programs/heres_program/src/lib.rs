@@ -448,21 +448,16 @@ pub mod heres_program {
         ctx: Context<ScheduleExecuteIntent>,
         args: ScheduleExecuteIntentArgs,
     ) -> Result<()> {
-        msg!("Scheduling execute_intent on TEE");
-        msg!(" - Payer: {:?}", ctx.accounts.payer.key());
-        msg!(" - Capsule: {:?}", ctx.accounts.capsule.key());
-        msg!(" - Vault: {:?}", ctx.accounts.vault.key());
-        msg!(" - Magic Program: {:?}", ctx.accounts.magic_program.key());
-        msg!(" - SDK MAGIC_PROGRAM_ID: {:?}", MAGIC_PROGRAM_ID);
-        msg!(" - Permission Program: {:?}", ctx.accounts.permission_program.key());
-        msg!(" - Permission PDA: {:?}", ctx.accounts.permission.key());
+        msg!("Scheduling execute_intent on TEE for capsule: {:?}", ctx.accounts.capsule.key());
 
+
+        // CRITICAL: Only include accounts that execute_intent actually needs
+        // execute_intent only updates capsule.is_active and capsule.executed_at
+        // It does NOT touch vault, permission, or any other accounts
+        // Including unnecessary accounts causes "account not delegated" errors on TEE
         let accounts = vec![
-                AccountMeta::new(ctx.accounts.capsule.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.vault.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.permission.key(), false),
-            ];
+            AccountMeta::new(ctx.accounts.capsule.key(), false),
+        ];
 
         let execute_ix = Instruction {
             program_id: crate::ID,
