@@ -183,18 +183,24 @@ export default function CapsuleDetailPage() {
       try {
         console.log('[STEP 2] Scheduling crank on devnet ER using TEE RPC...')
         // PASS the owner and token here
-        const scheduleSig = await scheduleExecuteIntent(
+        const signature = await scheduleExecuteIntent(
           wallet,
           capsule.owner,
           undefined,
           currentToken || undefined
         );
-        setScheduleTx(scheduleSig)
-        console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', scheduleSig)
+        setScheduleTx(signature)
+        console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', signature)
       } catch (e: any) {
-        const msg = e?.message || String(e)
+        let msg = e?.message || String(e)
+        if (e.logs && Array.isArray(e.logs)) {
+          console.error('[STEP 2] Transaction Logs:', e.logs)
+          // Look for specific error messages in logs if possible
+          const errorLog = e.logs.find((log: string) => log.includes('Error:'))
+          if (errorLog) msg += ` (Log: ${errorLog.split('Error:')[1].trim()})`
+        }
         console.error('[STEP 2] ✗ Scheduling failed:', msg)
-        setScheduleError(`Crank scheduling failed: ${msg}`)
+        setScheduleError(`Crank scheduling failed: ${msg}. Check console for full logs.`)
       }
     } catch (e: any) {
       const msg = e?.message || String(e)

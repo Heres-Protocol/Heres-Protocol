@@ -2,7 +2,7 @@
  * Solana program interaction utilities
  */
 
-import { SystemProgram, PublicKey, Connection } from '@solana/web3.js'
+import { SystemProgram, PublicKey, Connection, SendTransactionError } from '@solana/web3.js'
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor'
 import type { Wallet } from '@coral-xyz/anchor'
 const WalletClass = (require('@coral-xyz/anchor').Wallet || (AnchorProvider.prototype as any).wallet)
@@ -486,8 +486,11 @@ export async function scheduleExecuteIntent(
     return tx
   } catch (err: any) {
     console.error('[scheduleExecuteIntent] ✗ Rpc Error:', err);
+    if (err instanceof SendTransactionError) {
+      console.error('[scheduleExecuteIntent] ✗ Transaction Logs:', err.logs);
+    }
     if (err.stack) console.error('[scheduleExecuteIntent] ✗ Stack:', err.stack);
-    if (err.logs) console.error('[scheduleExecuteIntent] ✗ Logs:', err.logs);
+    if (err.logs && !(err instanceof SendTransactionError)) console.error('[scheduleExecuteIntent] ✗ Logs:', err.logs);
     throw err;
   }
 }

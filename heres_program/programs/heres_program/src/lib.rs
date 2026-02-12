@@ -582,7 +582,7 @@ pub struct UndelegateCapsuleInput<'info> {
     pub payer: Signer<'info>,
     pub owner: Signer<'info>,
     #[account(mut, seeds = [b"intent_capsule", owner.key().as_ref()], bump = capsule.bump)]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     /// CHECK: Vault PDA (committed alongside capsule)
     #[account(mut, seeds = [b"capsule_vault", owner.key().as_ref()], bump = capsule.vault_bump)]
     pub vault: AccountInfo<'info>,
@@ -680,7 +680,7 @@ pub struct CreateCapsule<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     #[account(
         init,
@@ -689,13 +689,13 @@ pub struct CreateCapsule<'info> {
         seeds = [b"capsule_vault", owner.key().as_ref()],
         bump
     )]
-    pub vault: Account<'info, CapsuleVault>,
+    pub vault: Box<Account<'info, CapsuleVault>>,
     
     #[account(mut)]
     pub owner: Signer<'info>,
     
     #[account(seeds = [b"fee_config"], bump)]
-    pub fee_config: Account<'info, FeeConfig>,
+    pub fee_config: Box<Account<'info, FeeConfig>>,
     
     /// Platform fee recipient (must match fee_config.fee_recipient when creation_fee_lamports > 0)
     /// CHECK: validated against fee_config.fee_recipient in instruction
@@ -706,10 +706,10 @@ pub struct CreateCapsule<'info> {
     
     pub token_program: Program<'info, Token>,
 
-    pub mint: Option<Account<'info, Mint>>,
+    pub mint: Option<Box<Account<'info, Mint>>>,
 
     #[account(mut)]
-    pub source_token_account: Option<Account<'info, TokenAccount>>,
+    pub source_token_account: Option<Box<Account<'info, TokenAccount>>>,
     
     #[account(
         init_if_needed,
@@ -717,7 +717,7 @@ pub struct CreateCapsule<'info> {
         associated_token::mint = mint,
         associated_token::authority = vault,
     )]
-    pub vault_token_account: Option<Account<'info, TokenAccount>>,
+    pub vault_token_account: Option<Box<Account<'info, TokenAccount>>>,
     
     
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -730,7 +730,7 @@ pub struct UpdateIntent<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     pub owner: Signer<'info>,
 }
@@ -742,7 +742,7 @@ pub struct ExecuteIntent<'info> {
         seeds = [b"intent_capsule", capsule.owner.as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     /// CHECK: Vault PDA (read-only for state check)
     #[account(
@@ -771,30 +771,30 @@ pub struct DistributeAssets<'info> {
         seeds = [b"intent_capsule", capsule.owner.as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     #[account(
         mut,
         seeds = [b"capsule_vault", capsule.owner.as_ref()],
         bump = capsule.vault_bump
     )]
-    pub vault: Account<'info, CapsuleVault>,
+    pub vault: Box<Account<'info, CapsuleVault>>,
     
     pub system_program: Program<'info, System>,
     
     pub token_program: Program<'info, Token>,
     
     #[account(seeds = [b"fee_config"], bump)]
-    pub fee_config: Account<'info, FeeConfig>,
+    pub fee_config: Box<Account<'info, FeeConfig>>,
     
     /// Platform fee recipient
     #[account(mut)]
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
 
-    pub mint: Option<Account<'info, Mint>>,
+    pub mint: Option<Box<Account<'info, Mint>>>,
 
     #[account(mut)]
-    pub vault_token_account: Option<Account<'info, TokenAccount>>,
+    pub vault_token_account: Option<Box<Account<'info, TokenAccount>>>,
 }
 
 #[derive(Accounts)]
@@ -804,7 +804,7 @@ pub struct UpdateActivity<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     pub owner: Signer<'info>,
 }
@@ -816,7 +816,7 @@ pub struct DeactivateCapsule<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     pub owner: Signer<'info>,
 }
@@ -828,14 +828,14 @@ pub struct RecreateCapsule<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     #[account(
         mut,
         seeds = [b"capsule_vault", owner.key().as_ref()],
         bump = capsule.vault_bump
     )]
-    pub vault: Account<'info, CapsuleVault>,
+    pub vault: Box<Account<'info, CapsuleVault>>,
     
     #[account(mut)]
     pub owner: Signer<'info>,

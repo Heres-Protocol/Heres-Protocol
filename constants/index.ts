@@ -56,7 +56,7 @@ export const MAGICBLOCK_ER = {
   /** MagicBlock Permission Program ID for Access Control (PER) */
   PERMISSION_PROGRAM_ID: 'ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1',
   /** Default crank scheduling parameters */
-  CRANK_DEFAULT_INTERVAL_MS: 60000,
+  CRANK_DEFAULT_INTERVAL_MS: 10000,
   CRANK_DEFAULT_ITERATIONS: 0,
 } as const
 
