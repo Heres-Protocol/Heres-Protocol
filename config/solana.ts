@@ -8,22 +8,32 @@ import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE, MAGICBLOCK_ER } from '@/constant
 let cachedConnection: Connection | null = null
 
 /**
- * Get Solana connection using Magic Router (Dynamic Routing).
- * Routes transactions to Ephemeral Rollup or Base Layer automatically.
+ * Get Solana connection with Helius RPC (Base Layer).
+ * Use Helius when API key is set; otherwise fallback to public RPC.
  */
 export function getSolanaConnection(): Connection {
   if (cachedConnection) return cachedConnection
 
-  const rpcUrl = MAGICBLOCK_ER.ROUTER_DEVNET
-  const wsUrl = MAGICBLOCK_ER.ROUTER_WS
-
+  const rpcUrl = HELIUS_CONFIG.RPC_URL
   cachedConnection = new Connection(rpcUrl, {
     commitment: 'confirmed',
-    confirmTransactionInitialTimeout: 120000,
-    wsEndpoint: wsUrl,
+    wsEndpoint: HELIUS_CONFIG.RPC_URL.replace('https', 'wss'),
   })
-
   return cachedConnection
+}
+
+let cachedTeeConnection: Connection | null = null
+
+/**
+ * Get direct TEE RPC connection for delegated state queries.
+ */
+export function getTeeConnection(): Connection {
+  if (cachedTeeConnection) return cachedTeeConnection
+
+  cachedTeeConnection = new Connection(PER_TEE.RPC_URL, {
+    commitment: 'confirmed',
+  })
+  return cachedTeeConnection
 }
 
 /**

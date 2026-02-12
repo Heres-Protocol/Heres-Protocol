@@ -8,7 +8,7 @@ import type { Wallet } from '@coral-xyz/anchor'
 const WalletClass = (require('@coral-xyz/anchor').Wallet || (AnchorProvider.prototype as any).wallet)
 import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/heres_program.json'
-import { getSolanaConnection, getProgramId } from '@/config/solana'
+import { getSolanaConnection, getTeeConnection, getProgramId } from '@/config/solana'
 import {
   getCapsulePDA,
   getFeeConfigPDA,
@@ -751,15 +751,30 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       return null
     }
 
-    // Anchor accounts start with an 8-byte discriminator
-    // Skip the discriminator and parse the account data
-    const data = accountInfo.data
+    // Check if the account is delegated to MagicBlock ER
+    const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+    if (accountInfo.owner.equals(delegationProgramId)) {
+      console.log('Account is delegated. Checking validator...')
+      // For delegated accounts, the first 32 bytes of data are the validator
+      const validator = new PublicKey(accountInfo.data.slice(0, 32))
+      if (validator.toBase58() === MAGICBLOCK_ER.VALIDATOR_TEE) {
+        console.log('Account delegated to TEE. Re-fetching from TEE RPC...')
+        const teeConnection = getTeeConnection()
+        const teeAccountInfo = await teeConnection.getAccountInfo(capsulePDA)
+        if (teeAccountInfo && teeAccountInfo.data) {
+          console.log('Successfully fetched delegated state from TEE RPC')
+          // Use the latest data from the TEE
+          accountInfo.data = teeAccountInfo.data
+        }
+      }
+    }
 
-    // Discriminator is 8 bytes, skip it
+    // Anchor accounts start with an 8-byte discriminator
+    const dataToParse = accountInfo.data
     let offset = 8
 
     // owner: Pubkey (32 bytes)
-    const ownerBytes = data.slice(offset, offset + 32)
+    const ownerBytes = dataToParse.slice(offset, offset + 32)
     const ownerPubkey = new PublicKey(ownerBytes)
     offset += 32
 
@@ -769,7 +784,6 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       for (let i = 0; i < 8; i++) {
         result |= BigInt(bytes[start + i]) << BigInt(i * 8)
       }
-      // Handle signed integer (two's complement)
       if (result & (1n << 63n)) {
         result = result - (1n << 64n)
       }
@@ -782,33 +796,31 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
     }
 
     // inactivity_period: i64 (8 bytes, little-endian)
-    const inactivityPeriod = readI64(data, offset)
+    const inactivityPeriod = readI64(dataToParse, offset)
     offset += 8
 
     // last_activity: i64 (8 bytes, little-endian)
-    const lastActivity = readI64(data, offset)
+    const lastActivity = readI64(dataToParse, offset)
     offset += 8
 
     // intent_data: Vec<u8> (4 bytes length + data)
-    const intentDataLength = readU32(data, offset)
+    const intentDataLength = readU32(dataToParse, offset)
     offset += 4
-    const intentDataBytes = data.slice(offset, offset + intentDataLength)
+    const intentDataBytes = dataToParse.slice(offset, offset + intentDataLength)
     offset += intentDataLength
 
     // is_active: bool (1 byte)
-    const isActive = data[offset] === 1
+    const isActive = dataToParse[offset] === 1
     offset += 1
 
     // executed_at: Option<i64> (1 byte for Some/None + 8 bytes if Some)
     let executedAt: number | null = null
-    const hasExecutedAt = data[offset] === 1
+    const hasExecutedAt = dataToParse[offset] === 1
     offset += 1
     if (hasExecutedAt) {
-      executedAt = Number(readI64(data, offset))
+      executedAt = Number(readI64(dataToParse, offset))
       offset += 8
     }
-
-    // bump: u8 (1 byte) - we don't need this for the return value
 
     const capsule: IntentCapsule & { accountOwner: PublicKey } = {
       owner: ownerPubkey,
@@ -823,8 +835,8 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
 
     // Skip bump (1) and vault_bump (1)
     offset += 2
-    if (offset + 32 <= data.length) {
-      capsule.mint = new PublicKey(data.slice(offset, offset + 32))
+    if (offset + 32 <= dataToParse.length) {
+      capsule.mint = new PublicKey(dataToParse.slice(offset, offset + 32))
     }
 
     console.log('Successfully fetched capsule:', {
@@ -855,9 +867,22 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
   try {
     const accountInfo = await connection.getAccountInfo(capsulePda)
     if (!accountInfo || !accountInfo.data) return null
-    const data = accountInfo.data
-    if (data.length < 60) return null
+    if (accountInfo.data.length < 60) return null
 
+    // Check if the account is delegated to MagicBlock ER
+    const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+    if (accountInfo.owner.equals(delegationProgramId)) {
+      const validator = new PublicKey(accountInfo.data.slice(0, 32))
+      if (validator.toBase58() === MAGICBLOCK_ER.VALIDATOR_TEE) {
+        const teeConnection = getTeeConnection()
+        const teeAccountInfo = await teeConnection.getAccountInfo(capsulePda)
+        if (teeAccountInfo && teeAccountInfo.data) {
+          accountInfo.data = teeAccountInfo.data
+        }
+      }
+    }
+
+    const dataToParse = accountInfo.data
     const readI64 = (bytes: Uint8Array, start: number): bigint => {
       let result = 0n
       for (let i = 0; i < 8; i++) {
@@ -870,22 +895,22 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
       bytes[start] | (bytes[start + 1] << 8) | (bytes[start + 2] << 16) | (bytes[start + 3] << 24)
 
     let offset = 8
-    const ownerPubkey = new PublicKey(data.slice(offset, offset + 32))
+    const ownerPubkey = new PublicKey(dataToParse.slice(offset, offset + 32))
     offset += 32
-    const inactivityPeriod = Number(readI64(data, offset))
+    const inactivityPeriod = Number(readI64(dataToParse, offset))
     offset += 8
-    const lastActivity = Number(readI64(data, offset))
+    const lastActivity = Number(readI64(dataToParse, offset))
     offset += 8
-    const intentDataLength = readU32(data, offset)
+    const intentDataLength = readU32(dataToParse, offset)
     offset += 4
-    const intentDataBytes = data.slice(offset, offset + intentDataLength)
+    const intentDataBytes = dataToParse.slice(offset, offset + intentDataLength)
     offset += intentDataLength
-    const isActive = data[offset] === 1
+    const isActive = dataToParse[offset] === 1
     offset += 1
     let executedAt: number | null = null
-    if (data[offset] === 1) {
+    if (dataToParse[offset] === 1) {
       offset += 1
-      executedAt = Number(readI64(data, offset))
+      executedAt = Number(readI64(dataToParse, offset))
       offset += 8
     }
 
@@ -898,15 +923,15 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
       isActive,
       executedAt,
       capsuleAddress: capsulePda.toBase58(),
-      accountOwner: accountInfo.owner, // Return the actual account owner (Heres or Delegation program)
+      accountOwner: accountInfo.owner,
       mint: undefined,
     }
 
     // Skip bump (1) and vault_bump (1)
     offset += 2
-    if (offset + 32 <= data.length) {
+    if (offset + 32 <= dataToParse.length) {
       // @ts-ignore
-      result.mint = new PublicKey(data.slice(offset, offset + 32))
+      result.mint = new PublicKey(dataToParse.slice(offset, offset + 32))
     }
     return result as IntentCapsule & { capsuleAddress: string }
   } catch {
