@@ -1,0 +1,14 @@
+[
+    {
+        "relation": [
+            "delegate_permission/common.handle_all_urls"
+        ],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.heres.twa",
+            "sha256_cert_fingerprints": [
+                "D9:7D:6D:11:FE:3B:DD:AD:40:2E:0A:72:79:72:D7:18:60:1D:AC:17:84:AB:06:C3:A7:E5:F0:5B:B7:AB:9A:DB"
+            ]
+        }
+    }
+]
