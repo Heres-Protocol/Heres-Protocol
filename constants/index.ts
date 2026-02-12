@@ -22,6 +22,7 @@ export const HELIUS_CONFIG = {
     : 'https://api.devnet.solana.com',
   // Alternative RPC endpoints for fallback
   RPC_URL_ALT: 'https://api.devnet.solana.com',
+  RPC_URL_DEVNET: 'https://api.devnet.solana.com',
 } as const
 
 // Default Values
@@ -56,7 +57,7 @@ export const MAGICBLOCK_ER = {
   /** MagicBlock Permission Program ID for Access Control (PER) */
   PERMISSION_PROGRAM_ID: 'ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1',
   /** Default crank scheduling parameters */
-  CRANK_DEFAULT_INTERVAL_MS: 60000,
+  CRANK_DEFAULT_INTERVAL_MS: 10000,
   CRANK_DEFAULT_ITERATIONS: 0,
 } as const
 

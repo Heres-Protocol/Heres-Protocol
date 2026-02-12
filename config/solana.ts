@@ -3,32 +3,33 @@
  */
 
 import { Connection, PublicKey } from '@solana/web3.js'
-import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE } from '@/constants'
+import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE, MAGICBLOCK_ER } from '@/constants'
 
 let cachedConnection: Connection | null = null
 
 /**
- * Get Solana connection with Helius RPC (cached to avoid duplicate instances and reduce RPC pressure).
- * Use Helius when API key is set; otherwise fallback to public RPC (rate-limited).
+ * Get Solana connection with Helius RPC (Base Layer).
+ * Use Helius when API key is set; otherwise fallback to public RPC.
  */
 export function getSolanaConnection(): Connection {
   if (cachedConnection) return cachedConnection
 
   const rpcUrl = HELIUS_CONFIG.RPC_URL
-  try {
-    cachedConnection = new Connection(rpcUrl, {
-      commitment: 'confirmed',
-      confirmTransactionInitialTimeout: 120000,
-      httpHeaders: { 'Content-Type': 'application/json' },
-    })
-  } catch {
-    const fallbackUrl = HELIUS_CONFIG.RPC_URL_ALT
-    cachedConnection = new Connection(fallbackUrl, {
-      commitment: 'confirmed',
-      confirmTransactionInitialTimeout: 120000,
-    })
-  }
+  cachedConnection = new Connection(rpcUrl, {
+    commitment: 'confirmed',
+    wsEndpoint: HELIUS_CONFIG.RPC_URL.replace('https', 'wss'),
+  })
   return cachedConnection
+}
+
+/**
+ * Get direct TEE RPC connection for delegated state queries.
+ */
+export function getTeeConnection(token?: string): Connection {
+  const url = token ? `${PER_TEE.RPC_URL}?token=${token}` : PER_TEE.RPC_URL
+  return new Connection(url, {
+    commitment: 'confirmed',
+  })
 }
 
 /**

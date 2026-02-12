@@ -2,13 +2,13 @@
  * Solana program interaction utilities
  */
 
-import { SystemProgram, PublicKey, Connection } from '@solana/web3.js'
+import { SystemProgram, PublicKey, Connection, SendTransactionError } from '@solana/web3.js'
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor'
 import type { Wallet } from '@coral-xyz/anchor'
 const WalletClass = (require('@coral-xyz/anchor').Wallet || (AnchorProvider.prototype as any).wallet)
 import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/heres_program.json'
-import { getSolanaConnection, getProgramId } from '@/config/solana'
+import { getSolanaConnection, getTeeConnection, getProgramId } from '@/config/solana'
 import {
   getCapsulePDA,
   getFeeConfigPDA,
@@ -64,37 +64,31 @@ export function getProvider(wallet: WalletContextState): AnchorProvider | null {
 }
 
 /**
- * Get Anchor program instance
+ * Get Anchor program instance. 
+ * Using Magic Router connection ensures dynamic routing to ER or Base Layer.
  */
 export function getProgram(wallet: WalletContextState): Program | null {
   const provider = getProvider(wallet)
   if (!provider) return null
 
-  // FORCE use the hardcoded program ID from our program's declare_id!
-  // This prevents issues if environment variables on Vercel are set to old/wrong IDs
   const programId = new PublicKey('CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM')
-
-  // Ensure we have a fresh, mutable IDL object
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
-
-  console.log('[getProgram] Creating Program instance:')
-  console.log(' - Program ID (Forced):', programId.toBase58())
-  console.log(' - Env Context:', SOLANA_CONFIG.NETWORK)
 
   const program = new Program(programIdl as any, provider)
   return program
 }
 
 /**
- * Get Anchor program instance pointing to TEE RPC (Private Ephemeral Rollup)
+ * Get Anchor program instance for TEE.
+ * Uses direct TEE connection (authenticated if token provided).
  */
 export function getTeeProgram(wallet: WalletContextState, token?: string): Program | null {
-  if (!wallet.publicKey || !wallet.signTransaction) return null
+  if (!wallet.publicKey || !wallet.signTransaction) {
+    return null
+  }
 
-  // Use TEE RPC with optional auth token
-  const url = token ? `${PER_TEE.RPC_URL}?token=${token}` : PER_TEE.RPC_URL
-  const connection = new Connection(url, 'confirmed')
+  const connection = getTeeConnection(token)
 
   const walletAdapter = {
     publicKey: wallet.publicKey,
@@ -106,19 +100,11 @@ export function getTeeProgram(wallet: WalletContextState, token?: string): Progr
     commitment: 'confirmed',
   })
 
-  // FORCE use the hardcoded program ID from our program's declare_id!
   const programId = new PublicKey('CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM')
+  const programIdl = JSON.parse(JSON.stringify(idl))
+  programIdl.address = programId.toBase58()
 
-  // Ensure we have a fresh, mutable IDL object
-  const teeIdl = JSON.parse(JSON.stringify(idl))
-  teeIdl.address = programId.toBase58()
-
-  console.log('[getTeeProgram] Creating TEE Program instance:')
-  console.log(' - Program ID (Forced):', programId.toBase58())
-  console.log(' - RPC URL:', url)
-
-  const program = new Program(teeIdl as any, provider)
-  return program
+  return new Program(programIdl as any, provider)
 }
 
 /**
@@ -136,8 +122,6 @@ export async function createCapsule(
   const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
   const [feeConfigPDA] = getFeeConfigPDA()
-  const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
-  const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
   const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
     ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
@@ -159,9 +143,6 @@ export async function createCapsule(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
-      const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
-
       const accounts: any = {
         capsule: capsulePDA,
         vault: vaultPDA,
@@ -174,8 +155,6 @@ export async function createCapsule(
         sourceTokenAccount: mint ? getAssociatedTokenAddress(mint, wallet.publicKey!) : null,
         vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
         associatedTokenProgram: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
-        permissionProgram: permissionProgramId,
-        permission: permissionPDA,
       }
 
       console.log('[createCapsule] Accounts:', Object.keys(accounts).map(k => `${k}: ${accounts[k]?.toString()}`))
@@ -426,6 +405,39 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
 }
 
 /**
+ * Cancel and close a capsule and vault.
+ * Reclaims SOL and account space.
+ */
+export async function cancelCapsule(
+  wallet: any,
+  capsulePda: PublicKey,
+  vaultPda: PublicKey
+): Promise<string> {
+  const connection = getSolanaConnection()
+  const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' })
+  const program = new Program(idl as any, provider)
+
+  try {
+    console.log('[cancelCapsule] Closing capsule and vault...')
+    const tx = await program.methods
+      .cancelCapsule()
+      .accounts({
+        capsule: capsulePda,
+        vault: vaultPda,
+        owner: wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc()
+
+    console.log('[cancelCapsule] ✅ Success! TX:', tx)
+    return tx
+  } catch (err: any) {
+    console.error('[cancelCapsule] ✗ Error:', err)
+    throw err
+  }
+}
+
+/**
  * Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).
  * When conditions are met, anyone (including crank) can call execute_intent without owner signature.
  */
@@ -444,23 +456,19 @@ export async function scheduleExecuteIntent(
   const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
   const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
-  // Explicitly map BOTH camelCase and snake_case for maximum compatibility
-  // Some versions of Anchor or TEE RPC might expect different formats
+  // Account mapping for schedule_execute_intent instruction
+  // These accounts are for the scheduling call itself, NOT the cranked execute_intent
   const accounts: any = {
     magicProgram: magicProgram,
-    magic_program: magicProgram,
     payer: wallet.publicKey as PublicKey,
     capsule: capsulePDA,
     vault: vaultPDA,
     permissionProgram: permissionProgramId,
-    permission_program: permissionProgramId,
     permission: permissionPDA,
   }
 
-  console.log('[scheduleExecuteIntent] 🚀 Scheduling on TEE RPC:')
+  console.log('[scheduleExecuteIntent] Scheduling on TEE RPC')
   console.log(' - Capsule:', capsulePDA.toBase58())
-  console.log(' - Magic Program:', magicProgram.toBase58())
-  console.log(' - Permission Program:', permissionProgramId.toBase58())
   console.log(' - Payer:', wallet.publicKey.toBase58())
 
   // Default values for optional args
@@ -484,22 +492,70 @@ export async function scheduleExecuteIntent(
   })
 
   try {
+    console.log('[scheduleExecuteIntent] Building transaction...');
+    // Use transaction() instead of rpc() to avoid blockhash issues as suggested
     const tx = await teeProgram.methods
       .scheduleExecuteIntent({
-        taskId,
-        executionIntervalMillis,
-        iterations,
+        task_id: taskId,
+        execution_interval_millis: executionIntervalMillis,
+        iterations: iterations,
       })
       // @ts-ignore
       .accounts(accounts)
-      .rpc();
+      .transaction();
 
-    return tx
+    console.log('[scheduleExecuteIntent] Sending and confirming transaction...');
+    // provider.sendAndConfirm manually handles the signature and confirmation
+    const txSignature = await teeProgram.provider.sendAndConfirm!(tx, [], {
+      commitment: 'confirmed',
+      skipPreflight: false,
+    });
+
+    console.log('[scheduleExecuteIntent] ✅ Success! TX:', txSignature);
+    return txSignature;
   } catch (err: any) {
-    console.error('[scheduleExecuteIntent] ✗ Rpc Error:', err);
-    if (err.stack) console.error('[scheduleExecuteIntent] ✗ Stack:', err.stack);
-    if (err.logs) console.error('[scheduleExecuteIntent] ✗ Logs:', err.logs);
-    throw err;
+    console.error('[scheduleExecuteIntent] ✗ Error:', err);
+
+    // Better error message translation
+    let errorMessage = err.message || 'Unknown error';
+    let logs: string[] | null = null;
+
+    if (err instanceof SendTransactionError || err.name === 'SendTransactionError') {
+      logs = err.logs || null;
+      if (!logs && typeof err.getLogs === 'function') {
+        try {
+          // Some environments might need the connection passed or have issues with getLogs
+          logs = await err.getLogs();
+        } catch (e) {
+          console.error('[scheduleExecuteIntent] ✗ Failed to get logs from err.getLogs():', e);
+          // Fallback: try to see if logs are in the error message or other fields
+          if (err.message && err.message.includes('logs:')) {
+            logs = [err.message];
+          }
+        }
+      }
+    } else if (err.logs) {
+      logs = err.logs;
+    }
+
+    if (logs) {
+      console.error('[scheduleExecuteIntent] ✗ Transaction Logs:', logs);
+      // Try to extract a more descriptive error from logs if it's an Anchor error
+      const anchorError = logs.find(l => l.includes('AnchorError'));
+      if (anchorError) {
+        errorMessage = `Anchor Error: ${anchorError.split('AnchorError thrown in ')[1] || anchorError}`;
+      } else if (logs.some(l => l.includes('invalid instruction data'))) {
+        errorMessage = 'Invalid instruction data: The TEE may be expecting a different account or argument format.';
+      }
+    }
+
+    const finalError = new Error(`Crank scheduling failed: ${errorMessage}`);
+    // @ts-ignore
+    finalError.logs = logs;
+    // @ts-ignore
+    finalError.originalError = err;
+
+    throw finalError;
   }
 }
 
@@ -783,15 +839,30 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       return null
     }
 
-    // Anchor accounts start with an 8-byte discriminator
-    // Skip the discriminator and parse the account data
-    const data = accountInfo.data
+    // Check if the account is delegated to MagicBlock ER
+    const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+    if (accountInfo.owner.equals(delegationProgramId)) {
+      console.log('Account is delegated. Checking validator...')
+      // For delegated accounts, the first 32 bytes of data are the validator
+      const validator = new PublicKey(accountInfo.data.slice(0, 32))
+      if (validator.toBase58() === MAGICBLOCK_ER.VALIDATOR_TEE) {
+        console.log('Account delegated to TEE. Re-fetching from TEE RPC...')
+        const teeConnection = getTeeConnection()
+        const teeAccountInfo = await teeConnection.getAccountInfo(capsulePDA)
+        if (teeAccountInfo && teeAccountInfo.data) {
+          console.log('Successfully fetched delegated state from TEE RPC')
+          // Use the latest data from the TEE
+          accountInfo.data = teeAccountInfo.data
+        }
+      }
+    }
 
-    // Discriminator is 8 bytes, skip it
+    // Anchor accounts start with an 8-byte discriminator
+    const dataToParse = accountInfo.data
     let offset = 8
 
     // owner: Pubkey (32 bytes)
-    const ownerBytes = data.slice(offset, offset + 32)
+    const ownerBytes = dataToParse.slice(offset, offset + 32)
     const ownerPubkey = new PublicKey(ownerBytes)
     offset += 32
 
@@ -801,7 +872,6 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       for (let i = 0; i < 8; i++) {
         result |= BigInt(bytes[start + i]) << BigInt(i * 8)
       }
-      // Handle signed integer (two's complement)
       if (result & (1n << 63n)) {
         result = result - (1n << 64n)
       }
@@ -814,33 +884,31 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
     }
 
     // inactivity_period: i64 (8 bytes, little-endian)
-    const inactivityPeriod = readI64(data, offset)
+    const inactivityPeriod = readI64(dataToParse, offset)
     offset += 8
 
     // last_activity: i64 (8 bytes, little-endian)
-    const lastActivity = readI64(data, offset)
+    const lastActivity = readI64(dataToParse, offset)
     offset += 8
 
     // intent_data: Vec<u8> (4 bytes length + data)
-    const intentDataLength = readU32(data, offset)
+    const intentDataLength = readU32(dataToParse, offset)
     offset += 4
-    const intentDataBytes = data.slice(offset, offset + intentDataLength)
+    const intentDataBytes = dataToParse.slice(offset, offset + intentDataLength)
     offset += intentDataLength
 
     // is_active: bool (1 byte)
-    const isActive = data[offset] === 1
+    const isActive = dataToParse[offset] === 1
     offset += 1
 
     // executed_at: Option<i64> (1 byte for Some/None + 8 bytes if Some)
     let executedAt: number | null = null
-    const hasExecutedAt = data[offset] === 1
+    const hasExecutedAt = dataToParse[offset] === 1
     offset += 1
     if (hasExecutedAt) {
-      executedAt = Number(readI64(data, offset))
+      executedAt = Number(readI64(dataToParse, offset))
       offset += 8
     }
-
-    // bump: u8 (1 byte) - we don't need this for the return value
 
     const capsule: IntentCapsule & { accountOwner: PublicKey } = {
       owner: ownerPubkey,
@@ -855,8 +923,8 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
 
     // Skip bump (1) and vault_bump (1)
     offset += 2
-    if (offset + 32 <= data.length) {
-      capsule.mint = new PublicKey(data.slice(offset, offset + 32))
+    if (offset + 32 <= dataToParse.length) {
+      capsule.mint = new PublicKey(dataToParse.slice(offset, offset + 32))
     }
 
     console.log('Successfully fetched capsule:', {
@@ -887,9 +955,22 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
   try {
     const accountInfo = await connection.getAccountInfo(capsulePda)
     if (!accountInfo || !accountInfo.data) return null
-    const data = accountInfo.data
-    if (data.length < 60) return null
+    if (accountInfo.data.length < 60) return null
 
+    // Check if the account is delegated to MagicBlock ER
+    const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+    if (accountInfo.owner.equals(delegationProgramId)) {
+      const validator = new PublicKey(accountInfo.data.slice(0, 32))
+      if (validator.toBase58() === MAGICBLOCK_ER.VALIDATOR_TEE) {
+        const teeConnection = getTeeConnection()
+        const teeAccountInfo = await teeConnection.getAccountInfo(capsulePda)
+        if (teeAccountInfo && teeAccountInfo.data) {
+          accountInfo.data = teeAccountInfo.data
+        }
+      }
+    }
+
+    const dataToParse = accountInfo.data
     const readI64 = (bytes: Uint8Array, start: number): bigint => {
       let result = 0n
       for (let i = 0; i < 8; i++) {
@@ -902,22 +983,22 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
       bytes[start] | (bytes[start + 1] << 8) | (bytes[start + 2] << 16) | (bytes[start + 3] << 24)
 
     let offset = 8
-    const ownerPubkey = new PublicKey(data.slice(offset, offset + 32))
+    const ownerPubkey = new PublicKey(dataToParse.slice(offset, offset + 32))
     offset += 32
-    const inactivityPeriod = Number(readI64(data, offset))
+    const inactivityPeriod = Number(readI64(dataToParse, offset))
     offset += 8
-    const lastActivity = Number(readI64(data, offset))
+    const lastActivity = Number(readI64(dataToParse, offset))
     offset += 8
-    const intentDataLength = readU32(data, offset)
+    const intentDataLength = readU32(dataToParse, offset)
     offset += 4
-    const intentDataBytes = data.slice(offset, offset + intentDataLength)
+    const intentDataBytes = dataToParse.slice(offset, offset + intentDataLength)
     offset += intentDataLength
-    const isActive = data[offset] === 1
+    const isActive = dataToParse[offset] === 1
     offset += 1
     let executedAt: number | null = null
-    if (data[offset] === 1) {
+    if (dataToParse[offset] === 1) {
       offset += 1
-      executedAt = Number(readI64(data, offset))
+      executedAt = Number(readI64(dataToParse, offset))
       offset += 8
     }
 
@@ -930,15 +1011,15 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
       isActive,
       executedAt,
       capsuleAddress: capsulePda.toBase58(),
-      accountOwner: accountInfo.owner, // Return the actual account owner (Heres or Delegation program)
+      accountOwner: accountInfo.owner,
       mint: undefined,
     }
 
     // Skip bump (1) and vault_bump (1)
     offset += 2
-    if (offset + 32 <= data.length) {
+    if (offset + 32 <= dataToParse.length) {
       // @ts-ignore
-      result.mint = new PublicKey(data.slice(offset, offset + 32))
+      result.mint = new PublicKey(dataToParse.slice(offset, offset + 32))
     }
     return result as IntentCapsule & { capsuleAddress: string }
   } catch {

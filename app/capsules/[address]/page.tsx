@@ -12,7 +12,10 @@ import {
   executeIntent,
   scheduleExecuteIntent,
   distributeAssets,
+  cancelCapsule,
+  undelegateCapsule,
 } from '@/lib/solana'
+import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE, PLATFORM_FEE } from '@/constants'
 import { TEE_AUTH } from '@/lib/tee'
@@ -124,6 +127,7 @@ export default function CapsuleDetailPage() {
   const [distributeError, setDistributeError] = useState<string | null>(null)
   const [teeAuthToken, setTeeAuthToken] = useState<string | null>(null)
   const [isTeeAuthenticated, setIsTeeAuthenticated] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
 
@@ -150,16 +154,30 @@ export default function CapsuleDetailPage() {
       try {
         if (!teeAuthToken) {
           console.log('[STEP 1] Fetching TEE authentication token...')
-          currentToken = await TEE_AUTH.getAuthToken(wallet)
-          setTeeAuthToken(currentToken)
-          setIsTeeAuthenticated(true)
-          console.log('[STEP 1] TEE Authentication successful')
+          try {
+            currentToken = await TEE_AUTH.getAuthToken(wallet)
+            setTeeAuthToken(currentToken)
+            setIsTeeAuthenticated(true)
+            console.log('[STEP 1] TEE Authentication successful')
+          } catch (error: any) {
+            const errorMsg = error?.message || String(error)
+            console.warn('[STEP 1] TEE Authentication failed:', errorMsg)
+
+            if (errorMsg.includes('UserKeyring not found')) {
+              setDelegateError('TEE authentication failed: Wallet keyring not found. Please try re-connecting your wallet or refreshing the page.')
+            } else if (errorMsg.includes('signMessage')) {
+              setDelegateError('TEE authentication failed: Wallet refused to sign the authentication message.')
+            } else {
+              setDelegateError(`TEE authentication failed: ${errorMsg}. Privacy features may be limited.`)
+            }
+            // We proceed even if auth fails, but scheduling might fail later if ER requires it
+          }
         } else {
           console.log('[STEP 1] Reusing existing TEE authentication token')
           currentToken = teeAuthToken
         }
-      } catch (authError) {
-        console.warn('[STEP 1] TEE Authentication failed, proceeding without token', authError)
+      } catch (wrapperError) {
+        console.error('[STEP 1] Unexpected error during TEE auth check:', wrapperError)
       }
 
       if (!isAlreadyDelegated) {
@@ -183,18 +201,32 @@ export default function CapsuleDetailPage() {
       try {
         console.log('[STEP 2] Scheduling crank on devnet ER using TEE RPC...')
         // PASS the owner and token here
-        const scheduleSig = await scheduleExecuteIntent(
+        const signature = await scheduleExecuteIntent(
           wallet,
           capsule.owner,
           undefined,
           currentToken || undefined
         );
-        setScheduleTx(scheduleSig)
-        console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', scheduleSig)
+        setScheduleTx(signature)
+        console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', signature)
       } catch (e: any) {
-        const msg = e?.message || String(e)
+        let msg = e?.message || String(e)
+        let logs = e.logs || (typeof e.getLogs === 'function' ? e.getLogs() : null);
+        if (logs instanceof Promise) {
+          try {
+            logs = await logs;
+          } catch (err) {
+            console.error('[STEP 2] Failed to get logs via getLogs():', err);
+            logs = null;
+          }
+        }
+        if (logs && Array.isArray(logs)) {
+          console.error('[STEP 2] Transaction Logs:', logs)
+          const errorLog = logs.find((log: string) => log.includes('Error:'))
+          if (errorLog) msg += ` (Log: ${errorLog.split('Error:')[1].trim()})`
+        }
         console.error('[STEP 2] ✗ Scheduling failed:', msg)
-        setScheduleError(`Crank scheduling failed: ${msg}`)
+        setScheduleError(`Crank scheduling failed: ${msg}. Check console for full logs.`)
       }
     } catch (e: any) {
       const msg = e?.message || String(e)
@@ -270,6 +302,49 @@ export default function CapsuleDetailPage() {
       setDistributePending(false)
     }
   }, [wallet, capsule, intentParsed])
+
+  const handleCancel = useCallback(async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    if (!confirm('Are you sure you want to delete this capsule? This will close all accounts and return SOL to your wallet.')) return
+
+    setIsCancelling(true)
+    try {
+      const capsulePDA = new PublicKey(capsule.capsuleAddress)
+      const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
+
+      // 1. Check if the capsule OR vault is delegated
+      const connection = getSolanaConnection()
+      const [capsuleAccountInfo, vaultAccountInfo] = await Promise.all([
+        connection.getAccountInfo(capsulePDA),
+        connection.getAccountInfo(vaultPDA)
+      ])
+
+      const capsuleDelegated = capsuleAccountInfo && capsuleAccountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID
+      const vaultDelegated = vaultAccountInfo && vaultAccountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID
+
+      if (capsuleDelegated || vaultDelegated) {
+        console.log('[handleCancel] Capsule or Vault is delegated. Attempting to undelegate first...')
+        console.log(`  Capsule delegated: ${capsuleDelegated}, Vault delegated: ${vaultDelegated}`)
+        try {
+          await undelegateCapsule(wallet as any)
+          console.log('[handleCancel] Undelegation successful.')
+          // Wait for network to reflect the change
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        } catch (undelErr: any) {
+          console.error('[handleCancel] Undelegation failed:', undelErr)
+          throw new Error(`Failed to undelegate: ${undelErr.message || String(undelErr)}`)
+        }
+      }
+
+      const tx = await cancelCapsule(wallet, capsulePDA, vaultPDA)
+      alert('Capsule deleted successfully! SOL returned.')
+      router.push('/dashboard')
+    } catch (e: any) {
+      alert(`Error deleting capsule: ${e.message || String(e)}`)
+    } finally {
+      setIsCancelling(false)
+    }
+  }, [wallet, capsule, router])
 
   const isNft = intentParsed?.type === 'nft'
   const isToken = intentParsed?.type === 'token'
@@ -770,6 +845,23 @@ export default function CapsuleDetailPage() {
               </div>
             )}
           </section>
+
+          {/* Danger Zone */}
+          {isOwner && capsule.isActive && (
+            <section className="card-Heres p-6 border-red-500/20 bg-red-500/5">
+              <h2 className="text-lg font-semibold text-red-400 mb-2">Danger Zone</h2>
+              <p className="text-sm text-Heres-muted mb-4">
+                Deleting this capsule will close the account and return all SOL from the vault to your wallet. This action cannot be undone.
+              </p>
+              <button
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="px-4 py-2 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 text-sm font-medium"
+              >
+                {isCancelling ? 'Deleting...' : 'Delete Capsule & Reclaim SOL'}
+              </button>
+            </section>
+          )}
         </div>
       </main>
     </div>

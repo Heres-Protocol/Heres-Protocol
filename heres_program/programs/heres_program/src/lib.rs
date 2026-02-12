@@ -141,36 +141,7 @@ pub mod heres_program {
             msg!("Locked {} lamports in vault for capsule {:?}", total_amount_lamports, capsule.key());
         }
 
-        // Initialize access control via Permission Program (PER/TEE)
-        let capsule_bump = ctx.accounts.capsule.bump;
-        let owner_key = ctx.accounts.owner.key();
-        let capsule_seeds: &[&[u8]] = &[
-            b"intent_capsule",
-            owner_key.as_ref(),
-            &[capsule_bump],
-        ];
-        let signer_seeds = &[capsule_seeds];
 
-        let members = vec![
-            Member {
-                flags: AUTHORITY_FLAG | TX_LOGS_FLAG | TX_BALANCES_FLAG | TX_MESSAGE_FLAG | ACCOUNT_SIGNATURES_FLAG,
-                pubkey: owner_key,
-            },
-            Member {
-                flags: TX_LOGS_FLAG | TX_BALANCES_FLAG | TX_MESSAGE_FLAG | ACCOUNT_SIGNATURES_FLAG,
-                pubkey: crate::TEE_VALIDATOR,
-            },
-        ];
-
-        CreatePermissionCpiBuilder::new(&ctx.accounts.permission_program)
-            .permissioned_account(&ctx.accounts.capsule.to_account_info())
-            .permission(&ctx.accounts.permission.to_account_info())
-            .payer(&ctx.accounts.owner.to_account_info())
-            .system_program(&ctx.accounts.system_program.to_account_info())
-            .args(MembersArgs { members: Some(members) })
-            .invoke_signed(signer_seeds)?;
-
-        msg!("Access control (TEE) initialized for capsule: {:?}", ctx.accounts.capsule.key());
         msg!("Intent Capsule created: {:?}", ctx.accounts.capsule.key());
         Ok(())
     }
@@ -383,12 +354,7 @@ pub mod heres_program {
 
     /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
     /// The #[delegate] macro handles this automatically for all fields marked with 'del'.
-    /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
-    /// The #[delegate] macro handles this automatically for all fields marked with 'del'.
     pub fn delegate_capsule(ctx: Context<DelegateCapsuleInput>) -> Result<()> {
-        let owner_key = ctx.accounts.owner.key();
-        
-        // Prepare config
         let validator_key = ctx.accounts.validator
             .as_ref()
             .map(|v| v.key())
@@ -400,28 +366,27 @@ pub mod heres_program {
         };
 
         msg!("Delegating capsule and vault to Ephemeral Rollup");
-        msg!("Owner: {:?}", owner_key);
+        let owner_key = ctx.accounts.owner.key();
 
         // Delegate Capsule PDA
-        // NOTE: Pass base seeds WITHOUT bump - delegate_pda finds the bump internally
-        let pda_seeds: &[&[u8]] = &[
-            b"intent_capsule",
-            owner_key.as_ref(),
-        ];
-        
-        ctx.accounts.delegate_pda(&ctx.accounts.payer, pda_seeds, config)?;
+        ctx.accounts.delegate_pda(
+            &ctx.accounts.payer, 
+            &[b"intent_capsule", owner_key.as_ref()], 
+            DelegateConfig {
+                commit_frequency_ms: 0,
+                validator: Some(validator_key),
+            }
+        )?;
 
         // Delegate Vault PDA
-        let vault_seeds: &[&[u8]] = &[
-            b"capsule_vault",
-            owner_key.as_ref(),
-        ];
-        
-        let config_vault = DelegateConfig {
-            commit_frequency_ms: 0,
-            validator: Some(validator_key),
-        };
-        ctx.accounts.delegate_vault(&ctx.accounts.payer, vault_seeds, config_vault)?;
+        ctx.accounts.delegate_vault(
+            &ctx.accounts.payer, 
+            &[b"capsule_vault", owner_key.as_ref()], 
+            DelegateConfig {
+                commit_frequency_ms: 0,
+                validator: Some(validator_key),
+            }
+        )?;
 
         msg!("Capsule and Vault delegated to Ephemeral Rollup");
         Ok(())
@@ -448,21 +413,19 @@ pub mod heres_program {
         ctx: Context<ScheduleExecuteIntent>,
         args: ScheduleExecuteIntentArgs,
     ) -> Result<()> {
-        msg!("Scheduling execute_intent on TEE");
-        msg!(" - Payer: {:?}", ctx.accounts.payer.key());
-        msg!(" - Capsule: {:?}", ctx.accounts.capsule.key());
-        msg!(" - Vault: {:?}", ctx.accounts.vault.key());
-        msg!(" - Magic Program: {:?}", ctx.accounts.magic_program.key());
-        msg!(" - SDK MAGIC_PROGRAM_ID: {:?}", MAGIC_PROGRAM_ID);
-        msg!(" - Permission Program: {:?}", ctx.accounts.permission_program.key());
-        msg!(" - Permission PDA: {:?}", ctx.accounts.permission.key());
+        msg!("Scheduling execute_intent on TEE for capsule: {:?}", ctx.accounts.capsule.key());
 
+
+        // CRITICAL: Only include accounts that execute_intent actually needs
+        // execute_intent only updates capsule.is_active and capsule.executed_at
+        // It does NOT touch vault, permission, or any other accounts
+        // Including unnecessary accounts causes "account not delegated" errors on TEE
         let accounts = vec![
-                AccountMeta::new(ctx.accounts.capsule.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.vault.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.permission.key(), false),
-            ];
+            AccountMeta::new(ctx.accounts.capsule.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.vault.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.permission.key(), false),
+        ];
 
         let execute_ix = Instruction {
             program_id: crate::ID,
@@ -578,6 +541,42 @@ pub mod heres_program {
         
         Ok(())
     }
+
+    /// Deactivate and close a capsule (owner reclaims SOL and account space).
+    /// Used to clear stuck capsules or simply close them.
+    pub fn cancel_capsule(ctx: Context<CancelCapsule>) -> Result<()> {
+        let capsule_info = &ctx.accounts.capsule;
+        let vault_info = &ctx.accounts.vault;
+        
+        msg!("Closing/Draining capsule {} and vault {}", capsule_info.key(), vault_info.key());
+
+        // Safety: Manual check for owner field in capsule data
+        let mut data: &[u8] = &capsule_info.try_borrow_data()?;
+        let capsule_data = IntentCapsule::try_deserialize(&mut data)?;
+        require!(
+            capsule_data.owner == ctx.accounts.owner.key(),
+            ErrorCode::Unauthorized
+        );
+        
+        // 1. Draining Vault (Always possible if seeds match, since our program is the PDA authority)
+        let vault_lamports = vault_info.lamports();
+        if vault_lamports > 0 {
+            **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? = 0;
+            **ctx.accounts.owner.to_account_info().try_borrow_mut_lamports()? += vault_lamports;
+        }
+
+        // 2. Draining Capsule
+        // If it's owned by us, we can effectively close it by zeroing lamports.
+        // If it's owned by DELeGG, this next part will FAIL at runtime, which is expected 
+        // until they call undelegate.
+        let capsule_lamports = capsule_info.lamports();
+        if capsule_lamports > 0 && capsule_info.owner == &crate::ID {
+            **ctx.accounts.capsule.to_account_info().try_borrow_mut_lamports()? = 0;
+            **ctx.accounts.owner.to_account_info().try_borrow_mut_lamports()? += capsule_lamports;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -596,10 +595,10 @@ pub struct DelegateCapsuleInput<'info> {
     /// CHECK: Checked by the delegation program
     pub validator: Option<AccountInfo<'info>>,
     /// CHECK: PDA to delegate (capsule); seeds: [b"intent_capsule", owner]
-    #[account(mut, del)]
+    #[account(mut, del, seeds = [b"intent_capsule", owner.key().as_ref()], bump)]
     pub pda: AccountInfo<'info>,
     /// CHECK: PDA to delegate (vault); seeds: [b"capsule_vault", owner]
-    #[account(mut, del)]
+    #[account(mut, del, seeds = [b"capsule_vault", owner.key().as_ref()], bump)]
     pub vault: AccountInfo<'info>,
     /// CHECK: Magic program
     pub magic_program: AccountInfo<'info>,
@@ -615,17 +614,29 @@ pub struct UndelegateCapsuleInput<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub owner: Signer<'info>,
-    #[account(mut, seeds = [b"intent_capsule", owner.key().as_ref()], bump = capsule.bump)]
-    pub capsule: Account<'info, IntentCapsule>,
+    #[account(
+        mut, 
+        seeds = [b"intent_capsule", owner.key().as_ref()], 
+        bump
+    )]
+    /// CHECK: Manual ownership check
+    pub capsule: AccountInfo<'info>,
+
     /// CHECK: Vault PDA (committed alongside capsule)
-    #[account(mut, seeds = [b"capsule_vault", owner.key().as_ref()], bump = capsule.vault_bump)]
+    #[account(
+        mut, 
+        seeds = [b"capsule_vault", owner.key().as_ref()], 
+        bump
+    )]
     pub vault: AccountInfo<'info>,
     /// CHECK: Buffer PDA for commit
     #[account(mut)]
     pub buffer: AccountInfo<'info>,
     /// CHECK: used for CPI
+    #[account(mut)]
     pub magic_context: AccountInfo<'info>,
     /// CHECK: Magic program
+    #[account(mut)]
     pub magic_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -714,7 +725,7 @@ pub struct CreateCapsule<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     #[account(
         init,
@@ -723,13 +734,13 @@ pub struct CreateCapsule<'info> {
         seeds = [b"capsule_vault", owner.key().as_ref()],
         bump
     )]
-    pub vault: Account<'info, CapsuleVault>,
+    pub vault: Box<Account<'info, CapsuleVault>>,
     
     #[account(mut)]
     pub owner: Signer<'info>,
     
     #[account(seeds = [b"fee_config"], bump)]
-    pub fee_config: Account<'info, FeeConfig>,
+    pub fee_config: Box<Account<'info, FeeConfig>>,
     
     /// Platform fee recipient (must match fee_config.fee_recipient when creation_fee_lamports > 0)
     /// CHECK: validated against fee_config.fee_recipient in instruction
@@ -740,10 +751,10 @@ pub struct CreateCapsule<'info> {
     
     pub token_program: Program<'info, Token>,
 
-    pub mint: Option<Account<'info, Mint>>,
+    pub mint: Option<Box<Account<'info, Mint>>>,
 
     #[account(mut)]
-    pub source_token_account: Option<Account<'info, TokenAccount>>,
+    pub source_token_account: Option<Box<Account<'info, TokenAccount>>>,
     
     #[account(
         init_if_needed,
@@ -751,23 +762,10 @@ pub struct CreateCapsule<'info> {
         associated_token::mint = mint,
         associated_token::authority = vault,
     )]
-    pub vault_token_account: Option<Account<'info, TokenAccount>>,
+    pub vault_token_account: Option<Box<Account<'info, TokenAccount>>>,
+    
     
     pub associated_token_program: Program<'info, AssociatedToken>,
-
-    /// MagicBlock Permission Program
-    /// CHECK: Validated by address
-    #[account(address = PERMISSION_PROGRAM_ID)]
-    pub permission_program: AccountInfo<'info>,
-
-    /// CHECK: PDA for access control; seeds [b"permission", capsule]
-    #[account(
-        mut,
-        seeds = [b"permission", capsule.key().as_ref()],
-        bump,
-        seeds::program = PERMISSION_PROGRAM_ID
-    )]
-    pub permission: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -777,7 +775,7 @@ pub struct UpdateIntent<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     pub owner: Signer<'info>,
 }
@@ -789,7 +787,7 @@ pub struct ExecuteIntent<'info> {
         seeds = [b"intent_capsule", capsule.owner.as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     /// CHECK: Vault PDA (read-only for state check)
     #[account(
@@ -818,30 +816,30 @@ pub struct DistributeAssets<'info> {
         seeds = [b"intent_capsule", capsule.owner.as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     #[account(
         mut,
         seeds = [b"capsule_vault", capsule.owner.as_ref()],
         bump = capsule.vault_bump
     )]
-    pub vault: Account<'info, CapsuleVault>,
+    pub vault: Box<Account<'info, CapsuleVault>>,
     
     pub system_program: Program<'info, System>,
     
     pub token_program: Program<'info, Token>,
     
     #[account(seeds = [b"fee_config"], bump)]
-    pub fee_config: Account<'info, FeeConfig>,
+    pub fee_config: Box<Account<'info, FeeConfig>>,
     
     /// Platform fee recipient
     #[account(mut)]
     pub platform_fee_recipient: Option<AccountInfo<'info>>,
 
-    pub mint: Option<Account<'info, Mint>>,
+    pub mint: Option<Box<Account<'info, Mint>>>,
 
     #[account(mut)]
-    pub vault_token_account: Option<Account<'info, TokenAccount>>,
+    pub vault_token_account: Option<Box<Account<'info, TokenAccount>>>,
 }
 
 #[derive(Accounts)]
@@ -851,7 +849,7 @@ pub struct UpdateActivity<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     pub owner: Signer<'info>,
 }
@@ -863,7 +861,7 @@ pub struct DeactivateCapsule<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     pub owner: Signer<'info>,
 }
@@ -875,14 +873,38 @@ pub struct RecreateCapsule<'info> {
         seeds = [b"intent_capsule", owner.key().as_ref()],
         bump = capsule.bump
     )]
-    pub capsule: Account<'info, IntentCapsule>,
+    pub capsule: Box<Account<'info, IntentCapsule>>,
     
     #[account(
         mut,
         seeds = [b"capsule_vault", owner.key().as_ref()],
         bump = capsule.vault_bump
     )]
-    pub vault: Account<'info, CapsuleVault>,
+    pub vault: Box<Account<'info, CapsuleVault>>,
+    
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CancelCapsule<'info> {
+    /// CHECK: Manual ownership check. We bypass Anchor's Account owner check to allow force reset of delegated capsules.
+    #[account(
+        mut,
+        seeds = [b"intent_capsule", owner.key().as_ref()],
+        bump,
+    )]
+    pub capsule: AccountInfo<'info>,
+
+    /// CHECK: Vault PDA. We manually drain lamports and close it by zeroing.
+    #[account(
+        mut,
+        seeds = [b"capsule_vault", owner.key().as_ref()],
+        bump,
+    )]
+    pub vault: AccountInfo<'info>,
     
     #[account(mut)]
     pub owner: Signer<'info>,

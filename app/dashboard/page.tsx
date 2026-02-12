@@ -13,10 +13,10 @@ import {
   Sparkles,
   User,
 } from 'lucide-react'
-import { PublicKey } from '@solana/web3.js'
+import { Connection, PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
-import { SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
+import { SOLANA_CONFIG, PLATFORM_FEE, HELIUS_CONFIG } from '@/constants'
 import { getEnhancedTransactions } from '@/lib/helius'
 import { initFeeConfig } from '@/lib/solana'
 import { getFeeConfigPDA } from '@/lib/program'
@@ -465,14 +465,28 @@ export default function DashboardPage() {
 
         let accounts: any = []
         try {
+          console.log('Fetching program accounts from primary RPC...')
           accounts = await connection.getProgramAccounts(programId, {
             commitment: 'confirmed',
           })
-        } catch (e) {
-          console.error('Failed to fetch program accounts:', e)
-          if (isMounted) setError('Unable to load on-chain capsule data. RPC connection failed.')
-          setIsRefreshing(false)
-          return
+        } catch (e: any) {
+          console.warn('Primary RPC failed:', e)
+          // Handle 403 or other RPC failures by falling back
+          if (e?.message?.includes('403') || e?.message?.includes('Forbidden') || e?.message?.includes('Bad request')) {
+            console.log('Detection of 403/Forbidden. Retrying with fallback RPC...')
+            try {
+              const fallbackConnection = new Connection(HELIUS_CONFIG.RPC_URL_DEVNET, 'confirmed')
+              accounts = await fallbackConnection.getProgramAccounts(programId, {
+                commitment: 'confirmed',
+              })
+              console.log('Successfully fetched from fallback RPC')
+            } catch (fallbackError: any) {
+              console.error('Fallback RPC also failed:', fallbackError)
+              throw fallbackError
+            }
+          } else {
+            throw e
+          }
         }
 
         const decodedCapsules = accounts
