@@ -459,36 +459,65 @@ export async function scheduleExecuteIntent(
   })
 
   try {
+    console.log('[scheduleExecuteIntent] Building transaction...');
+    // Use transaction() instead of rpc() to avoid blockhash issues as suggested
     const tx = await teeProgram.methods
       .scheduleExecuteIntent({
-        task_id: taskId,
-        execution_interval_millis: executionIntervalMillis,
+        taskId,
+        executionIntervalMillis,
         iterations,
       })
       // @ts-ignore
       .accounts(accounts)
-      .rpc();
+      .transaction();
 
-    return tx
+    console.log('[scheduleExecuteIntent] Sending and confirming transaction...');
+    // provider.sendAndConfirm manually handles the signature and confirmation
+    const txSignature = await teeProgram.provider.sendAndConfirm!(tx, [], {
+      commitment: 'confirmed',
+      skipPreflight: false,
+    });
+
+    console.log('[scheduleExecuteIntent] ✅ Success! TX:', txSignature);
+    return txSignature;
   } catch (err: any) {
-    console.error('[scheduleExecuteIntent] ✗ Rpc Error:', err);
+    console.error('[scheduleExecuteIntent] ✗ Error:', err);
+
+    // Better error message translation
+    let errorMessage = err.message || 'Unknown error';
     let logs: string[] | null = null;
+
     if (err instanceof SendTransactionError || err.name === 'SendTransactionError') {
       logs = err.logs || null;
       if (!logs && typeof err.getLogs === 'function') {
         try {
           logs = await err.getLogs();
         } catch (e) {
-          console.error('[scheduleExecuteIntent] ✗ Failed to get logs via getLogs():', e);
+          console.error('[scheduleExecuteIntent] ✗ Failed to get logs:', e);
         }
       }
-      console.error('[scheduleExecuteIntent] ✗ Transaction Logs:', logs);
     } else if (err.logs) {
       logs = err.logs;
-      console.error('[scheduleExecuteIntent] ✗ Error Logs:', logs);
     }
-    if (err.stack) console.error('[scheduleExecuteIntent] ✗ Stack:', err.stack);
-    throw err;
+
+    if (logs) {
+      console.error('[scheduleExecuteIntent] ✗ Transaction Logs:', logs);
+      // Try to extract a more descriptive error from logs if it's an Anchor error
+      const anchorError = logs.find(l => l.includes('AnchorError'));
+      if (anchorError) {
+        errorMessage = `Anchor Error: ${anchorError.split('AnchorError thrown in ')[1] || anchorError}`;
+      } else if (logs.some(l => l.includes('invalid instruction data'))) {
+        errorMessage = 'Invalid instruction data: The TEE may be expecting a different account or argument format.';
+      }
+    }
+
+    const finalError = new Error(`Crank scheduling failed: ${errorMessage}`);
+    // @ts-ignore
+    finalError.logs = logs;
+    // @ts-ignore
+    finalError.originalError = err;
+
+    throw finalError;
   }
 }
 
