@@ -150,16 +150,30 @@ export default function CapsuleDetailPage() {
       try {
         if (!teeAuthToken) {
           console.log('[STEP 1] Fetching TEE authentication token...')
-          currentToken = await TEE_AUTH.getAuthToken(wallet)
-          setTeeAuthToken(currentToken)
-          setIsTeeAuthenticated(true)
-          console.log('[STEP 1] TEE Authentication successful')
+          try {
+            currentToken = await TEE_AUTH.getAuthToken(wallet)
+            setTeeAuthToken(currentToken)
+            setIsTeeAuthenticated(true)
+            console.log('[STEP 1] TEE Authentication successful')
+          } catch (error: any) {
+            const errorMsg = error?.message || String(error)
+            console.warn('[STEP 1] TEE Authentication failed:', errorMsg)
+
+            if (errorMsg.includes('UserKeyring not found')) {
+              setDelegateError('TEE authentication failed: Wallet keyring not found. Please try re-connecting your wallet or refreshing the page.')
+            } else if (errorMsg.includes('signMessage')) {
+              setDelegateError('TEE authentication failed: Wallet refused to sign the authentication message.')
+            } else {
+              setDelegateError(`TEE authentication failed: ${errorMsg}. Privacy features may be limited.`)
+            }
+            // We proceed even if auth fails, but scheduling might fail later if ER requires it
+          }
         } else {
           console.log('[STEP 1] Reusing existing TEE authentication token')
           currentToken = teeAuthToken
         }
-      } catch (authError) {
-        console.warn('[STEP 1] TEE Authentication failed, proceeding without token', authError)
+      } catch (wrapperError) {
+        console.error('[STEP 1] Unexpected error during TEE auth check:', wrapperError)
       }
 
       if (!isAlreadyDelegated) {

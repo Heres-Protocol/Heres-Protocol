@@ -22,18 +22,14 @@ export function getSolanaConnection(): Connection {
   return cachedConnection
 }
 
-let cachedTeeConnection: Connection | null = null
-
 /**
  * Get direct TEE RPC connection for delegated state queries.
  */
-export function getTeeConnection(): Connection {
-  if (cachedTeeConnection) return cachedTeeConnection
-
-  cachedTeeConnection = new Connection(PER_TEE.RPC_URL, {
+export function getTeeConnection(token?: string): Connection {
+  const url = token ? `${PER_TEE.RPC_URL}?token=${token}` : PER_TEE.RPC_URL
+  return new Connection(url, {
     commitment: 'confirmed',
   })
-  return cachedTeeConnection
 }
 
 /**

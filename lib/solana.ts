@@ -80,10 +80,31 @@ export function getProgram(wallet: WalletContextState): Program | null {
 }
 
 /**
- * Alias for getProgram to maintain backward compatibility, now using unified routing.
+ * Get Anchor program instance for TEE.
+ * Uses direct TEE connection (authenticated if token provided).
  */
-export function getTeeProgram(wallet: WalletContextState, _token?: string): Program | null {
-  return getProgram(wallet)
+export function getTeeProgram(wallet: WalletContextState, token?: string): Program | null {
+  if (!wallet.publicKey || !wallet.signTransaction) {
+    return null
+  }
+
+  const connection = getTeeConnection(token)
+
+  const walletAdapter = {
+    publicKey: wallet.publicKey,
+    signTransaction: wallet.signTransaction,
+    signAllTransactions: wallet.signAllTransactions || (async (txs: any) => txs),
+  } as Wallet
+
+  const provider = new AnchorProvider(connection, walletAdapter, {
+    commitment: 'confirmed',
+  })
+
+  const programId = new PublicKey('CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM')
+  const programIdl = JSON.parse(JSON.stringify(idl))
+  programIdl.address = programId.toBase58()
+
+  return new Program(programIdl as any, provider)
 }
 
 /**
