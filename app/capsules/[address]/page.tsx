@@ -12,7 +12,9 @@ import {
   executeIntent,
   scheduleExecuteIntent,
   distributeAssets,
+  cancelCapsule,
 } from '@/lib/solana'
+import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE, PLATFORM_FEE } from '@/constants'
 import { TEE_AUTH } from '@/lib/tee'
@@ -124,6 +126,7 @@ export default function CapsuleDetailPage() {
   const [distributeError, setDistributeError] = useState<string | null>(null)
   const [teeAuthToken, setTeeAuthToken] = useState<string | null>(null)
   const [isTeeAuthenticated, setIsTeeAuthenticated] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
 
@@ -298,6 +301,23 @@ export default function CapsuleDetailPage() {
       setDistributePending(false)
     }
   }, [wallet, capsule, intentParsed])
+
+  const handleCancel = useCallback(async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    if (!confirm('Are you sure you want to delete this capsule? This will close all accounts and return SOL to your wallet.')) return
+
+    setIsCancelling(true)
+    try {
+      const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
+      const tx = await cancelCapsule(wallet, new PublicKey(capsule.capsuleAddress), vaultPDA)
+      alert('Capsule deleted successfully! SOL returned.')
+      router.push('/dashboard')
+    } catch (e: any) {
+      alert(`Error deleting capsule: ${e.message || String(e)}`)
+    } finally {
+      setIsCancelling(false)
+    }
+  }, [wallet, capsule, router])
 
   const isNft = intentParsed?.type === 'nft'
   const isToken = intentParsed?.type === 'token'
@@ -798,6 +818,23 @@ export default function CapsuleDetailPage() {
               </div>
             )}
           </section>
+
+          {/* Danger Zone */}
+          {isOwner && capsule.isActive && (
+            <section className="card-Heres p-6 border-red-500/20 bg-red-500/5">
+              <h2 className="text-lg font-semibold text-red-400 mb-2">Danger Zone</h2>
+              <p className="text-sm text-Heres-muted mb-4">
+                Deleting this capsule will close the account and return all SOL from the vault to your wallet. This action cannot be undone.
+              </p>
+              <button
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="px-4 py-2 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 text-sm font-medium"
+              >
+                {isCancelling ? 'Deleting...' : 'Delete Capsule & Reclaim SOL'}
+              </button>
+            </section>
+          )}
         </div>
       </main>
     </div>

@@ -405,6 +405,39 @@ export async function undelegateCapsule(wallet: WalletContextState): Promise<str
 }
 
 /**
+ * Cancel and close a capsule and vault.
+ * Reclaims SOL and account space.
+ */
+export async function cancelCapsule(
+  wallet: any,
+  capsulePda: PublicKey,
+  vaultPda: PublicKey
+): Promise<string> {
+  const connection = getSolanaConnection()
+  const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' })
+  const program = new Program(idl as any, provider)
+
+  try {
+    console.log('[cancelCapsule] Closing capsule and vault...')
+    const tx = await program.methods
+      .cancelCapsule()
+      .accounts({
+        capsule: capsulePda,
+        vault: vaultPda,
+        owner: wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc()
+
+    console.log('[cancelCapsule] ✅ Success! TX:', tx)
+    return tx
+  } catch (err: any) {
+    console.error('[cancelCapsule] ✗ Error:', err)
+    throw err
+  }
+}
+
+/**
  * Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).
  * When conditions are met, anyone (including crank) can call execute_intent without owner signature.
  */

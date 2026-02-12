@@ -541,6 +541,33 @@ pub mod heres_program {
         
         Ok(())
     }
+
+    /// Deactivate and close a capsule (owner reclaims SOL and account space).
+    /// Used to clear stuck capsules or simply close them.
+    pub fn cancel_capsule(ctx: Context<CancelCapsule>) -> Result<()> {
+        let capsule = &ctx.accounts.capsule;
+        let vault = &ctx.accounts.vault;
+        
+        // Safety: Ensure it's not delegated (MagicBlock doesn't allow closing delegated accounts easily anyway)
+        // If it is delegated, owner will be DELEGATION_PROGRAM_ID
+        require!(
+            capsule.to_account_info().owner == &crate::ID,
+            ErrorCode::Unauthorized // Or a better "IsDelegated" error
+        );
+        
+        msg!("Closing capsule {} and vault {}", capsule.key(), vault.key());
+        
+        // Distribution of SOL happens automatically during account closing via Anchor's `close = ...`
+        // but we need to ensure the vault (AccountInfo) is handled.
+        // For AccountInfo vault, we manually transfer lamports if it's not empty.
+        let vault_lamports = vault.lamports();
+        if vault_lamports > 0 {
+            **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? = 0;
+            **ctx.accounts.owner.to_account_info().try_borrow_mut_lamports()? += vault_lamports;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -833,6 +860,32 @@ pub struct RecreateCapsule<'info> {
         bump = capsule.vault_bump
     )]
     pub vault: Box<Account<'info, CapsuleVault>>,
+    
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CancelCapsule<'info> {
+    #[account(
+        mut,
+        seeds = [b"intent_capsule", owner.key().as_ref()],
+        bump = capsule.bump,
+        close = owner,
+        constraint = capsule.owner == owner.key()
+    )]
+    pub capsule: Box<Account<'info, IntentCapsule>>,
+    
+    /// CHECK: Vault PDA. We manually drain lamports and close it by zeroing.
+    /// Since it's a naked AccountInfo in most logic, we just empty it.
+    #[account(
+        mut,
+        seeds = [b"capsule_vault", owner.key().as_ref()],
+        bump = capsule.vault_bump,
+    )]
+    pub vault: AccountInfo<'info>,
     
     #[account(mut)]
     pub owner: Signer<'info>,

@@ -12,7 +12,8 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 )
 import Link from 'next/link'
-import { createCapsule, getCapsule } from '@/lib/solana'
+import { createCapsule, getCapsule, cancelCapsule } from '@/lib/solana'
+import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
 import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
 import { getNftsByOwner } from '@/lib/helius'
@@ -55,6 +56,7 @@ export default function CreatePage() {
   const [selectedNftMints, setSelectedNftMints] = useState<string[]>([])
   const [nftRecipients, setNftRecipients] = useState<{ address: string }[]>([{ address: '' }])
   const [nftAssignments, setNftAssignments] = useState<Record<string, number>>({})
+  const [isCancelling, setIsCancelling] = useState(false)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -462,6 +464,32 @@ export default function CreatePage() {
     }
   }
 
+  const handleCancelCapsule = async () => {
+    if (!connected || !publicKey) return
+    if (!confirm('Are you sure you want to cancel and delete this capsule? This will reclaim all SOL locked in the vault.')) return
+
+    setIsCancelling(true)
+    setError(null)
+    try {
+      const [capsulePDA] = getCapsulePDA(publicKey)
+      const [vaultPDA] = getCapsuleVaultPDA(publicKey)
+
+      const hash = await cancelCapsule(wallet as any, capsulePDA, vaultPDA)
+      alert(`Capsule cancelled successfully! SOL has been returned to your wallet.`)
+      setExistingCapsule(false)
+      setTxHash(hash)
+      // Clear any local storage related to this capsule
+      localStorage.removeItem(STORAGE_KEYS.CAPSULE_CREATION_TX(publicKey.toString()))
+    } catch (err: any) {
+      console.error('Error cancelling capsule:', err)
+      const msg = err.message || 'Failed to cancel capsule'
+      setError(msg)
+      alert(`Error: ${msg}`)
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
   const simulateExecution = () => {
     setShowSimulation(true)
   }
@@ -554,9 +582,18 @@ export default function CreatePage() {
                       <p className="text-Heres-muted mb-4">
                         You already have a capsule for this wallet. Please visit your existing capsule to update or deactivate it first.
                       </p>
-                      <Link href="/capsules">
-                        <span className="btn-secondary inline-block px-4 py-2 text-sm">View My Capsule</span>
-                      </Link>
+                      <div className="flex flex-wrap gap-3">
+                        <Link href="/capsules">
+                          <span className="btn-secondary inline-block px-4 py-2 text-sm">View My Capsule</span>
+                        </Link>
+                        <button
+                          onClick={handleCancelCapsule}
+                          disabled={isCancelling}
+                          className="px-4 py-2 text-sm rounded-xl border border-red-500/50 bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-50 transition-colors"
+                        >
+                          {isCancelling ? 'Cancelling...' : 'Cancel & Reset (Reclaim SOL)'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
