@@ -312,19 +312,27 @@ export default function CapsuleDetailPage() {
       const capsulePDA = new PublicKey(capsule.capsuleAddress)
       const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
 
-      // 1. Check if the capsule is delegated
+      // 1. Check if the capsule OR vault is delegated
       const connection = getSolanaConnection()
-      const accountInfo = await connection.getAccountInfo(capsulePDA)
+      const [capsuleAccountInfo, vaultAccountInfo] = await Promise.all([
+        connection.getAccountInfo(capsulePDA),
+        connection.getAccountInfo(vaultPDA)
+      ])
 
-      if (accountInfo && accountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID) {
-        console.log('[handleCancel] Capsule is delegated. Attempting to undelegate first...')
+      const capsuleDelegated = capsuleAccountInfo && capsuleAccountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID
+      const vaultDelegated = vaultAccountInfo && vaultAccountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID
+
+      if (capsuleDelegated || vaultDelegated) {
+        console.log('[handleCancel] Capsule or Vault is delegated. Attempting to undelegate first...')
+        console.log(`  Capsule delegated: ${capsuleDelegated}, Vault delegated: ${vaultDelegated}`)
         try {
           await undelegateCapsule(wallet as any)
           console.log('[handleCancel] Undelegation successful.')
-          // Wait a second for network to reflect the change
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          // Wait for network to reflect the change
+          await new Promise(resolve => setTimeout(resolve, 2000))
         } catch (undelErr: any) {
-          console.warn('[handleCancel] Undelegation failed, but proceeding anyway:', undelErr)
+          console.error('[handleCancel] Undelegation failed:', undelErr)
+          throw new Error(`Failed to undelegate: ${undelErr.message || String(undelErr)}`)
         }
       }
 
