@@ -633,8 +633,10 @@ pub struct UndelegateCapsuleInput<'info> {
     #[account(mut)]
     pub buffer: AccountInfo<'info>,
     /// CHECK: used for CPI
+    #[account(mut)]
     pub magic_context: AccountInfo<'info>,
     /// CHECK: Magic program
+    #[account(mut)]
     pub magic_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
 }
