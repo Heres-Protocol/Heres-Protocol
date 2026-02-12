@@ -488,11 +488,20 @@ export async function scheduleExecuteIntent(
     console.error('[scheduleExecuteIntent] ✗ Rpc Error:', err);
     let logs: string[] | null = null;
     if (err instanceof SendTransactionError || err.name === 'SendTransactionError') {
-      logs = err.logs || (typeof err.getLogs === 'function' ? err.getLogs() : null);
+      logs = err.logs || null;
+      if (!logs && typeof err.getLogs === 'function') {
+        try {
+          logs = await err.getLogs();
+        } catch (e) {
+          console.error('[scheduleExecuteIntent] ✗ Failed to get logs via getLogs():', e);
+        }
+      }
       console.error('[scheduleExecuteIntent] ✗ Transaction Logs:', logs);
+    } else if (err.logs) {
+      logs = err.logs;
+      console.error('[scheduleExecuteIntent] ✗ Error Logs:', logs);
     }
     if (err.stack) console.error('[scheduleExecuteIntent] ✗ Stack:', err.stack);
-    if (err.logs && !logs) console.error('[scheduleExecuteIntent] ✗ Logs:', err.logs);
     throw err;
   }
 }

@@ -193,7 +193,15 @@ export default function CapsuleDetailPage() {
         console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', signature)
       } catch (e: any) {
         let msg = e?.message || String(e)
-        const logs = e.logs || (typeof e.getLogs === 'function' ? e.getLogs() : null);
+        let logs = e.logs || (typeof e.getLogs === 'function' ? e.getLogs() : null);
+        if (logs instanceof Promise) {
+          try {
+            logs = await logs;
+          } catch (err) {
+            console.error('[STEP 2] Failed to get logs via getLogs():', err);
+            logs = null;
+          }
+        }
         if (logs && Array.isArray(logs)) {
           console.error('[STEP 2] Transaction Logs:', logs)
           const errorLog = logs.find((log: string) => log.includes('Error:'))
