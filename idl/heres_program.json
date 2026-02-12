@@ -1474,10 +1474,12 @@
           "writable": true
         },
         {
-          "name": "magic_context"
+          "name": "magic_context",
+          "writable": true
         },
         {
-          "name": "magic_program"
+          "name": "magic_program",
+          "writable": true
         },
         {
           "name": "system_program",
