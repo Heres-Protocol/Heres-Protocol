@@ -13,6 +13,7 @@ import {
   scheduleExecuteIntent,
   distributeAssets,
   cancelCapsule,
+  undelegateCapsule,
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
@@ -308,8 +309,26 @@ export default function CapsuleDetailPage() {
 
     setIsCancelling(true)
     try {
+      const capsulePDA = new PublicKey(capsule.capsuleAddress)
       const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
-      const tx = await cancelCapsule(wallet, new PublicKey(capsule.capsuleAddress), vaultPDA)
+
+      // 1. Check if the capsule is delegated
+      const connection = getSolanaConnection()
+      const accountInfo = await connection.getAccountInfo(capsulePDA)
+
+      if (accountInfo && accountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID) {
+        console.log('[handleCancel] Capsule is delegated. Attempting to undelegate first...')
+        try {
+          await undelegateCapsule(wallet as any)
+          console.log('[handleCancel] Undelegation successful.')
+          // Wait a second for network to reflect the change
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        } catch (undelErr: any) {
+          console.warn('[handleCancel] Undelegation failed, but proceeding anyway:', undelErr)
+        }
+      }
+
+      const tx = await cancelCapsule(wallet, capsulePDA, vaultPDA)
       alert('Capsule deleted successfully! SOL returned.')
       router.push('/dashboard')
     } catch (e: any) {

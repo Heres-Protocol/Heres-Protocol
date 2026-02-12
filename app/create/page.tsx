@@ -12,10 +12,10 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 )
 import Link from 'next/link'
-import { createCapsule, getCapsule, cancelCapsule } from '@/lib/solana'
+import { createCapsule, getCapsule, cancelCapsule, undelegateCapsule } from '@/lib/solana'
 import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
-import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE } from '@/constants'
+import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER } from '@/constants'
 import { getNftsByOwner } from '@/lib/helius'
 import { encodeIntentData, daysToSeconds } from '@/utils/intent'
 import {
@@ -473,6 +473,23 @@ export default function CreatePage() {
     try {
       const [capsulePDA] = getCapsulePDA(publicKey)
       const [vaultPDA] = getCapsuleVaultPDA(publicKey)
+
+      // 1. Check if the capsule is delegated
+      const connection = getSolanaConnection()
+      const accountInfo = await connection.getAccountInfo(capsulePDA)
+
+      if (accountInfo && accountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID) {
+        console.log('[handleCancelCapsule] Capsule is delegated. Attempting to undelegate first...')
+        try {
+          await undelegateCapsule(wallet as any)
+          console.log('[handleCancelCapsule] Undelegation successful.')
+          // Wait a second for network to reflect the change
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        } catch (undelErr: any) {
+          console.warn('[handleCancelCapsule] Undelegation failed, but proceeding anyway:', undelErr)
+          // We proceed because sometimes the ER state is already gone but the account is still marked
+        }
+      }
 
       const hash = await cancelCapsule(wallet as any, capsulePDA, vaultPDA)
       alert(`Capsule cancelled successfully! SOL has been returned to your wallet.`)
