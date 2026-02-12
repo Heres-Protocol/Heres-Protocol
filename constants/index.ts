@@ -22,6 +22,7 @@ export const HELIUS_CONFIG = {
     : 'https://api.devnet.solana.com',
   // Alternative RPC endpoints for fallback
   RPC_URL_ALT: 'https://api.devnet.solana.com',
+  RPC_URL_DEVNET: 'https://api.devnet.solana.com',
 } as const
 
 // Default Values
