@@ -170,9 +170,9 @@ async function main() {
     try {
         const tx = await teeProgram.methods
             .scheduleExecuteIntent({
-                taskId,
-                executionIntervalMillis,
-                iterations,
+                task_id: taskId,
+                execution_interval_millis: executionIntervalMillis,
+                iterations: iterations,
             })
             .accounts({
                 magicProgram,

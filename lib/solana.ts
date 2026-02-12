@@ -463,9 +463,9 @@ export async function scheduleExecuteIntent(
     // Use transaction() instead of rpc() to avoid blockhash issues as suggested
     const tx = await teeProgram.methods
       .scheduleExecuteIntent({
-        taskId,
-        executionIntervalMillis,
-        iterations,
+        task_id: taskId,
+        execution_interval_millis: executionIntervalMillis,
+        iterations: iterations,
       })
       // @ts-ignore
       .accounts(accounts)
@@ -491,9 +491,14 @@ export async function scheduleExecuteIntent(
       logs = err.logs || null;
       if (!logs && typeof err.getLogs === 'function') {
         try {
+          // Some environments might need the connection passed or have issues with getLogs
           logs = await err.getLogs();
         } catch (e) {
-          console.error('[scheduleExecuteIntent] ✗ Failed to get logs:', e);
+          console.error('[scheduleExecuteIntent] ✗ Failed to get logs from err.getLogs():', e);
+          // Fallback: try to see if logs are in the error message or other fields
+          if (err.message && err.message.includes('logs:')) {
+            logs = [err.message];
+          }
         }
       }
     } else if (err.logs) {
