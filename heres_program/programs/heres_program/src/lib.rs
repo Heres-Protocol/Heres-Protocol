@@ -354,12 +354,7 @@ pub mod heres_program {
 
     /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
     /// The #[delegate] macro handles this automatically for all fields marked with 'del'.
-    /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
-    /// The #[delegate] macro handles this automatically for all fields marked with 'del'.
     pub fn delegate_capsule(ctx: Context<DelegateCapsuleInput>) -> Result<()> {
-        let owner_key = ctx.accounts.owner.key();
-        
-        // Prepare config
         let validator_key = ctx.accounts.validator
             .as_ref()
             .map(|v| v.key())
@@ -371,28 +366,27 @@ pub mod heres_program {
         };
 
         msg!("Delegating capsule and vault to Ephemeral Rollup");
-        msg!("Owner: {:?}", owner_key);
+        let owner_key = ctx.accounts.owner.key();
 
         // Delegate Capsule PDA
-        // NOTE: Pass base seeds WITHOUT bump - delegate_pda finds the bump internally
-        let pda_seeds: &[&[u8]] = &[
-            b"intent_capsule",
-            owner_key.as_ref(),
-        ];
-        
-        ctx.accounts.delegate_pda(&ctx.accounts.payer, pda_seeds, config)?;
+        ctx.accounts.delegate_pda(
+            &ctx.accounts.payer, 
+            &[b"intent_capsule", owner_key.as_ref()], 
+            DelegateConfig {
+                commit_frequency_ms: 0,
+                validator: Some(validator_key),
+            }
+        )?;
 
         // Delegate Vault PDA
-        let vault_seeds: &[&[u8]] = &[
-            b"capsule_vault",
-            owner_key.as_ref(),
-        ];
-        
-        let config_vault = DelegateConfig {
-            commit_frequency_ms: 0,
-            validator: Some(validator_key),
-        };
-        ctx.accounts.delegate_vault(&ctx.accounts.payer, vault_seeds, config_vault)?;
+        ctx.accounts.delegate_vault(
+            &ctx.accounts.payer, 
+            &[b"capsule_vault", owner_key.as_ref()], 
+            DelegateConfig {
+                commit_frequency_ms: 0,
+                validator: Some(validator_key),
+            }
+        )?;
 
         msg!("Capsule and Vault delegated to Ephemeral Rollup");
         Ok(())
@@ -565,10 +559,10 @@ pub struct DelegateCapsuleInput<'info> {
     /// CHECK: Checked by the delegation program
     pub validator: Option<AccountInfo<'info>>,
     /// CHECK: PDA to delegate (capsule); seeds: [b"intent_capsule", owner]
-    #[account(mut, del)]
+    #[account(mut, del, seeds = [b"intent_capsule", owner.key().as_ref()], bump)]
     pub pda: AccountInfo<'info>,
     /// CHECK: PDA to delegate (vault); seeds: [b"capsule_vault", owner]
-    #[account(mut, del)]
+    #[account(mut, del, seeds = [b"capsule_vault", owner.key().as_ref()], bump)]
     pub vault: AccountInfo<'info>,
     /// CHECK: Magic program
     pub magic_program: AccountInfo<'info>,

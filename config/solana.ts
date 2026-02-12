@@ -3,31 +3,26 @@
  */
 
 import { Connection, PublicKey } from '@solana/web3.js'
-import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE } from '@/constants'
+import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE, MAGICBLOCK_ER } from '@/constants'
 
 let cachedConnection: Connection | null = null
 
 /**
- * Get Solana connection with Helius RPC (cached to avoid duplicate instances and reduce RPC pressure).
- * Use Helius when API key is set; otherwise fallback to public RPC (rate-limited).
+ * Get Solana connection using Magic Router (Dynamic Routing).
+ * Routes transactions to Ephemeral Rollup or Base Layer automatically.
  */
 export function getSolanaConnection(): Connection {
   if (cachedConnection) return cachedConnection
 
-  const rpcUrl = HELIUS_CONFIG.RPC_URL
-  try {
-    cachedConnection = new Connection(rpcUrl, {
-      commitment: 'confirmed',
-      confirmTransactionInitialTimeout: 120000,
-      httpHeaders: { 'Content-Type': 'application/json' },
-    })
-  } catch {
-    const fallbackUrl = HELIUS_CONFIG.RPC_URL_ALT
-    cachedConnection = new Connection(fallbackUrl, {
-      commitment: 'confirmed',
-      confirmTransactionInitialTimeout: 120000,
-    })
-  }
+  const rpcUrl = MAGICBLOCK_ER.ROUTER_DEVNET
+  const wsUrl = MAGICBLOCK_ER.ROUTER_WS
+
+  cachedConnection = new Connection(rpcUrl, {
+    commitment: 'confirmed',
+    confirmTransactionInitialTimeout: 120000,
+    wsEndpoint: wsUrl,
+  })
+
   return cachedConnection
 }
 

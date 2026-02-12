@@ -64,61 +64,26 @@ export function getProvider(wallet: WalletContextState): AnchorProvider | null {
 }
 
 /**
- * Get Anchor program instance
+ * Get Anchor program instance. 
+ * Using Magic Router connection ensures dynamic routing to ER or Base Layer.
  */
 export function getProgram(wallet: WalletContextState): Program | null {
   const provider = getProvider(wallet)
   if (!provider) return null
 
-  // FORCE use the hardcoded program ID from our program's declare_id!
-  // This prevents issues if environment variables on Vercel are set to old/wrong IDs
   const programId = new PublicKey('CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM')
-
-  // Ensure we have a fresh, mutable IDL object
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
-
-  console.log('[getProgram] Creating Program instance:')
-  console.log(' - Program ID (Forced):', programId.toBase58())
-  console.log(' - Env Context:', SOLANA_CONFIG.NETWORK)
 
   const program = new Program(programIdl as any, provider)
   return program
 }
 
 /**
- * Get Anchor program instance pointing to TEE RPC (Private Ephemeral Rollup)
+ * Alias for getProgram to maintain backward compatibility, now using unified routing.
  */
-export function getTeeProgram(wallet: WalletContextState, token?: string): Program | null {
-  if (!wallet.publicKey || !wallet.signTransaction) return null
-
-  // Use TEE RPC with optional auth token
-  const url = token ? `${PER_TEE.RPC_URL}?token=${token}` : PER_TEE.RPC_URL
-  const connection = new Connection(url, 'confirmed')
-
-  const walletAdapter = {
-    publicKey: wallet.publicKey,
-    signTransaction: wallet.signTransaction,
-    signAllTransactions: wallet.signAllTransactions || (async (txs: any) => txs),
-  } as Wallet
-
-  const provider = new AnchorProvider(connection, walletAdapter, {
-    commitment: 'confirmed',
-  })
-
-  // FORCE use the hardcoded program ID from our program's declare_id!
-  const programId = new PublicKey('CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM')
-
-  // Ensure we have a fresh, mutable IDL object
-  const teeIdl = JSON.parse(JSON.stringify(idl))
-  teeIdl.address = programId.toBase58()
-
-  console.log('[getTeeProgram] Creating TEE Program instance:')
-  console.log(' - Program ID (Forced):', programId.toBase58())
-  console.log(' - RPC URL:', url)
-
-  const program = new Program(teeIdl as any, provider)
-  return program
+export function getTeeProgram(wallet: WalletContextState, _token?: string): Program | null {
+  return getProgram(wallet)
 }
 
 /**
