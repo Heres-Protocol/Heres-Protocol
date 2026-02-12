@@ -1417,6 +1417,96 @@
       "args": []
     },
     {
+      "name": "cancel_capsule",
+      "docs": [
+        "Deactivate and close a capsule (owner reclaims SOL and account space).",
+        "Used to clear stuck capsules or simply close them."
+      ],
+      "discriminator": [
+        27,
+        143,
+        220,
+        25,
+        39,
+        186,
+        66,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  116,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "update_activity",
       "docs": [
         "Update last activity timestamp (called by Helius webhook or user)"
