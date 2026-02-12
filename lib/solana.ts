@@ -486,11 +486,13 @@ export async function scheduleExecuteIntent(
     return tx
   } catch (err: any) {
     console.error('[scheduleExecuteIntent] ✗ Rpc Error:', err);
-    if (err instanceof SendTransactionError) {
-      console.error('[scheduleExecuteIntent] ✗ Transaction Logs:', err.logs);
+    let logs: string[] | null = null;
+    if (err instanceof SendTransactionError || err.name === 'SendTransactionError') {
+      logs = err.logs || (typeof err.getLogs === 'function' ? err.getLogs() : null);
+      console.error('[scheduleExecuteIntent] ✗ Transaction Logs:', logs);
     }
     if (err.stack) console.error('[scheduleExecuteIntent] ✗ Stack:', err.stack);
-    if (err.logs && !(err instanceof SendTransactionError)) console.error('[scheduleExecuteIntent] ✗ Logs:', err.logs);
+    if (err.logs && !logs) console.error('[scheduleExecuteIntent] ✗ Logs:', err.logs);
     throw err;
   }
 }

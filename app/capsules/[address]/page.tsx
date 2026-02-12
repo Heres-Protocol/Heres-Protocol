@@ -193,10 +193,10 @@ export default function CapsuleDetailPage() {
         console.log('[STEP 2] ✓ Crank scheduled successfully. Tx:', signature)
       } catch (e: any) {
         let msg = e?.message || String(e)
-        if (e.logs && Array.isArray(e.logs)) {
-          console.error('[STEP 2] Transaction Logs:', e.logs)
-          // Look for specific error messages in logs if possible
-          const errorLog = e.logs.find((log: string) => log.includes('Error:'))
+        const logs = e.logs || (typeof e.getLogs === 'function' ? e.getLogs() : null);
+        if (logs && Array.isArray(logs)) {
+          console.error('[STEP 2] Transaction Logs:', logs)
+          const errorLog = logs.find((log: string) => log.includes('Error:'))
           if (errorLog) msg += ` (Log: ${errorLog.split('Error:')[1].trim()})`
         }
         console.error('[STEP 2] ✗ Scheduling failed:', msg)

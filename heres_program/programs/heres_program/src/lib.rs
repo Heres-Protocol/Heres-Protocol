@@ -428,6 +428,9 @@ pub mod heres_program {
         // Including unnecessary accounts causes "account not delegated" errors on TEE
         let accounts = vec![
             AccountMeta::new(ctx.accounts.capsule.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.vault.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.permission.key(), false),
         ];
 
         let execute_ix = Instruction {
