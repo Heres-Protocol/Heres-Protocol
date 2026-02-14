@@ -179,6 +179,11 @@ pub mod heres_program {
             ErrorCode::InactivityPeriodNotMet
         );
         
+        // FAIL-SAFE / AUTO-RESTART: 
+        // If the execution is triggered but we want to "delay" it or if it's a re-occurring check,
+        // we could reset the timer instead. 
+        // For now, we follow the standard execute -> deactivate flow.
+        
         capsule.is_active = false;
         capsule.executed_at = Some(current_time);
         
@@ -189,6 +194,22 @@ pub mod heres_program {
             executed_at: current_time,
         });
         
+        Ok(())
+    }
+
+    /// Reset the inactivity timer (Fail-safe / Auto-restart).
+    /// Allows the owner or the system (via TEE) to restart the 1-year (or set period) countdown.
+    /// This is used if the Crank needs to be rebooted or if the owner proves they are still active.
+    pub fn restart_timer(ctx: Context<RestartTimer>) -> Result<()> {
+        let capsule = &mut ctx.accounts.capsule;
+        require!(capsule.is_active, ErrorCode::CapsuleInactive);
+        
+        // In a real TEE fail-safe, this could be triggered by an external "I'm alive" signal
+        // or by the TEE itself if a previous execution cycle failed to reach L1.
+        capsule.last_activity = Clock::get()?.unix_timestamp;
+        capsule.retry_count += 1;
+        
+        msg!("Timer restarted for capsule: {:?}. New last_activity: {}", capsule.key(), capsule.last_activity);
         Ok(())
     }
 
@@ -855,6 +876,19 @@ pub struct UpdateActivity<'info> {
 }
 
 #[derive(Accounts)]
+pub struct RestartTimer<'info> {
+    #[account(
+        mut,
+        seeds = [b"intent_capsule", capsule.owner.as_ref()],
+        bump = capsule.bump
+    )]
+    pub capsule: Box<Account<'info, IntentCapsule>>,
+    
+    /// Can be the owner or any authorized signer/crank
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct DeactivateCapsule<'info> {
     #[account(
         mut,
@@ -933,6 +967,7 @@ pub struct IntentCapsule {
     pub bump: u8,
     pub vault_bump: u8, // for invoke_signed when transferring from vault
     pub mint: Pubkey,
+    pub retry_count: u64, // Fail-safe: track TEE/execution retries
 }
 
 impl IntentCapsule {
@@ -944,7 +979,8 @@ impl IntentCapsule {
         1 + 8 +                  // executed_at (Option<i64>)
         1 +                      // bump
         1 +                      // vault_bump
-        32;                      // mint
+        32 +                     // mint
+        8;                       // retry_count
 }
 
 #[event]

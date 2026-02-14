@@ -14,6 +14,7 @@ import {
   distributeAssets,
   cancelCapsule,
   undelegateCapsule,
+  restartTimer,
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
@@ -128,6 +129,9 @@ export default function CapsuleDetailPage() {
   const [teeAuthToken, setTeeAuthToken] = useState<string | null>(null)
   const [isTeeAuthenticated, setIsTeeAuthenticated] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [restartPending, setRestartPending] = useState(false)
+  const [restartTx, setRestartTx] = useState<string | null>(null)
+  const [restartError, setRestartError] = useState<string | null>(null)
 
   const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
 
@@ -243,6 +247,28 @@ export default function CapsuleDetailPage() {
     return parseIntentData(capsule.intentData)
   }, [capsule?.intentData])
 
+  const handleRestartTimer = useCallback(async () => {
+    if (!wallet.publicKey || !capsule) return
+    if (!confirm('Are you sure you want to reset the inactivity timer? This will set the last activity to now.')) return
+
+    setRestartPending(true)
+    setRestartError(null)
+    setRestartTx(null)
+    try {
+      const tx = await restartTimer(wallet, capsule.owner)
+      setRestartTx(tx)
+      console.log('[restartTimer] ✓ Timer reset successful. Tx:', tx)
+
+      const pubkey = new PublicKey(capsule.capsuleAddress)
+      const updated = await getCapsuleByAddress(pubkey)
+      if (updated) setCapsule(updated)
+    } catch (e: any) {
+      setRestartError(e?.message || String(e))
+    } finally {
+      setRestartPending(false)
+    }
+  }, [wallet, capsule])
+
   const handleExecute = useCallback(async () => {
     if (!wallet.connected || !wallet.publicKey || !capsule) return
 
@@ -302,6 +328,33 @@ export default function CapsuleDetailPage() {
       setDistributePending(false)
     }
   }, [wallet, capsule, intentParsed])
+
+  const handleManualClaim = useCallback(async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+
+    // Check if the account is delegated. If so, it must be undelegated first for L1 claim.
+    const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+    const isDelegated = capsule.accountOwner?.equals(delegationProgramId)
+
+    if (isDelegated) {
+      if (!confirm('This capsule is currently delegated to the TEE. To claim manually on main chain, we must undelegate it first. Proceed?')) return
+      try {
+        await undelegateCapsule(wallet as any)
+        console.log('[ManualClaim] Undelegated successfully.')
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      } catch (err: any) {
+        alert(`Failed to undelegate: ${err.message}`)
+        return
+      }
+    }
+
+    // Step 1: Execute
+    await handleExecute()
+    // Step 2: Distribute (Wait a bit for L1 confirm if needed)
+    setTimeout(() => {
+      handleDistribute()
+    }, 2000)
+  }, [wallet, capsule, handleExecute, handleDistribute])
 
   const handleCancel = useCallback(async () => {
     if (!wallet.connected || !wallet.publicKey || !capsule) return
@@ -531,24 +584,18 @@ export default function CapsuleDetailPage() {
                   <div className="flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={handleExecute}
-                      disabled={executePending || !wallet.connected}
+                      onClick={handleManualClaim}
+                      disabled={executePending || distributePending || !wallet.connected}
                       className="inline-flex items-center gap-2 rounded-lg bg-Heres-accent/20 border border-Heres-accent px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
                     >
                       <Play className="h-4 w-4" />
-                      {executePending ? 'Executing…' : 'Execute (Update State)'}
+                      {executePending || distributePending ? 'Claiming Assets...' : 'Manual Claim (Direct)'}
                     </button>
-                    {executeTx && (
-                      <a
-                        href={`https://explorer.solana.com/tx/${executeTx}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-Heres-accent hover:underline"
-                      >
-                        ✓ Step 1 complete. View tx
-                      </a>
+                    {executeTx && <p className="text-[10px] text-Heres-accent">State updated ✓</p>}
+                    {distributeTx && <p className="text-[10px] text-Heres-accent">Assets distributed ✓</p>}
+                    {(executeError || distributeError) && (
+                      <p className="text-xs text-red-400">{executeError || distributeError}</p>
                     )}
-                    {executeError && <p className="text-xs text-red-400">{executeError}</p>}
                   </div>
                 )}
 
@@ -639,6 +686,10 @@ export default function CapsuleDetailPage() {
                 </div>
               </div>
             )}
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Retries</p>
+              <p className="text-sm font-mono text-Heres-white">{(capsule as any).retryCount?.toString() || '0'}</p>
+            </div>
           </section>
 
           {/* Privacy & Delegation (PER / TEE) */}
@@ -668,7 +719,18 @@ export default function CapsuleDetailPage() {
                     className="inline-flex items-center gap-2 rounded-lg border border-Heres-accent bg-Heres-accent/20 px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
                   >
                     <Shield className="h-4 w-4" />
-                    {delegatePending ? 'Step 1: Delegating to ER...' : schedulePending ? 'Step 2: Scheduling crank on ER...' : 'Delegate & Schedule Crank'}
+                    {delegatePending ? 'Step 1: Delegating...' : schedulePending ? 'Step 2: Scheduling...' : 'Delegate & Schedule Crank'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRestartTimer}
+                    disabled={restartPending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-Heres-purple/50 bg-Heres-purple/10 px-4 py-2 text-sm font-medium text-Heres-purple transition hover:bg-Heres-purple/20 disabled:opacity-60"
+                    title="Auto-restart placeholder: resets inactivity timer"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${restartPending ? 'animate-spin' : ''}`} />
+                    {restartPending ? 'Restarting...' : 'Restart Inactivity Timer'}
                   </button>
                 </div>
 

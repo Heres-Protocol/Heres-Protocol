@@ -707,6 +707,26 @@ export async function updateActivity(wallet: WalletContextState): Promise<string
 }
 
 /**
+ * Restart the inactivity timer (Fail-safe / Auto-restart)
+ */
+export async function restartTimer(wallet: WalletContextState, ownerPublicKey: PublicKey): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+
+  const [capsulePDA] = getCapsulePDA(ownerPublicKey)
+
+  const tx = await program.methods
+    .restartTimer()
+    .accounts({
+      capsule: capsulePDA,
+      authority: wallet.publicKey!,
+    })
+    .rpc()
+
+  return tx
+}
+
+/**
  * Deactivate capsule
  */
 export async function deactivateCapsule(wallet: WalletContextState): Promise<string> {
