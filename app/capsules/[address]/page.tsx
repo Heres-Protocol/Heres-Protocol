@@ -12,8 +12,6 @@ import {
   executeIntent,
   scheduleExecuteIntent,
   distributeAssets,
-  cancelCapsule,
-  undelegateCapsule,
   restartTimer,
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
@@ -329,75 +327,6 @@ export default function CapsuleDetailPage() {
     }
   }, [wallet, capsule, intentParsed])
 
-  const handleManualClaim = useCallback(async () => {
-    if (!wallet.connected || !wallet.publicKey || !capsule) return
-
-    // Check if the account is delegated. If so, it must be undelegated first for L1 claim.
-    const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
-    const isDelegated = capsule.accountOwner?.equals(delegationProgramId)
-
-    if (isDelegated) {
-      if (!confirm('This capsule is currently delegated to the TEE. To claim manually on main chain, we must undelegate it first. Proceed?')) return
-      try {
-        await undelegateCapsule(wallet as any)
-        console.log('[ManualClaim] Undelegated successfully.')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-      } catch (err: any) {
-        alert(`Failed to undelegate: ${err.message}`)
-        return
-      }
-    }
-
-    // Step 1: Execute
-    await handleExecute()
-    // Step 2: Distribute (Wait a bit for L1 confirm if needed)
-    setTimeout(() => {
-      handleDistribute()
-    }, 2000)
-  }, [wallet, capsule, handleExecute, handleDistribute])
-
-  const handleCancel = useCallback(async () => {
-    if (!wallet.connected || !wallet.publicKey || !capsule) return
-    if (!confirm('Are you sure you want to delete this capsule? This will close all accounts and return SOL to your wallet.')) return
-
-    setIsCancelling(true)
-    try {
-      const capsulePDA = new PublicKey(capsule.capsuleAddress)
-      const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
-
-      // 1. Check if the capsule OR vault is delegated
-      const connection = getSolanaConnection()
-      const [capsuleAccountInfo, vaultAccountInfo] = await Promise.all([
-        connection.getAccountInfo(capsulePDA),
-        connection.getAccountInfo(vaultPDA)
-      ])
-
-      const capsuleDelegated = capsuleAccountInfo && capsuleAccountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID
-      const vaultDelegated = vaultAccountInfo && vaultAccountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID
-
-      if (capsuleDelegated || vaultDelegated) {
-        console.log('[handleCancel] Capsule or Vault is delegated. Attempting to undelegate first...')
-        console.log(`  Capsule delegated: ${capsuleDelegated}, Vault delegated: ${vaultDelegated}`)
-        try {
-          await undelegateCapsule(wallet as any)
-          console.log('[handleCancel] Undelegation successful.')
-          // Wait for network to reflect the change
-          await new Promise(resolve => setTimeout(resolve, 2000))
-        } catch (undelErr: any) {
-          console.error('[handleCancel] Undelegation failed:', undelErr)
-          throw new Error(`Failed to undelegate: ${undelErr.message || String(undelErr)}`)
-        }
-      }
-
-      const tx = await cancelCapsule(wallet, capsulePDA, vaultPDA)
-      alert('Capsule deleted successfully! SOL returned.')
-      router.push('/dashboard')
-    } catch (e: any) {
-      alert(`Error deleting capsule: ${e.message || String(e)}`)
-    } finally {
-      setIsCancelling(false)
-    }
-  }, [wallet, capsule, router])
 
   const isNft = intentParsed?.type === 'nft'
   const isToken = intentParsed?.type === 'token'
@@ -580,24 +509,6 @@ export default function CapsuleDetailPage() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                {status === 'Expired' && capsule.isActive && (
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={handleManualClaim}
-                      disabled={executePending || distributePending || !wallet.connected}
-                      className="inline-flex items-center gap-2 rounded-lg bg-Heres-accent/20 border border-Heres-accent px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
-                    >
-                      <Play className="h-4 w-4" />
-                      {executePending || distributePending ? 'Claiming Assets...' : 'Manual Claim (Direct)'}
-                    </button>
-                    {executeTx && <p className="text-[10px] text-Heres-accent">State updated ✓</p>}
-                    {distributeTx && <p className="text-[10px] text-Heres-accent">Assets distributed ✓</p>}
-                    {(executeError || distributeError) && (
-                      <p className="text-xs text-red-400">{executeError || distributeError}</p>
-                    )}
-                  </div>
-                )}
 
                 {status === 'Executed' && (
                   <div className="flex flex-col gap-2">
@@ -908,22 +819,6 @@ export default function CapsuleDetailPage() {
             )}
           </section>
 
-          {/* Danger Zone */}
-          {isOwner && capsule.isActive && (
-            <section className="card-Heres p-6 border-red-500/20 bg-red-500/5">
-              <h2 className="text-lg font-semibold text-red-400 mb-2">Danger Zone</h2>
-              <p className="text-sm text-Heres-muted mb-4">
-                Deleting this capsule will close the account and return all SOL from the vault to your wallet. This action cannot be undone.
-              </p>
-              <button
-                onClick={handleCancel}
-                disabled={isCancelling}
-                className="px-4 py-2 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 text-sm font-medium"
-              >
-                {isCancelling ? 'Deleting...' : 'Delete Capsule & Reclaim SOL'}
-              </button>
-            </section>
-          )}
         </div>
       </main>
     </div>
