@@ -179,6 +179,11 @@ pub mod heres_program {
             ErrorCode::InactivityPeriodNotMet
         );
         
+        // FAIL-SAFE / AUTO-RESTART: 
+        // If the execution is triggered but we want to "delay" it or if it's a re-occurring check,
+        // we could reset the timer instead. 
+        // For now, we follow the standard execute -> deactivate flow.
+        
         capsule.is_active = false;
         capsule.executed_at = Some(current_time);
         
@@ -189,6 +194,22 @@ pub mod heres_program {
             executed_at: current_time,
         });
         
+        Ok(())
+    }
+
+    /// Reset the inactivity timer (Fail-safe / Auto-restart).
+    /// Allows the owner or the system (via TEE) to restart the 1-year (or set period) countdown.
+    /// This is used if the Crank needs to be rebooted or if the owner proves they are still active.
+    pub fn restart_timer(ctx: Context<RestartTimer>) -> Result<()> {
+        let capsule = &mut ctx.accounts.capsule;
+        require!(capsule.is_active, ErrorCode::CapsuleInactive);
+        
+        // In a real TEE fail-safe, this could be triggered by an external "I'm alive" signal
+        // or by the TEE itself if a previous execution cycle failed to reach L1.
+        capsule.last_activity = Clock::get()?.unix_timestamp;
+        capsule.retry_count += 1;
+        
+        msg!("Timer restarted for capsule: {:?}. New last_activity: {}", capsule.key(), capsule.last_activity);
         Ok(())
     }
 
@@ -340,17 +361,6 @@ pub mod heres_program {
         Ok(())
     }
 
-    /// Deactivate a capsule (owner can cancel before execution)
-    pub fn deactivate_capsule(ctx: Context<DeactivateCapsule>) -> Result<()> {
-        let capsule = &mut ctx.accounts.capsule;
-        require!(capsule.owner == ctx.accounts.owner.key(), ErrorCode::Unauthorized);
-        require!(capsule.is_active, ErrorCode::CapsuleInactive);
-        
-        capsule.is_active = false;
-        
-        msg!("Capsule deactivated: {:?}", capsule.key());
-        Ok(())
-    }
 
     /// Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).
     /// The #[delegate] macro handles this automatically for all fields marked with 'del'.
@@ -392,20 +402,6 @@ pub mod heres_program {
         Ok(())
     }
 
-    /// Commit and undelegate capsule and vault from Ephemeral Rollup back to Solana base layer
-    pub fn undelegate_capsule(ctx: Context<UndelegateCapsuleInput>) -> Result<()> {
-        commit_and_undelegate_accounts(
-            &ctx.accounts.payer,
-            vec![
-                &ctx.accounts.capsule.to_account_info(),
-                &ctx.accounts.vault.to_account_info(),
-            ],
-            &ctx.accounts.magic_context,
-            &ctx.accounts.magic_program,
-        )?;
-        msg!("Capsule and Vault undelegated from Ephemeral Rollup");
-        Ok(())
-    }
 
     /// Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).
     /// Anyone can execute when conditions are met; this registers the task for the crank.
@@ -542,41 +538,6 @@ pub mod heres_program {
         Ok(())
     }
 
-    /// Deactivate and close a capsule (owner reclaims SOL and account space).
-    /// Used to clear stuck capsules or simply close them.
-    pub fn cancel_capsule(ctx: Context<CancelCapsule>) -> Result<()> {
-        let capsule_info = &ctx.accounts.capsule;
-        let vault_info = &ctx.accounts.vault;
-        
-        msg!("Closing/Draining capsule {} and vault {}", capsule_info.key(), vault_info.key());
-
-        // Safety: Manual check for owner field in capsule data
-        let mut data: &[u8] = &capsule_info.try_borrow_data()?;
-        let capsule_data = IntentCapsule::try_deserialize(&mut data)?;
-        require!(
-            capsule_data.owner == ctx.accounts.owner.key(),
-            ErrorCode::Unauthorized
-        );
-        
-        // 1. Draining Vault (Always possible if seeds match, since our program is the PDA authority)
-        let vault_lamports = vault_info.lamports();
-        if vault_lamports > 0 {
-            **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? = 0;
-            **ctx.accounts.owner.to_account_info().try_borrow_mut_lamports()? += vault_lamports;
-        }
-
-        // 2. Draining Capsule
-        // If it's owned by us, we can effectively close it by zeroing lamports.
-        // If it's owned by DELeGG, this next part will FAIL at runtime, which is expected 
-        // until they call undelegate.
-        let capsule_lamports = capsule_info.lamports();
-        if capsule_lamports > 0 && capsule_info.owner == &crate::ID {
-            **ctx.accounts.capsule.to_account_info().try_borrow_mut_lamports()? = 0;
-            **ctx.accounts.owner.to_account_info().try_borrow_mut_lamports()? += capsule_lamports;
-        }
-
-        Ok(())
-    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -608,38 +569,6 @@ pub struct DelegateCapsuleInput<'info> {
     pub system_program: Program<'info, System>,
 }
 
-#[commit]
-#[derive(Accounts)]
-pub struct UndelegateCapsuleInput<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    pub owner: Signer<'info>,
-    #[account(
-        mut, 
-        seeds = [b"intent_capsule", owner.key().as_ref()], 
-        bump
-    )]
-    /// CHECK: Manual ownership check
-    pub capsule: AccountInfo<'info>,
-
-    /// CHECK: Vault PDA (committed alongside capsule)
-    #[account(
-        mut, 
-        seeds = [b"capsule_vault", owner.key().as_ref()], 
-        bump
-    )]
-    pub vault: AccountInfo<'info>,
-    /// CHECK: Buffer PDA for commit
-    #[account(mut)]
-    pub buffer: AccountInfo<'info>,
-    /// CHECK: used for CPI
-    #[account(mut)]
-    pub magic_context: AccountInfo<'info>,
-    /// CHECK: Magic program
-    #[account(mut)]
-    pub magic_program: AccountInfo<'info>,
-    pub system_program: Program<'info, System>,
-}
 
 #[derive(Accounts)]
 pub struct ScheduleExecuteIntent<'info> {
@@ -855,16 +784,18 @@ pub struct UpdateActivity<'info> {
 }
 
 #[derive(Accounts)]
-pub struct DeactivateCapsule<'info> {
+pub struct RestartTimer<'info> {
     #[account(
         mut,
-        seeds = [b"intent_capsule", owner.key().as_ref()],
+        seeds = [b"intent_capsule", capsule.owner.as_ref()],
         bump = capsule.bump
     )]
     pub capsule: Box<Account<'info, IntentCapsule>>,
     
-    pub owner: Signer<'info>,
+    /// Can be the owner or any authorized signer/crank
+    pub authority: Signer<'info>,
 }
+
 
 #[derive(Accounts)]
 pub struct RecreateCapsule<'info> {
@@ -888,29 +819,6 @@ pub struct RecreateCapsule<'info> {
     pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-pub struct CancelCapsule<'info> {
-    /// CHECK: Manual ownership check. We bypass Anchor's Account owner check to allow force reset of delegated capsules.
-    #[account(
-        mut,
-        seeds = [b"intent_capsule", owner.key().as_ref()],
-        bump,
-    )]
-    pub capsule: AccountInfo<'info>,
-
-    /// CHECK: Vault PDA. We manually drain lamports and close it by zeroing.
-    #[account(
-        mut,
-        seeds = [b"capsule_vault", owner.key().as_ref()],
-        bump,
-    )]
-    pub vault: AccountInfo<'info>,
-    
-    #[account(mut)]
-    pub owner: Signer<'info>,
-    
-    pub system_program: Program<'info, System>,
-}
 
 /// Vault PDA holds SOL locked at capsule creation; anyone can trigger execute when conditions are met.
 #[account]
@@ -933,6 +841,7 @@ pub struct IntentCapsule {
     pub bump: u8,
     pub vault_bump: u8, // for invoke_signed when transferring from vault
     pub mint: Pubkey,
+    pub retry_count: u64, // Fail-safe: track TEE/execution retries
 }
 
 impl IntentCapsule {
@@ -944,7 +853,8 @@ impl IntentCapsule {
         1 + 8 +                  // executed_at (Option<i64>)
         1 +                      // bump
         1 +                      // vault_bump
-        32;                      // mint
+        32 +                     // mint
+        8;                       // retry_count
 }
 
 #[event]

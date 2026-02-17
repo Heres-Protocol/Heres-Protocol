@@ -372,70 +372,7 @@ export async function delegateCapsule(
   return tx
 }
 
-/**
- * Commit and undelegate capsule from Ephemeral Rollup back to Solana base layer (e.g. after execution)
- */
-export async function undelegateCapsule(wallet: WalletContextState): Promise<string> {
-  const program = getProgram(wallet)
-  if (!program) throw new Error('Wallet not connected')
 
-  const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
-  const magicProgram = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
-  const magicContext = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
-
-  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey!)
-  const [commitBufferPDA] = getBufferPDA(capsulePDA, magicProgram)
-
-  const tx = await program.methods
-    .undelegateCapsule()
-    .accounts({
-      payer: wallet.publicKey as PublicKey,
-      owner: wallet.publicKey as PublicKey,
-      capsule: capsulePDA,
-      vault: vaultPDA,
-      buffer: commitBufferPDA,
-      // Programs at the end
-      magicContext,
-      magicProgram,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc()
-
-  return tx
-}
-
-/**
- * Cancel and close a capsule and vault.
- * Reclaims SOL and account space.
- */
-export async function cancelCapsule(
-  wallet: any,
-  capsulePda: PublicKey,
-  vaultPda: PublicKey
-): Promise<string> {
-  const connection = getSolanaConnection()
-  const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' })
-  const program = new Program(idl as any, provider)
-
-  try {
-    console.log('[cancelCapsule] Closing capsule and vault...')
-    const tx = await program.methods
-      .cancelCapsule()
-      .accounts({
-        capsule: capsulePda,
-        vault: vaultPda,
-        owner: wallet.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc()
-
-    console.log('[cancelCapsule] ✅ Success! TX:', tx)
-    return tx
-  } catch (err: any) {
-    console.error('[cancelCapsule] ✗ Error:', err)
-    throw err
-  }
-}
 
 /**
  * Schedule crank to run execute_intent at intervals (Magicblock ScheduleTask).
@@ -707,24 +644,25 @@ export async function updateActivity(wallet: WalletContextState): Promise<string
 }
 
 /**
- * Deactivate capsule
+ * Restart the inactivity timer (Fail-safe / Auto-restart)
  */
-export async function deactivateCapsule(wallet: WalletContextState): Promise<string> {
+export async function restartTimer(wallet: WalletContextState, ownerPublicKey: PublicKey): Promise<string> {
   const program = getProgram(wallet)
   if (!program) throw new Error('Wallet not connected')
 
-  const [capsulePDA] = getCapsulePDA(wallet.publicKey!)
+  const [capsulePDA] = getCapsulePDA(ownerPublicKey)
 
   const tx = await program.methods
-    .deactivateCapsule()
+    .restartTimer()
     .accounts({
       capsule: capsulePDA,
-      owner: wallet.publicKey!,
+      authority: wallet.publicKey!,
     })
     .rpc()
 
   return tx
 }
+
 
 /**
  * Recreate capsule from executed state

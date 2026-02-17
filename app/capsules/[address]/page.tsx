@@ -12,8 +12,7 @@ import {
   executeIntent,
   scheduleExecuteIntent,
   distributeAssets,
-  cancelCapsule,
-  undelegateCapsule,
+  restartTimer,
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
@@ -128,6 +127,9 @@ export default function CapsuleDetailPage() {
   const [teeAuthToken, setTeeAuthToken] = useState<string | null>(null)
   const [isTeeAuthenticated, setIsTeeAuthenticated] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [restartPending, setRestartPending] = useState(false)
+  const [restartTx, setRestartTx] = useState<string | null>(null)
+  const [restartError, setRestartError] = useState<string | null>(null)
 
   const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
 
@@ -243,6 +245,28 @@ export default function CapsuleDetailPage() {
     return parseIntentData(capsule.intentData)
   }, [capsule?.intentData])
 
+  const handleRestartTimer = useCallback(async () => {
+    if (!wallet.publicKey || !capsule) return
+    if (!confirm('Are you sure you want to reset the inactivity timer? This will set the last activity to now.')) return
+
+    setRestartPending(true)
+    setRestartError(null)
+    setRestartTx(null)
+    try {
+      const tx = await restartTimer(wallet, capsule.owner)
+      setRestartTx(tx)
+      console.log('[restartTimer] ✓ Timer reset successful. Tx:', tx)
+
+      const pubkey = new PublicKey(capsule.capsuleAddress)
+      const updated = await getCapsuleByAddress(pubkey)
+      if (updated) setCapsule(updated)
+    } catch (e: any) {
+      setRestartError(e?.message || String(e))
+    } finally {
+      setRestartPending(false)
+    }
+  }, [wallet, capsule])
+
   const handleExecute = useCallback(async () => {
     if (!wallet.connected || !wallet.publicKey || !capsule) return
 
@@ -303,48 +327,6 @@ export default function CapsuleDetailPage() {
     }
   }, [wallet, capsule, intentParsed])
 
-  const handleCancel = useCallback(async () => {
-    if (!wallet.connected || !wallet.publicKey || !capsule) return
-    if (!confirm('Are you sure you want to delete this capsule? This will close all accounts and return SOL to your wallet.')) return
-
-    setIsCancelling(true)
-    try {
-      const capsulePDA = new PublicKey(capsule.capsuleAddress)
-      const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
-
-      // 1. Check if the capsule OR vault is delegated
-      const connection = getSolanaConnection()
-      const [capsuleAccountInfo, vaultAccountInfo] = await Promise.all([
-        connection.getAccountInfo(capsulePDA),
-        connection.getAccountInfo(vaultPDA)
-      ])
-
-      const capsuleDelegated = capsuleAccountInfo && capsuleAccountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID
-      const vaultDelegated = vaultAccountInfo && vaultAccountInfo.owner.toBase58() === MAGICBLOCK_ER.DELEGATION_PROGRAM_ID
-
-      if (capsuleDelegated || vaultDelegated) {
-        console.log('[handleCancel] Capsule or Vault is delegated. Attempting to undelegate first...')
-        console.log(`  Capsule delegated: ${capsuleDelegated}, Vault delegated: ${vaultDelegated}`)
-        try {
-          await undelegateCapsule(wallet as any)
-          console.log('[handleCancel] Undelegation successful.')
-          // Wait for network to reflect the change
-          await new Promise(resolve => setTimeout(resolve, 2000))
-        } catch (undelErr: any) {
-          console.error('[handleCancel] Undelegation failed:', undelErr)
-          throw new Error(`Failed to undelegate: ${undelErr.message || String(undelErr)}`)
-        }
-      }
-
-      const tx = await cancelCapsule(wallet, capsulePDA, vaultPDA)
-      alert('Capsule deleted successfully! SOL returned.')
-      router.push('/dashboard')
-    } catch (e: any) {
-      alert(`Error deleting capsule: ${e.message || String(e)}`)
-    } finally {
-      setIsCancelling(false)
-    }
-  }, [wallet, capsule, router])
 
   const isNft = intentParsed?.type === 'nft'
   const isToken = intentParsed?.type === 'token'
@@ -527,30 +509,6 @@ export default function CapsuleDetailPage() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                {status === 'Expired' && capsule.isActive && (
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={handleExecute}
-                      disabled={executePending || !wallet.connected}
-                      className="inline-flex items-center gap-2 rounded-lg bg-Heres-accent/20 border border-Heres-accent px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
-                    >
-                      <Play className="h-4 w-4" />
-                      {executePending ? 'Executing…' : 'Execute (Update State)'}
-                    </button>
-                    {executeTx && (
-                      <a
-                        href={`https://explorer.solana.com/tx/${executeTx}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-Heres-accent hover:underline"
-                      >
-                        ✓ Step 1 complete. View tx
-                      </a>
-                    )}
-                    {executeError && <p className="text-xs text-red-400">{executeError}</p>}
-                  </div>
-                )}
 
                 {status === 'Executed' && (
                   <div className="flex flex-col gap-2">
@@ -639,6 +597,10 @@ export default function CapsuleDetailPage() {
                 </div>
               </div>
             )}
+            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Retries</p>
+              <p className="text-sm font-mono text-Heres-white">{(capsule as any).retryCount?.toString() || '0'}</p>
+            </div>
           </section>
 
           {/* Privacy & Delegation (PER / TEE) */}
@@ -668,7 +630,18 @@ export default function CapsuleDetailPage() {
                     className="inline-flex items-center gap-2 rounded-lg border border-Heres-accent bg-Heres-accent/20 px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
                   >
                     <Shield className="h-4 w-4" />
-                    {delegatePending ? 'Step 1: Delegating to ER...' : schedulePending ? 'Step 2: Scheduling crank on ER...' : 'Delegate & Schedule Crank'}
+                    {delegatePending ? 'Step 1: Delegating...' : schedulePending ? 'Step 2: Scheduling...' : 'Delegate & Schedule Crank'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRestartTimer}
+                    disabled={restartPending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-Heres-purple/50 bg-Heres-purple/10 px-4 py-2 text-sm font-medium text-Heres-purple transition hover:bg-Heres-purple/20 disabled:opacity-60"
+                    title="Auto-restart placeholder: resets inactivity timer"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${restartPending ? 'animate-spin' : ''}`} />
+                    {restartPending ? 'Restarting...' : 'Restart Inactivity Timer'}
                   </button>
                 </div>
 
@@ -846,22 +819,6 @@ export default function CapsuleDetailPage() {
             )}
           </section>
 
-          {/* Danger Zone */}
-          {isOwner && capsule.isActive && (
-            <section className="card-Heres p-6 border-red-500/20 bg-red-500/5">
-              <h2 className="text-lg font-semibold text-red-400 mb-2">Danger Zone</h2>
-              <p className="text-sm text-Heres-muted mb-4">
-                Deleting this capsule will close the account and return all SOL from the vault to your wallet. This action cannot be undone.
-              </p>
-              <button
-                onClick={handleCancel}
-                disabled={isCancelling}
-                className="px-4 py-2 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 text-sm font-medium"
-              >
-                {isCancelling ? 'Deleting...' : 'Delete Capsule & Reclaim SOL'}
-              </button>
-            </section>
-          )}
         </div>
       </main>
     </div>
