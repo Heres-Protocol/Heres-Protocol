@@ -18,7 +18,9 @@ import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
 import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE, PLATFORM_FEE } from '@/constants'
 import { TEE_AUTH } from '@/lib/tee'
-import { decodeIntentData, secondsToDays } from '@/utils/intent'
+import { parseIntentPayload, secondsToDays } from '@/utils/intent'
+import { buildCreSignedMessage } from '@/utils/creAuth'
+import { bytesToBase64 } from '@/utils/creCrypto'
 import {
   XAxis,
   YAxis,
@@ -52,22 +54,62 @@ function formatChartTime(ts: number, rangeKey: string): string {
 }
 
 type IntentParsed =
-  | { type: 'token'; intent?: string; totalAmount?: string; beneficiaries?: any[]; inactivityDays?: number; delayDays?: number }
-  | { type: 'nft'; intent?: string; nftMints?: string[]; nftRecipients?: string[]; inactivityDays?: number; delayDays?: number }
+  | {
+    type: 'token'
+    intent?: string
+    totalAmount?: string
+    beneficiaries?: any[]
+    inactivityDays?: number
+    delayDays?: number
+    cre?: {
+      enabled?: boolean
+      secretRef?: string
+      secretHash?: string
+      recipientEmailHash?: string
+      recipientEmail?: string
+      deliveryChannel?: 'email' | 'sms'
+    }
+    // Legacy payload key support
+    premium?: {
+      enabled?: boolean
+      secretRef?: string
+      secretHash?: string
+      recipientEmailHash?: string
+      recipientEmail?: string
+      deliveryChannel?: 'email' | 'sms'
+    }
+  }
+  | {
+    type: 'nft'
+    intent?: string
+    nftMints?: string[]
+    nftRecipients?: string[]
+    inactivityDays?: number
+    delayDays?: number
+    cre?: {
+      enabled?: boolean
+      secretRef?: string
+      secretHash?: string
+      recipientEmailHash?: string
+      recipientEmail?: string
+      deliveryChannel?: 'email' | 'sms'
+    }
+    // Legacy payload key support
+    premium?: {
+      enabled?: boolean
+      secretRef?: string
+      secretHash?: string
+      recipientEmailHash?: string
+      recipientEmail?: string
+      deliveryChannel?: 'email' | 'sms'
+    }
+  }
 
 function parseIntentData(intentData: Uint8Array): IntentParsed | null {
-  try {
-    const json = new TextDecoder().decode(intentData)
-    const data = JSON.parse(json) as Record<string, unknown>
-    if (data?.type === 'nft') return { type: 'nft', ...data } as IntentParsed
-    return { type: 'token', ...data } as IntentParsed
-  } catch {
-    try {
-      const decoded = decodeIntentData(intentData)
-      if (decoded) return { type: 'token', ...decoded } as IntentParsed
-    } catch { }
-    return null
-  }
+  const parsed = parseIntentPayload(intentData) as Record<string, unknown> | null
+  if (!parsed) return null
+  if (parsed.type === 'nft') return { type: 'nft', ...parsed } as IntentParsed
+  return { type: 'token', ...parsed } as IntentParsed
 }
 
 const maskAddress = (addr: string) =>
@@ -130,8 +172,16 @@ export default function CapsuleDetailPage() {
   const [restartPending, setRestartPending] = useState(false)
   const [restartTx, setRestartTx] = useState<string | null>(null)
   const [restartError, setRestartError] = useState<string | null>(null)
+  const [creDeliveryStatus, setCreDeliveryStatus] = useState<{
+    status: string
+    updatedAt: number
+    idempotencyKey: string
+    lastError?: string
+  } | null>(null)
+  const [creDeliveryLoading, setCreDeliveryLoading] = useState(false)
+  const [creDeliveryError, setCreDeliveryError] = useState<string | null>(null)
 
-  const isOwner = wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey)
+  const isOwner = Boolean(wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey))
 
   const handleDelegate = useCallback(async () => {
     if (!wallet.publicKey || !wallet.signTransaction || !wallet.signMessage || !capsule) return
@@ -238,7 +288,7 @@ export default function CapsuleDetailPage() {
       setDelegatePending(false)
       setSchedulePending(false)
     }
-  }, [wallet, capsule])
+  }, [wallet, capsule, teeAuthToken])
 
   const intentParsed = useMemo(() => {
     if (!capsule?.intentData) return null
@@ -330,6 +380,13 @@ export default function CapsuleDetailPage() {
 
   const isNft = intentParsed?.type === 'nft'
   const isToken = intentParsed?.type === 'token'
+  const creConfig = intentParsed?.cre ?? intentParsed?.premium
+  const isCreEnabled = Boolean(
+    creConfig?.enabled &&
+    creConfig.secretRef &&
+    creConfig.secretHash &&
+    (creConfig.recipientEmailHash || creConfig.recipientEmail)
+  )
 
   useEffect(() => {
     if (!address) {
@@ -359,6 +416,97 @@ export default function CapsuleDetailPage() {
     }
     return () => { cancelled = true }
   }, [address])
+
+  useEffect(() => {
+    if (
+      !capsule?.capsuleAddress ||
+      !isCreEnabled ||
+      !wallet.connected ||
+      !wallet.publicKey ||
+      !wallet.signMessage ||
+      !isOwner
+    ) {
+      setCreDeliveryStatus(null)
+      setCreDeliveryError(null)
+      return
+    }
+
+    let cancelled = false
+    setCreDeliveryLoading(true)
+    setCreDeliveryError(null)
+    const walletPublicKey = wallet.publicKey
+    if (!walletPublicKey) {
+      setCreDeliveryLoading(false)
+      setCreDeliveryError('Wallet public key is unavailable.')
+      return
+    }
+    const signMessage = wallet.signMessage
+    if (!signMessage) {
+      setCreDeliveryLoading(false)
+      setCreDeliveryError('Wallet does not support message signing for Intent Statement delivery status lookup.')
+      return
+    }
+
+    ; (async () => {
+      try {
+        const owner = walletPublicKey.toBase58()
+        const cacheKey = `cre-status-auth:${capsule.capsuleAddress}:${owner}`
+        let timestamp = 0
+        let signature = ''
+
+        try {
+          const cachedRaw = sessionStorage.getItem(cacheKey)
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw) as { timestamp?: number; signature?: string }
+            if (typeof cached.timestamp === 'number' && typeof cached.signature === 'string') {
+              const ageMs = Date.now() - cached.timestamp
+              if (ageMs >= 0 && ageMs < 4 * 60 * 1000) {
+                timestamp = cached.timestamp
+                signature = cached.signature
+              }
+            }
+          }
+        } catch {
+          // Ignore cache parse failures and request a fresh signature.
+        }
+
+        if (!signature) {
+          timestamp = Date.now()
+          const message = buildCreSignedMessage({
+            action: 'delivery-status',
+            owner,
+            capsuleAddress: capsule.capsuleAddress,
+            timestamp,
+          })
+          signature = bytesToBase64(await signMessage(new TextEncoder().encode(message)))
+          sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp, signature }))
+        }
+
+        const params = new URLSearchParams({
+          capsule: capsule.capsuleAddress,
+          owner,
+          timestamp: String(timestamp),
+        })
+        const res = await fetch(`/api/intent-delivery/status?${params.toString()}`, {
+          headers: { 'x-cre-signature': signature },
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data?.error || 'Failed to fetch Intent Statement delivery status')
+        }
+        if (cancelled) return
+        const latest = Array.isArray(data.entries) ? data.entries[0] : null
+        setCreDeliveryStatus(latest ?? null)
+      } catch (err) {
+        if (cancelled) return
+        setCreDeliveryError(err instanceof Error ? err.message : String(err))
+      } finally {
+        if (!cancelled) setCreDeliveryLoading(false)
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [capsule?.capsuleAddress, isCreEnabled, wallet.connected, wallet.publicKey, wallet.signMessage, isOwner])
 
   // Token: SOL price chart from CoinGecko (with range filter)
   const rangeConfig = useMemo(() => CHART_RANGES.find((r) => r.key === chartRange) ?? CHART_RANGES[2], [chartRange])
@@ -509,6 +657,30 @@ export default function CapsuleDetailPage() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3">
+                {(status === 'Expired' || status === 'Active') && (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={handleExecute}
+                      disabled={executePending || !wallet.connected}
+                      className="inline-flex items-center gap-2 rounded-lg border border-Heres-accent bg-Heres-accent/20 px-4 py-2 text-sm font-medium text-Heres-accent transition hover:bg-Heres-accent/30 disabled:opacity-60"
+                    >
+                      <Play className="h-4 w-4" />
+                      {executePending ? 'Executing…' : 'Execute Intent'}
+                    </button>
+                    {executeTx && (
+                      <a
+                        href={`https://explorer.solana.com/tx/${executeTx}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-Heres-accent hover:underline"
+                      >
+                        ✓ Intent executed. View tx
+                      </a>
+                    )}
+                    {executeError && <p className="text-xs text-red-400">{executeError}</p>}
+                  </div>
+                )}
 
                 {status === 'Executed' && (
                   <div className="flex flex-col gap-2">
@@ -741,6 +913,51 @@ export default function CapsuleDetailPage() {
               </p>
             )}
           </section>
+
+          {isCreEnabled && (
+            <section className="card-Heres p-6 mb-6 border-Heres-accent/30">
+              <h2 className="text-lg font-semibold text-Heres-white mb-2">Intent Statement Delivery</h2>
+              <p className="text-sm text-Heres-muted mb-4">
+                Off-chain encrypted Intent Statement package delivery powered by CRE orchestration.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Channel</p>
+                  <p className="text-sm text-Heres-white">
+                    {(creConfig?.deliveryChannel || 'email').toUpperCase()}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Recipient Commitment</p>
+                  <p className="text-sm text-Heres-white font-mono">
+                    {creConfig?.recipientEmailHash
+                      ? `${creConfig.recipientEmailHash.slice(0, 16)}...`
+                      : creConfig?.recipientEmail
+                        ? 'legacy-email-onchain'
+                      : '—'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Delivery Status</p>
+                  {creDeliveryLoading ? (
+                    <p className="text-sm text-Heres-muted">Loading...</p>
+                  ) : !wallet.connected ? (
+                    <p className="text-sm text-Heres-muted">Connect wallet</p>
+                  ) : !isOwner ? (
+                    <p className="text-sm text-Heres-muted">Owner auth required</p>
+                  ) : (
+                    <p className="text-sm text-Heres-accent">{creDeliveryStatus?.status || 'pending'}</p>
+                  )}
+                </div>
+              </div>
+              {creDeliveryStatus?.lastError && (
+                <p className="text-xs text-amber-400 mt-3">{creDeliveryStatus.lastError}</p>
+              )}
+              {creDeliveryError && (
+                <p className="text-xs text-red-400 mt-3">{creDeliveryError}</p>
+              )}
+            </section>
+          )}
 
           {/* Price / Value chart (Graph Explorer style) */}
           <section className="card-Heres p-6 mb-6">

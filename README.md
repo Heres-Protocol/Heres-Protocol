@@ -227,6 +227,58 @@ Heres_solana/
    ```
    Open [http://localhost:3000](http://localhost:3000).
 
+### Intent Statement Delivery + CRE local testing
+
+For local end-to-end testing (without a real Chainlink CRE URL), use the built-in mock CRE endpoint:
+
+1. Copy env template:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Ensure this is set:
+   ```env
+   CHAINLINK_CRE_WEBHOOK_URL=http://127.0.0.1:3000/api/mock/cre
+   CHAINLINK_CRE_SIGNING_SECRET=dev-cre-signing-secret
+   CHAINLINK_CRE_CALLBACK_SECRET=dev-cre-callback-secret
+   MOCK_CRE_AUTO_CALLBACK=true
+   ```
+3. Start app:
+   ```bash
+   npm run dev
+   ```
+4. Create a capsule on `/create` with **Representative Email** and **Access Code**, then open capsule detail and click **Execute Intent**.
+5. Trigger CRE reconcile (cron/manual):
+   - `GET /api/cron/reconcile-cre-delivery` with `Authorization: Bearer <CRON_SECRET>`
+6. Check delivery status:
+   - UI: `Intent Statement Delivery` card on `/capsules/[address]`
+   - API: `GET /api/intent-delivery/status?...` now requires owner-signed request headers (recommended via UI flow)
+
+### CRE auto setup commands
+
+You can configure CRE-related env vars automatically:
+
+1. Mock mode (local callback loop):
+   ```bash
+   npm run cre:setup:mock
+   ```
+
+2. Real CRE webhook mode:
+   ```bash
+   npm run cre:setup:real -- --webhook-url https://<your-cre-endpoint> --api-key <optional-api-key> --callback-secret <optional-callback-hmac-secret>
+   ```
+
+This updates `.env.local` with:
+- `CHAINLINK_CRE_WEBHOOK_URL`
+- `CHAINLINK_CRE_API_KEY`
+- `CHAINLINK_CRE_SIGNING_SECRET`
+- `CHAINLINK_CRE_CALLBACK_SECRET`
+- `CRE_DISPATCH_SECRET`
+- `CRE_STORE_PATH`
+- mock flags (`MOCK_CRE_*`)
+
+Notes:
+- If `--callback-secret` is omitted in real mode, `CHAINLINK_CRE_CALLBACK_SECRET` is left empty (callback signature verification disabled in app).
+
 ---
 
 ## Deployed Program (Devnet)
