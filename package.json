@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:cre": "node --test --experimental-strip-types tests/cre-auth.test.mts",
+    "test": "npm run lint && npx tsc --noEmit && npm run test:cre",
+    "cre:setup": "node scripts/setup_cre.mjs",
+    "cre:setup:mock": "node scripts/setup_cre.mjs --mode mock",
+    "cre:setup:real": "node scripts/setup_cre.mjs --mode real"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.32.1",
