@@ -18,10 +18,13 @@ import { Beneficiary } from '@/types'
 import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER } from '@/constants'
 import { getNftsByOwner } from '@/lib/helius'
 import { encodeIntentData, daysToSeconds } from '@/utils/intent'
+import { buildCreSignedMessage } from '@/utils/creAuth'
+import { bytesToBase64, encryptPrivateMessage, sha256Hex } from '@/utils/creCrypto'
 import {
   validateBeneficiaryAddresses,
   validateBeneficiaryAmounts,
   validatePercentageTotals,
+  isValidEmail,
 } from '@/utils/validation'
 import { isValidSolanaAddress, getSolanaConnection } from '@/config/solana'
 import { PublicKey } from '@solana/web3.js'
@@ -56,6 +59,9 @@ export default function CreatePage() {
   const [selectedNftMints, setSelectedNftMints] = useState<string[]>([])
   const [nftRecipients, setNftRecipients] = useState<{ address: string }[]>([{ address: '' }])
   const [nftAssignments, setNftAssignments] = useState<Record<string, number>>({})
+  // Intent Statement email delivery (CRE)
+  const [creEmail, setCreEmail] = useState('')
+  const [creUnlockCode, setCreUnlockCode] = useState('')
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -293,6 +299,21 @@ export default function CreatePage() {
       return
     }
 
+    if (!wallet.signMessage) {
+      alert('This wallet does not support message signing required for Intent Statement email delivery.')
+      return
+    }
+    if (!isValidEmail(creEmail)) {
+      alert('Please enter a valid representative email address.')
+      return
+    }
+    if (creUnlockCode.trim().length < 6) {
+      alert('Please set an access code with at least 6 characters.')
+      return
+    }
+
+    const signMessage = wallet.signMessage
+
     setIsPending(true)
     setError(null)
 
@@ -317,6 +338,52 @@ export default function CreatePage() {
 
       const inactivityDaysNum = parseInt(inactivityDays)
       let intentData: Uint8Array
+      let creMeta: {
+        enabled: true
+        secretRef: string
+        secretHash: string
+        recipientEmailHash: string
+        deliveryChannel: 'email'
+      }
+
+      const normalizedEmail = creEmail.trim().toLowerCase()
+      const encryptedPayload = await encryptPrivateMessage(intent.trim(), creUnlockCode)
+      const recipientEmailHash = await sha256Hex(normalizedEmail)
+      const encryptedPayloadHash = await sha256Hex(encryptedPayload)
+      const timestamp = Date.now()
+      const signatureMessage = buildCreSignedMessage({
+        action: 'register-secret',
+        owner: publicKey.toBase58(),
+        timestamp,
+        recipientEmailHash,
+        encryptedPayloadHash,
+      })
+      const signatureBytes = await signMessage(new TextEncoder().encode(signatureMessage))
+      const signature = bytesToBase64(signatureBytes)
+
+      const secretRes = await fetch('/api/intent-delivery/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner: publicKey.toBase58(),
+          recipientEmail: normalizedEmail,
+          encryptedPayload,
+          timestamp,
+          signature,
+        }),
+      })
+      const secretJson = await secretRes.json()
+      if (!secretRes.ok) {
+        throw new Error(secretJson?.error || 'Failed to register CRE secret')
+      }
+      creMeta = {
+        enabled: true,
+        secretRef: secretJson.secretRef,
+        secretHash: secretJson.secretHash,
+        recipientEmailHash: secretJson.recipientEmailHash || recipientEmailHash,
+        deliveryChannel: 'email',
+      }
+
       if (capsuleType === 'nft') {
         const validRecipients = nftRecipients.filter((r) => r.address.trim()).map((r) => r.address)
         const payload = {
@@ -327,6 +394,7 @@ export default function CreatePage() {
           nftAssignments,
           inactivityDays: inactivityDaysNum,
           delayDays: parseInt(delayDays),
+          cre: creMeta,
         }
         intentData = new TextEncoder().encode(JSON.stringify(payload))
       } else {
@@ -336,6 +404,7 @@ export default function CreatePage() {
           totalAmount,
           inactivityDays: inactivityDaysNum,
           delayDays: parseInt(delayDays),
+          cre: creMeta,
         })
       }
 
@@ -572,17 +641,19 @@ export default function CreatePage() {
                     <Shield className="w-5 h-5 text-Heres-accent" />
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wider text-Heres-accent">Step 1</p>
-                    <h2 className="text-xl font-bold text-Heres-white">Intent Statement</h2>
+                      <p className="text-xs font-medium uppercase tracking-wider text-Heres-accent">Step 1</p>
+                      <h2 className="text-xl font-bold text-Heres-white">Intent Statement</h2>
+                    </div>
                   </div>
-                </div>
                 <textarea
                   value={intent}
                   onChange={(e) => setIntent(e.target.value)}
                   placeholder="If I am inactive for one year, transfer my assets to my family, and delegate DAO permissions to my co-founder."
                   className="w-full h-32 rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50 transition-colors resize-none"
                 />
-                <p className="text-sm text-Heres-muted mt-3">Describe what should happen when you can no longer act.</p>
+                <p className="text-sm text-Heres-muted mt-3">
+                  Describe your inheritance intent and executor notes. This is a support instruction, not a formal legal will.
+                </p>
               </div>
 
               {/* Getting Started style: choose Token or NFT */}
@@ -983,6 +1054,53 @@ export default function CreatePage() {
               )}
 
               {capsuleType !== null && (
+                <div className="card-Heres p-6 sm:p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-border flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-Heres-accent" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-Heres-accent">Step 5 (Required)</p>
+                      <h2 className="text-xl font-bold text-Heres-white">Intent Statement Delivery</h2>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-Heres-white mb-4">
+                    Email encrypted Intent Statement to a single representative (powered by CRE)
+                  </p>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-Heres-muted mb-2">Representative Email</label>
+                      <input
+                        type="email"
+                        value={creEmail}
+                        onChange={(e) => setCreEmail(e.target.value)}
+                        placeholder="executor@example.com"
+                        className="w-full rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-Heres-muted mb-2">Access Code (share offline with representative)</label>
+                      <input
+                        type="password"
+                        value={creUnlockCode}
+                        onChange={(e) => setCreUnlockCode(e.target.value)}
+                        placeholder="At least 6 characters"
+                        className="w-full rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50"
+                      />
+                      <p className="text-xs text-Heres-muted mt-2">
+                        Your Intent Statement is encrypted in-browser before upload and delivered through CRE when execution is confirmed.
+                      </p>
+                      <p className="text-xs text-amber-400 mt-1">
+                        Do not put private keys, seed phrases, or master passwords in the Intent Statement.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {capsuleType !== null && (
                 <>
                   <div className="rounded-xl border border-Heres-accent/30 bg-Heres-accent/10 p-4 mb-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -1021,6 +1139,9 @@ export default function CreatePage() {
                           !intent.trim() ||
                           !inactivityDays ||
                           parseInt(inactivityDays) <= 0 ||
+                          !wallet.signMessage ||
+                          !isValidEmail(creEmail) ||
+                          creUnlockCode.trim().length < 6 ||
                           (capsuleType === 'token' && (beneficiaries.length === 0 || beneficiaries.some((b) => !b.address || !b.amount))) ||
                           (capsuleType === 'nft' && (selectedNftMints.length === 0 || !nftRecipients.some((r) => r.address.trim()) || nftRecipients.every((r) => !r.address.trim())))
                         }
@@ -1102,6 +1223,10 @@ export default function CreatePage() {
                       <div className="rounded-xl p-4 border border-Heres-border bg-Heres-surface/50">
                         <p className="text-xs text-Heres-accent mb-1">Trigger</p>
                         <p className="text-Heres-white">After {inactivityDays} days of inactivity, {delayDays}-day delay.</p>
+                      </div>
+                      <div className="rounded-xl p-4 border border-Heres-border bg-Heres-surface/50">
+                        <p className="text-xs text-Heres-accent mb-1">Intent Statement Delivery</p>
+                        <p className="text-Heres-white">An encrypted Intent Statement package will be sent to {creEmail || 'representative email'} when execution is confirmed.</p>
                       </div>
                       <div className="rounded-xl p-4 border border-Heres-accent/30 bg-Heres-accent/10">
                         <p className="text-Heres-accent font-semibold flex items-center gap-2">

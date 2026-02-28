@@ -4,6 +4,7 @@
 
 import { Beneficiary } from '@/types'
 import { isValidSolanaAddress } from '@/config/solana'
+import { CreIntentData } from '@/utils/intent'
 
 /**
  * Validate beneficiary addresses
@@ -39,3 +40,14 @@ export function validatePercentageTotals(beneficiaries: Beneficiary[]): boolean 
   return Math.abs(totalPercentage - 100) < 0.01
 }
 
+export function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+export function validateCreIntent(cre: CreIntentData | undefined): boolean {
+  if (!cre) return true
+  if (!cre.enabled) return true
+  if (!cre.secretRef || !cre.secretHash) return false
+  if (!cre.recipientEmailHash) return false
+  return /^[a-f0-9]{64}$/.test(cre.recipientEmailHash)
+}
