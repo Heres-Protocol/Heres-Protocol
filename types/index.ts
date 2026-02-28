@@ -23,6 +23,16 @@ export interface IntentCapsule {
   mint?: PublicKey
 }
 
+export interface CreIntentConfig {
+  enabled: boolean
+  secretRef: string
+  secretHash: string
+  recipientEmailHash: string
+  recipientPhone?: string
+  deliveryChannel?: 'email' | 'sms'
+  paymentTx?: string
+}
+
 // Wallet Activity types
 export interface WalletActivity {
   wallet: string

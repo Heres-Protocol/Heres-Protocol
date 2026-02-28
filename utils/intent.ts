@@ -4,13 +4,41 @@
 
 import { Beneficiary } from '@/types'
 
+export interface CreIntentData {
+  enabled: boolean
+  secretRef: string
+  secretHash: string
+  recipientEmailHash: string
+  recipientPhone?: string
+  deliveryChannel?: 'email' | 'sms'
+  paymentTx?: string
+}
+
 export interface IntentData {
   intent: string
   beneficiaries: Beneficiary[]
   totalAmount?: string
   inactivityDays: number
   delayDays: number
+  cre?: CreIntentData
+  // Legacy payload field for backward compatibility with already-created capsules.
+  premium?: CreIntentData
 }
+
+export interface NftIntentData {
+  type: 'nft'
+  intent: string
+  nftMints: string[]
+  nftRecipients: string[]
+  nftAssignments?: Record<string, number>
+  inactivityDays: number
+  delayDays: number
+  cre?: CreIntentData
+  // Legacy payload field for backward compatibility with already-created capsules.
+  premium?: CreIntentData
+}
+
+export type AnyIntentData = IntentData | NftIntentData
 
 /**
  * Encode intent data to Uint8Array
@@ -26,9 +54,19 @@ export function encodeIntentData(data: IntentData): Uint8Array {
 export function decodeIntentData(data: Uint8Array): IntentData | null {
   try {
     const json = new TextDecoder().decode(data)
-    return JSON.parse(json)
+    return JSON.parse(json) as IntentData
   } catch (error) {
     console.error('Error decoding intent data:', error)
+    return null
+  }
+}
+
+export function parseIntentPayload(data: Uint8Array): AnyIntentData | null {
+  try {
+    const json = new TextDecoder().decode(data)
+    return JSON.parse(json) as AnyIntentData
+  } catch (error) {
+    console.error('Error parsing intent payload:', error)
     return null
   }
 }
