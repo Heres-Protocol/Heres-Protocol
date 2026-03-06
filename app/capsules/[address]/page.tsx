@@ -5,10 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { ArrowLeft, Copy, RefreshCw, Shield, Play } from 'lucide-react'
+import { ArrowLeft, Copy, RefreshCw, Shield, Play, X } from 'lucide-react'
 import {
   getCapsuleByAddress,
   delegateCapsule,
+  undelegateCapsule,
+  cancelCapsule,
+  deactivateCapsule,
   executeIntent,
   scheduleExecuteIntent,
   distributeAssets,
@@ -169,6 +172,15 @@ export default function CapsuleDetailPage() {
   const [teeAuthToken, setTeeAuthToken] = useState<string | null>(null)
   const [isTeeAuthenticated, setIsTeeAuthenticated] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [undelegatePending, setUndelegatePending] = useState(false)
+  const [undelegateTx, setUndelegateTx] = useState<string | null>(null)
+  const [undelegateError, setUndelegateError] = useState<string | null>(null)
+  const [cancelPending, setCancelPending] = useState(false)
+  const [cancelTx, setCancelTx] = useState<string | null>(null)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [deactivatePending, setDeactivatePending] = useState(false)
+  const [deactivateTx, setDeactivateTx] = useState<string | null>(null)
+  const [deactivateError, setDeactivateError] = useState<string | null>(null)
   const [restartPending, setRestartPending] = useState(false)
   const [restartTx, setRestartTx] = useState<string | null>(null)
   const [restartError, setRestartError] = useState<string | null>(null)
@@ -289,6 +301,75 @@ export default function CapsuleDetailPage() {
       setSchedulePending(false)
     }
   }, [wallet, capsule, teeAuthToken])
+
+  const handleUndelegate = useCallback(async () => {
+    if (!wallet.publicKey || !wallet.signTransaction || !capsule) return
+    if (!confirm('Are you sure you want to undelegate this capsule from the Ephemeral Rollup? This will commit state back to the base layer.')) return
+
+    setUndelegatePending(true)
+    setUndelegateError(null)
+    setUndelegateTx(null)
+    try {
+      const tx = await undelegateCapsule(wallet)
+      setUndelegateTx(tx)
+      console.log('[undelegateCapsule] Success. Tx:', tx)
+
+      // Refresh capsule data after undelegation
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      const pubkey = new PublicKey(capsule.capsuleAddress)
+      const updated = await getCapsuleByAddress(pubkey)
+      if (updated) setCapsule(updated)
+    } catch (e: any) {
+      setUndelegateError(e?.message || String(e))
+    } finally {
+      setUndelegatePending(false)
+    }
+  }, [wallet, capsule])
+
+  const handleCancelCapsule = useCallback(async () => {
+    if (!wallet.publicKey || !wallet.signTransaction || !capsule) return
+    if (!confirm('Are you sure you want to cancel this capsule? This will close the capsule account and reclaim all SOL from the vault.')) return
+
+    setCancelPending(true)
+    setCancelError(null)
+    setCancelTx(null)
+    try {
+      const tx = await cancelCapsule(wallet)
+      setCancelTx(tx)
+      console.log('[cancelCapsule] Success. Tx:', tx)
+
+      // Refresh capsule data
+      const pubkey = new PublicKey(capsule.capsuleAddress)
+      const updated = await getCapsuleByAddress(pubkey)
+      if (updated) setCapsule(updated)
+    } catch (e: any) {
+      setCancelError(e?.message || String(e))
+    } finally {
+      setCancelPending(false)
+    }
+  }, [wallet, capsule])
+
+  const handleDeactivate = useCallback(async () => {
+    if (!wallet.publicKey || !wallet.signTransaction || !capsule) return
+    if (!confirm('Are you sure you want to deactivate this capsule? It will no longer execute when conditions are met.')) return
+
+    setDeactivatePending(true)
+    setDeactivateError(null)
+    setDeactivateTx(null)
+    try {
+      const tx = await deactivateCapsule(wallet)
+      setDeactivateTx(tx)
+      console.log('[deactivateCapsule] Success. Tx:', tx)
+
+      const pubkey = new PublicKey(capsule.capsuleAddress)
+      const updated = await getCapsuleByAddress(pubkey)
+      if (updated) setCapsule(updated)
+    } catch (e: any) {
+      setDeactivateError(e?.message || String(e))
+    } finally {
+      setDeactivatePending(false)
+    }
+  }, [wallet, capsule])
 
   const intentParsed = useMemo(() => {
     if (!capsule?.intentData) return null
@@ -815,6 +896,39 @@ export default function CapsuleDetailPage() {
                     <RefreshCw className={`h-4 w-4 ${restartPending ? 'animate-spin' : ''}`} />
                     {restartPending ? 'Restarting...' : 'Restart Inactivity Timer'}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={handleUndelegate}
+                    disabled={undelegatePending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-amber-400/50 bg-amber-400/10 px-4 py-2 text-sm font-medium text-amber-400 transition hover:bg-amber-400/20 disabled:opacity-60"
+                    title="Commit state from ER and undelegate back to Solana base layer"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    {undelegatePending ? 'Undelegating...' : 'Undelegate from ER'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeactivate}
+                    disabled={deactivatePending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-400/50 bg-red-400/10 px-4 py-2 text-sm font-medium text-red-400 transition hover:bg-red-400/20 disabled:opacity-60"
+                    title="Deactivate capsule (stop execution)"
+                  >
+                    <X className="h-4 w-4" />
+                    {deactivatePending ? 'Deactivating...' : 'Deactivate'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCancelCapsule}
+                    disabled={cancelPending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-500 transition hover:bg-red-500/20 disabled:opacity-60"
+                    title="Cancel and close capsule, reclaim SOL"
+                  >
+                    <X className="h-4 w-4" />
+                    {cancelPending ? 'Cancelling...' : 'Cancel & Reclaim SOL'}
+                  </button>
                 </div>
 
                 {/* Step 1: Delegation Status */}
@@ -850,6 +964,71 @@ export default function CapsuleDetailPage() {
                   <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
                     <p className="text-xs font-semibold text-amber-400 mb-1">✗ Step 2: Crank Scheduling Failed</p>
                     <p className="text-xs text-amber-400">{scheduleError}</p>
+                  </div>
+                )}
+
+                {/* Undelegate Status */}
+                {undelegateTx && (
+                  <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
+                    <p className="text-xs font-semibold text-amber-400 mb-1">✓ Undelegation Complete</p>
+                    <p className="text-xs text-Heres-muted mb-2">Capsule committed and undelegated from Ephemeral Rollup</p>
+                    <a
+                      href={`https://explorer.solana.com/tx/${undelegateTx}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-amber-400 hover:underline"
+                    >
+                      View undelegation tx →
+                    </a>
+                  </div>
+                )}
+                {undelegateError && (
+                  <div className="rounded-lg border border-red-400/30 bg-red-400/5 p-3">
+                    <p className="text-xs font-semibold text-red-400 mb-1">✗ Undelegation Failed</p>
+                    <p className="text-xs text-red-400">{undelegateError}</p>
+                  </div>
+                )}
+
+                {/* Deactivate Status */}
+                {deactivateTx && (
+                  <div className="rounded-lg border border-red-400/30 bg-red-400/5 p-3">
+                    <p className="text-xs font-semibold text-red-400 mb-1">✓ Capsule Deactivated</p>
+                    <a
+                      href={`https://explorer.solana.com/tx/${deactivateTx}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-red-400 hover:underline"
+                    >
+                      View tx →
+                    </a>
+                  </div>
+                )}
+                {deactivateError && (
+                  <div className="rounded-lg border border-red-400/30 bg-red-400/5 p-3">
+                    <p className="text-xs font-semibold text-red-400 mb-1">✗ Deactivation Failed</p>
+                    <p className="text-xs text-red-400">{deactivateError}</p>
+                  </div>
+                )}
+
+                {/* Cancel Status */}
+                {cancelTx && (
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                    <p className="text-xs font-semibold text-red-500 mb-1">✓ Capsule Cancelled</p>
+                    <p className="text-xs text-Heres-muted mb-2">SOL reclaimed from vault and account closed</p>
+                    <a
+                      href={`https://explorer.solana.com/tx/${cancelTx}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-red-500 hover:underline"
+                    >
+                      View tx →
+                    </a>
+                  </div>
+                )}
+                {cancelError && (
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                    <p className="text-xs font-semibold text-red-500 mb-1">✗ Cancel Failed</p>
+                    <p className="text-xs text-red-500">{cancelError}</p>
                   </div>
                 )}
               </div>
