@@ -241,15 +241,10 @@ export async function executeIntent(
   beneficiaries?: Array<{ address: string; amount: string; amountType: string }>,
   mint?: PublicKey
 ): Promise<string> {
-  const program = getProgram(wallet)
-  if (!program) throw new Error('Wallet not connected')
+  if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(ownerPublicKey)
   const [vaultPDA] = getCapsuleVaultPDA(ownerPublicKey)
-  const [feeConfigPDA] = getFeeConfigPDA()
-  const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
-    ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
-    : null
 
   const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
   const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
@@ -277,6 +272,43 @@ export async function executeIntent(
       isWritable: true,
     }
   }) || []
+
+  // Check if capsule is delegated — if so, route through TEE RPC
+  const baseConnection = getSolanaConnection()
+  const accountInfo = await baseConnection.getAccountInfo(capsulePDA)
+  const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+  const isDelegated = accountInfo && accountInfo.owner.equals(delegationProgramId)
+
+  if (isDelegated) {
+    // Get TEE auth token for authenticated RPC access
+    const token = await TEE_AUTH.getAuthToken(wallet)
+
+    const teeProgram = getTeeProgram(wallet, token)
+    if (!teeProgram) throw new Error('Failed to initialize TEE program')
+
+    const ix = await teeProgram.methods
+      .executeIntent()
+      .accounts(accounts)
+      .remainingAccounts(remainingAccounts)
+      .instruction()
+
+    const { Transaction } = await import('@solana/web3.js')
+    const teeConnection = (teeProgram.provider as AnchorProvider).connection
+    const { blockhash, lastValidBlockHeight } = await teeConnection.getLatestBlockhash('confirmed')
+
+    const tx = new Transaction({ feePayer: wallet.publicKey, blockhash, lastValidBlockHeight })
+    tx.add(ix)
+
+    const signedTx = await wallet.signTransaction(tx)
+    const txSignature = await teeConnection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
+    await teeConnection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed')
+
+    return txSignature
+  }
+
+  // Not delegated — send to base layer
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
 
   const tx = await program.methods
     .executeIntent()
@@ -519,8 +551,7 @@ export async function distributeAssets(
   beneficiaries?: Array<{ address: string; amount: string; amountType: string }>,
   mint?: PublicKey
 ): Promise<string> {
-  const program = getProgram(wallet)
-  if (!program) throw new Error('Wallet not connected')
+  if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(ownerPublicKey)
   const [vaultPDA] = getCapsuleVaultPDA(ownerPublicKey)
@@ -558,6 +589,42 @@ export async function distributeAssets(
   }) || []
 
   console.log('[distributeAssets] Calling with beneficiaries:', beneficiaries?.length || 0)
+
+  // Check if capsule is delegated — if so, route through TEE RPC
+  const baseConnection = getSolanaConnection()
+  const accountInfo = await baseConnection.getAccountInfo(capsulePDA)
+  const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
+  const isDelegated = accountInfo && accountInfo.owner.equals(delegationProgramId)
+
+  if (isDelegated) {
+    const token = await TEE_AUTH.getAuthToken(wallet)
+
+    const teeProgram = getTeeProgram(wallet, token)
+    if (!teeProgram) throw new Error('Failed to initialize TEE program')
+
+    const ix = await teeProgram.methods
+      .distributeAssets()
+      .accounts(accounts)
+      .remainingAccounts(remainingAccounts)
+      .instruction()
+
+    const { Transaction } = await import('@solana/web3.js')
+    const teeConnection = (teeProgram.provider as AnchorProvider).connection
+    const { blockhash, lastValidBlockHeight } = await teeConnection.getLatestBlockhash('confirmed')
+
+    const tx = new Transaction({ feePayer: wallet.publicKey, blockhash, lastValidBlockHeight })
+    tx.add(ix)
+
+    const signedTx = await wallet.signTransaction(tx)
+    const txSignature = await teeConnection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
+    await teeConnection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed')
+
+    return txSignature
+  }
+
+  // Not delegated — send to base layer
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
 
   const tx = await program.methods
     .distributeAssets()

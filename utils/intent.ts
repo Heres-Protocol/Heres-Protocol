@@ -84,3 +84,9 @@ export function daysToSeconds(days: number): number {
 export function secondsToDays(seconds: number): number {
   return seconds / (24 * 60 * 60)
 }
+
+export function formatDuration(seconds: number): string {
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`
+  return `${Math.round(seconds / 86400)}d`
+}

@@ -12,10 +12,11 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 )
 import Link from 'next/link'
-import { createCapsule, getCapsule } from '@/lib/solana'
+import { createCapsule, getCapsule, delegateCapsule, scheduleExecuteIntent, executeIntent, distributeAssets } from '@/lib/solana'
+import { TEE_AUTH } from '@/lib/tee'
 import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
-import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER } from '@/constants'
+import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, MAX_CAPSULE_MODIFICATIONS } from '@/constants'
 import { getNftsByOwner } from '@/lib/helius'
 import { encodeIntentData, daysToSeconds } from '@/utils/intent'
 import { buildCreSignedMessage } from '@/utils/creAuth'
@@ -50,9 +51,11 @@ export default function CreatePage() {
   const [delayDays, setDelayDays] = useState<string>(DEFAULT_VALUES.DELAY_DAYS)
   const [showSimulation, setShowSimulation] = useState(false)
   const [isPending, setIsPending] = useState(false)
+  const [currentStep, setCurrentStep] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [existingCapsule, setExistingCapsule] = useState<boolean>(false)
+  const [modifyCount, setModifyCount] = useState<number>(0)
   // NFT flow
   const [nftList, setNftList] = useState<NftItem[]>([])
   const [nftListLoading, setNftListLoading] = useState(false)
@@ -132,10 +135,15 @@ export default function CreatePage() {
     return () => { cancelled = true }
   }, [capsuleType, publicKey, connected])
 
-  // Check for existing capsule on mount
+  // Check for existing capsule on mount and load modification count
   useEffect(() => {
     const checkExistingCapsule = async () => {
       if (connected && publicKey) {
+        // Load modification count from localStorage
+        const countKey = STORAGE_KEYS.CAPSULE_MODIFY_COUNT(publicKey.toBase58())
+        const stored = localStorage.getItem(countKey)
+        setModifyCount(stored ? parseInt(stored, 10) || 0 : 0)
+
         try {
           const capsule = await getCapsule(publicKey)
           // Only show warning if capsule is active AND not executed
@@ -270,6 +278,14 @@ export default function CreatePage() {
       return
     }
 
+    // Check modification limit (3 per wallet)
+    const countKey = STORAGE_KEYS.CAPSULE_MODIFY_COUNT(publicKey.toBase58())
+    const currentCount = parseInt(localStorage.getItem(countKey) || '0', 10)
+    if (currentCount >= MAX_CAPSULE_MODIFICATIONS) {
+      alert(`You have reached the maximum number of capsule modifications (${MAX_CAPSULE_MODIFICATIONS}) for this wallet.`)
+      return
+    }
+
     if (capsuleType === 'token' && !validateBeneficiaries()) return
     if (capsuleType === 'nft') {
       const validRecipients = nftRecipients.filter((r) => r.address.trim())
@@ -318,23 +334,6 @@ export default function CreatePage() {
     setError(null)
 
     try {
-      // Check if capsule already exists and is active (not executed)
-      if (publicKey) {
-        const existingCapsule = await getCapsule(publicKey)
-        // Only block if capsule is active AND not executed
-        // If capsule is executed (executedAt is set), we can recreate it
-        if (existingCapsule && existingCapsule.isActive && !existingCapsule.executedAt) {
-          const errorMsg = 'You already have an active capsule. Please deactivate it first or update the existing one.'
-          setError(errorMsg)
-          alert(errorMsg + '\n\nYou can view your existing capsule at /capsules')
-          setIsPending(false)
-          return
-        }
-        // Allow creation/recreation if:
-        // 1. Capsule doesn't exist
-        // 2. Capsule is executed (executedAt is set) - will use recreateCapsule
-        // 3. Capsule exists but isActive is false and executedAt is null (edge case)
-      }
 
       const inactivityDaysNum = parseInt(inactivityDays)
       let intentData: Uint8Array
@@ -408,38 +407,27 @@ export default function CreatePage() {
         })
       }
 
-      const inactivityPeriodSeconds = daysToSeconds(inactivityDaysNum)
+      // On devnet, allow small values for testing (treat values <= 30 as minutes, not days)
+      const inactivityPeriodSeconds = SOLANA_CONFIG.NETWORK === 'devnet' && inactivityDaysNum <= 30
+        ? inactivityDaysNum * 60  // treat as minutes on devnet for small values
+        : daysToSeconds(inactivityDaysNum)
 
-      // Final check before submitting transaction - re-fetch to ensure state hasn't changed
-      if (publicKey) {
-        const finalCheck = await getCapsule(publicKey)
-        if (finalCheck && finalCheck.isActive && !finalCheck.executedAt) {
-          const errorMsg = 'You already have an active capsule. Please deactivate it first or update the existing one.'
-          setError(errorMsg)
-          alert(errorMsg + '\n\nYou can view your existing capsule at /capsules')
-          setIsPending(false)
-          return
-        }
-      }
-
-      // Check if there's an executed capsule - if so, recreate it instead of creating new
+      // Check if there's an existing capsule - if so, recreate it instead of creating new
       let hash: string
       if (publicKey) {
-        // Re-fetch capsule to check current state (may have changed)
         const existingCapsule = await getCapsule(publicKey)
 
-        // Use recreateCapsule if:
-        // 1. Capsule exists AND
-        // 2. (executedAt is set OR isActive is false)
-        // This handles both executed capsules and deactivated capsules
-        if (existingCapsule && (existingCapsule.executedAt || !existingCapsule.isActive)) {
-          // Use recreateCapsule for executed or deactivated capsules
+        if (existingCapsule && !existingCapsule.isActive && existingCapsule.executedAt) {
+          // Executed capsule — recreate it
           const { recreateCapsule } = await import('@/lib/solana')
           hash = await recreateCapsule(
             wallet as any,
             inactivityPeriodSeconds,
             intentData
           )
+        } else if (existingCapsule && existingCapsule.isActive) {
+          // Active capsule exists — cannot create new one (on-chain constraint)
+          throw new Error('You already have an active capsule. It must be executed or cancelled before creating a new one. Visit /capsules to view it.')
         } else {
           hash = await createCapsule(
             wallet as any,
@@ -456,6 +444,14 @@ export default function CreatePage() {
       }
 
       setTxHash(hash)
+      console.log('[Step 1/5] Capsule created. Tx:', hash)
+
+      // Increment modification count
+      if (publicKey) {
+        const newCount = currentCount + 1
+        localStorage.setItem(countKey, String(newCount))
+        setModifyCount(newCount)
+      }
 
       // Save intent to localStorage
       if (intent.trim() && publicKey) {
@@ -465,16 +461,75 @@ export default function CreatePage() {
 
       // Save capsule creation transaction signature with unique key
       if (publicKey && hash) {
-        // Save with signature in key to preserve all transactions
         const txKeyWithSig = STORAGE_KEYS.CAPSULE_CREATION_TX_WITH_SIG(publicKey.toString(), hash)
         localStorage.setItem(txKeyWithSig, hash)
-
-        // Also save to the main key (for backward compatibility)
         const txKey = STORAGE_KEYS.CAPSULE_CREATION_TX(publicKey.toString())
         localStorage.setItem(txKey, hash)
       }
 
-      alert(`Capsule created successfully! Transaction: ${hash}`)
+      // ===== Step 2: Delegate to TEE =====
+      setCurrentStep('Delegating to TEE...')
+      console.log('[Step 2/5] Delegating capsule to TEE validator...')
+      try {
+        const delegateTx = await delegateCapsule(wallet as any, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
+        console.log('[Step 2/5] Delegation successful. Tx:', delegateTx)
+      } catch (delegateErr: any) {
+        console.warn('[Step 2/5] Delegation failed:', delegateErr?.message)
+        // Continue — capsule is created, delegation can be retried
+      }
+
+      // Wait for ER to sync the delegated account
+      setCurrentStep('Waiting for TEE sync...')
+      await new Promise(resolve => setTimeout(resolve, 5000))
+
+      // ===== Step 3: Schedule Crank =====
+      setCurrentStep('Scheduling crank...')
+      console.log('[Step 3/5] Scheduling crank on TEE ER...')
+      try {
+        const token = await TEE_AUTH.getAuthToken(wallet as any)
+        const scheduleTx = await scheduleExecuteIntent(wallet as any, publicKey, undefined, token)
+        console.log('[Step 3/5] Crank scheduled. Tx:', scheduleTx)
+      } catch (scheduleErr: any) {
+        console.warn('[Step 3/5] Crank scheduling failed:', scheduleErr?.message)
+      }
+
+      // ===== Step 4: Execute Intent =====
+      setCurrentStep('Executing intent...')
+      console.log('[Step 4/5] Executing intent on TEE...')
+      try {
+        const validBeneficiaries = capsuleType === 'token' && beneficiaries?.length
+          ? beneficiaries.filter(b => b.address.trim()).map(b => ({
+              address: b.address,
+              amount: b.amount,
+              amountType: b.amountType,
+            }))
+          : undefined
+        const executeTx = await executeIntent(wallet as any, publicKey, validBeneficiaries)
+        console.log('[Step 4/5] Execute successful. Tx:', executeTx)
+      } catch (executeErr: any) {
+        console.warn('[Step 4/5] Execute failed:', executeErr?.message)
+      }
+
+      // ===== Step 5: Distribute Assets =====
+      setCurrentStep('Distributing assets...')
+      console.log('[Step 5/5] Distributing assets...')
+      try {
+        const distBeneficiaries = capsuleType === 'token' && beneficiaries?.length
+          ? beneficiaries.filter(b => b.address.trim()).map(b => ({
+              address: b.address,
+              amount: b.amount,
+              amountType: b.amountType,
+            }))
+          : undefined
+        if (distBeneficiaries?.length) {
+          const distributeTx = await distributeAssets(wallet as any, publicKey, distBeneficiaries)
+          console.log('[Step 5/5] Distribution successful. Tx:', distributeTx)
+        }
+      } catch (distErr: any) {
+        console.warn('[Step 5/5] Distribution failed:', distErr?.message)
+      }
+
+      setCurrentStep(null)
 
       // Redirect to capsules page after successful creation
       window.location.href = '/capsules'
@@ -616,22 +671,23 @@ export default function CreatePage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {existingCapsule && (
-                <div className="card-Heres p-6 border-Heres-accent/40 bg-Heres-accent/5">
+              {connected && modifyCount >= MAX_CAPSULE_MODIFICATIONS && (
+                <div className="card-Heres p-6 border-red-500/40 bg-red-500/5">
                   <div className="flex items-start gap-4">
-                    <Shield className="w-6 h-6 text-Heres-accent flex-shrink-0 mt-0.5" />
+                    <Shield className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-Heres-accent mb-2">Existing Capsule Detected</h3>
-                      <p className="text-Heres-muted mb-4">
-                        You already have a capsule for this wallet. Please visit your existing capsule to update or deactivate it first.
+                      <h3 className="text-lg font-semibold text-red-400 mb-2">Modification Limit Reached</h3>
+                      <p className="text-Heres-muted">
+                        You have used all {MAX_CAPSULE_MODIFICATIONS} capsule modifications for this wallet. No further changes are allowed.
                       </p>
-                      <div className="flex flex-wrap gap-3">
-                        <Link href="/capsules">
-                          <span className="btn-secondary inline-block px-4 py-2 text-sm">View My Capsule</span>
-                        </Link>
-                      </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {connected && modifyCount > 0 && modifyCount < MAX_CAPSULE_MODIFICATIONS && (
+                <div className="rounded-lg border border-Heres-border bg-Heres-surface/50 px-4 py-3 text-sm text-Heres-muted">
+                  Capsule modifications used: <span className="text-Heres-white font-medium">{modifyCount}</span> / {MAX_CAPSULE_MODIFICATIONS}
                 </div>
               )}
 
@@ -1028,7 +1084,9 @@ export default function CreatePage() {
                     </div>
                   </div>
                   <div className="mt-4">
-                    <label className="block text-sm text-Heres-muted mb-2">Or inactivity period (days)</label>
+                    <label className="block text-sm text-Heres-muted mb-2">
+                      {SOLANA_CONFIG.NETWORK === 'devnet' ? 'Inactivity period (≤30 = minutes, >30 = days)' : 'Or inactivity period (days)'}
+                    </label>
                     <input
                       type="number"
                       value={inactivityDays}
@@ -1046,9 +1104,32 @@ export default function CreatePage() {
                       placeholder="Enter days"
                       className="w-full rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50"
                     />
+                    {SOLANA_CONFIG.NETWORK === 'devnet' && (
+                      <div className="flex gap-2 mt-2">
+                        {[1, 3, 5, 10].map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => {
+                              setInactivityDays(String(m))
+                              setTargetDate('')
+                            }}
+                            className="rounded-lg border border-Heres-accent/30 bg-Heres-accent/10 px-3 py-1 text-xs text-Heres-accent hover:bg-Heres-accent/20"
+                          >
+                            {m}min
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <p className="text-sm text-Heres-muted mt-4">
-                    {targetDate ? `Triggers on ${new Date(targetDate).toLocaleDateString()}, ${delayDays}-day delay.` : inactivityDays ? `After ${inactivityDays} days of inactivity, ${delayDays}-day delay.` : 'Set target date or inactivity period.'}
+                    {targetDate
+                      ? `Triggers on ${new Date(targetDate).toLocaleDateString()}, ${delayDays}-day delay.`
+                      : inactivityDays
+                        ? SOLANA_CONFIG.NETWORK === 'devnet' && parseInt(inactivityDays) <= 30
+                          ? `After ${inactivityDays} minutes of inactivity (devnet test mode).`
+                          : `After ${inactivityDays} days of inactivity, ${delayDays}-day delay.`
+                        : 'Set target date or inactivity period.'}
                   </p>
                 </div>
               )}
@@ -1133,7 +1214,7 @@ export default function CreatePage() {
                         onClick={handleCreate}
                         disabled={
                           isPending ||
-                          existingCapsule ||
+                          modifyCount >= MAX_CAPSULE_MODIFICATIONS ||
                           !connected ||
                           !publicKey ||
                           !intent.trim() ||
@@ -1147,7 +1228,7 @@ export default function CreatePage() {
                         }
                         className="btn-primary w-full py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isPending ? 'Creating...' : 'Create Capsule'}
+                        {isPending ? (currentStep || 'Creating capsule...') : 'Create Capsule'}
                       </button>
                     </div>
                   </div>
