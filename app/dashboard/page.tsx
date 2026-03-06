@@ -228,7 +228,7 @@ const fetchAllSignatures = async (
   connection: ReturnType<typeof getSolanaConnection>,
   address: PublicKey,
   pageSize = 100,
-  maxPages = 200
+  maxPages = 10
 ) => {
   let all: Awaited<ReturnType<typeof connection.getSignaturesForAddress>> = []
   let before: string | undefined
@@ -254,8 +254,8 @@ const fetchAllSignatures = async (
 const fetchTransactionsBatched = async (
   connection: ReturnType<typeof getSolanaConnection>,
   signatureInfos: Array<{ signature: string; err: any; blockTime?: number | null; memo?: string | null; slot?: number }>,
-  batchSize = 6,
-  delayMs = 200
+  batchSize = 3,
+  delayMs = 500
 ): Promise<Array<{ info: (typeof signatureInfos)[0]; tx: any }>> => {
   const results: Array<{ info: (typeof signatureInfos)[0]; tx: any }> = []
   for (let i = 0; i < signatureInfos.length; i += batchSize) {
@@ -296,7 +296,7 @@ const getBlockTimeFromTx = (tx: any) => {
 }
 
 /** Fetch all enhanced transactions from Helius (paginated). */
-const fetchAllEnhancedTransactions = async (address: string, pageSize = 100, maxPages = 120) => {
+const fetchAllEnhancedTransactions = async (address: string, pageSize = 100, maxPages = 10) => {
   let all: any[] = []
   let before: string | undefined
   for (let page = 0; page < maxPages; page += 1) {
@@ -457,7 +457,30 @@ export default function DashboardPage() {
   useEffect(() => {
     let isMounted = true
 
+    const DASHBOARD_CACHE_KEY = 'dashboard_cache'
+    const DASHBOARD_CACHE_TTL = 5 * 60 * 1000 // 5 min
+
     const loadDashboard = async () => {
+      // Try sessionStorage cache first (skip on manual refresh)
+      if (refreshKey === 0) {
+        try {
+          const cached = sessionStorage.getItem(DASHBOARD_CACHE_KEY)
+          if (cached) {
+            const { data, timestamp } = JSON.parse(cached)
+            if (Date.now() - timestamp < DASHBOARD_CACHE_TTL && data) {
+              if (isMounted) {
+                setCapsules(data.capsules)
+                setSummary(data.summary)
+                setLastUpdated(timestamp)
+                setError(null)
+                setIsRefreshing(false)
+              }
+              return
+            }
+          }
+        } catch { /* ignore cache read errors */ }
+      }
+
       setIsRefreshing(true)
       try {
         const connection = getSolanaConnection()
@@ -717,17 +740,26 @@ export default function DashboardPage() {
         })
 
         if (isMounted) {
-          setCapsules(combinedRows)
-          setSummary({
+          const summaryData = {
             total: totalEventSignatures,
             active: activeCapsules,
             executed: executedEventSignatures,
             expired: expiredCapsules,
             proofs: verifiedProofs,
             successRate,
-          })
+          }
+          setCapsules(combinedRows)
+          setSummary(summaryData)
           setLastUpdated(Date.now())
           setError(null)
+
+          // Cache to sessionStorage
+          try {
+            sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
+              data: { capsules: combinedRows, summary: summaryData },
+              timestamp: Date.now(),
+            }))
+          } catch { /* ignore quota errors */ }
         }
       } catch (err) {
         if (isMounted) {
