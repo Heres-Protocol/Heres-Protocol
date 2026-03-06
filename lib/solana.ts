@@ -413,7 +413,7 @@ export async function scheduleExecuteIntent(
   const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_INTERVAL_MS || 60000);
   const iterations = args?.iterations ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_ITERATIONS || 0);
 
-  // IMPORTANT: For crank scheduling, we MUST use the TEE program instance
+  // Use TEE RPC with auth token for sending transactions
   const teeProgram = getTeeProgram(wallet, token);
   if (!teeProgram) throw new Error('Failed to initialize TEE program');
 
@@ -429,24 +429,38 @@ export async function scheduleExecuteIntent(
   })
 
   try {
-    console.log('[scheduleExecuteIntent] Building transaction...');
-    // Use transaction() instead of rpc() to avoid blockhash issues as suggested
-    const tx = await teeProgram.methods
+    console.log('[scheduleExecuteIntent] Building raw transaction for TEE RPC...');
+    // Build instruction manually via Anchor, then send raw (avoids Anchor provider compute budget additions)
+    const ix = await teeProgram.methods
       .scheduleExecuteIntent({
-        task_id: taskId,
-        execution_interval_millis: executionIntervalMillis,
+        taskId: taskId,
+        executionIntervalMillis: executionIntervalMillis,
         iterations: iterations,
       })
       // @ts-ignore
       .accounts(accounts)
-      .transaction();
+      .instruction();
 
-    console.log('[scheduleExecuteIntent] Sending and confirming transaction...');
-    // provider.sendAndConfirm manually handles the signature and confirmation
-    const txSignature = await teeProgram.provider.sendAndConfirm!(tx, [], {
-      commitment: 'confirmed',
-      skipPreflight: false,
+    const { Transaction } = await import('@solana/web3.js');
+    const teeConnection = (teeProgram.provider as AnchorProvider).connection;
+    const { blockhash, lastValidBlockHeight } = await teeConnection.getLatestBlockhash('confirmed');
+
+    const tx = new Transaction({
+      feePayer: wallet.publicKey,
+      blockhash,
+      lastValidBlockHeight,
     });
+    tx.add(ix);
+
+    // Sign via wallet adapter
+    const signedTx = await wallet.signTransaction!(tx);
+    console.log('[scheduleExecuteIntent] Sending signed tx to TEE RPC...');
+
+    const txSignature = await teeConnection.sendRawTransaction(signedTx.serialize(), {
+      skipPreflight: true,
+    });
+    console.log('[scheduleExecuteIntent] Tx sent, confirming...', txSignature);
+    await teeConnection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed');
 
     console.log('[scheduleExecuteIntent] ✅ Success! TX:', txSignature);
     return txSignature;
@@ -963,6 +977,149 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
   } catch {
     return null
   }
+}
+
+/**
+ * Undelegate capsule and vault from Ephemeral Rollup back to Solana base layer.
+ * Commits state from ER and undelegates both capsule and vault PDAs.
+ */
+export async function undelegateCapsule(
+  wallet: WalletContextState
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+  if (!wallet.publicKey) throw new Error('Wallet not connected')
+
+  const [capsulePDA] = getCapsulePDA(wallet.publicKey)
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
+
+  const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+  const magicContext = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
+
+  // Buffer PDA for capsule (needed for commit)
+  const [bufferPDA] = getBufferPDA(capsulePDA, magicProgramId)
+
+  const accounts = {
+    payer: wallet.publicKey,
+    owner: wallet.publicKey,
+    capsule: capsulePDA,
+    vault: vaultPDA,
+    buffer: bufferPDA,
+    magicContext: magicContext,
+    magicProgram: magicProgramId,
+    systemProgram: SystemProgram.programId,
+  }
+
+  console.log('[undelegateCapsule] Committing and undelegating from ER...')
+  console.log(' - Capsule:', capsulePDA.toBase58())
+  console.log(' - Vault:', vaultPDA.toBase58())
+
+  const tx = await program.methods
+    .undelegateCapsule()
+    // @ts-ignore
+    .accounts(accounts)
+    .rpc()
+
+  console.log('[undelegateCapsule] Success. Tx:', tx)
+  return tx
+}
+
+/**
+ * Process undelegation for an account after commit from ER.
+ * Called on the base layer to finalize the undelegation.
+ */
+export async function processUndelegation(
+  wallet: WalletContextState,
+  baseAccount: PublicKey,
+  accountSeeds: Uint8Array[]
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+  if (!wallet.publicKey) throw new Error('Wallet not connected')
+
+  const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+  const [bufferPDA] = getBufferPDA(baseAccount, magicProgramId)
+
+  const accounts = {
+    baseAccount: baseAccount,
+    buffer: bufferPDA,
+    payer: wallet.publicKey,
+    systemProgram: SystemProgram.programId,
+  }
+
+  const seedsBuffers = accountSeeds.map(s => Buffer.from(s))
+
+  const tx = await program.methods
+    .processUndelegation(seedsBuffers)
+    // @ts-ignore
+    .accounts(accounts)
+    .rpc()
+
+  console.log('[processUndelegation] Success. Tx:', tx)
+  return tx
+}
+
+/**
+ * Cancel (close) a capsule, reclaiming SOL from vault and account rent.
+ * Owner-only. Used to clear stuck capsules or simply close them.
+ */
+export async function cancelCapsule(
+  wallet: WalletContextState
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+  if (!wallet.publicKey) throw new Error('Wallet not connected')
+
+  const [capsulePDA] = getCapsulePDA(wallet.publicKey)
+  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
+
+  const accounts = {
+    capsule: capsulePDA,
+    vault: vaultPDA,
+    owner: wallet.publicKey,
+    systemProgram: SystemProgram.programId,
+  }
+
+  console.log('[cancelCapsule] Cancelling capsule and reclaiming SOL...')
+
+  const tx = await program.methods
+    .cancelCapsule()
+    // @ts-ignore
+    .accounts(accounts)
+    .rpc()
+
+  console.log('[cancelCapsule] Success. Tx:', tx)
+  return tx
+}
+
+/**
+ * Deactivate a capsule (owner can cancel before execution).
+ * Marks capsule as inactive but does not close the account.
+ */
+export async function deactivateCapsule(
+  wallet: WalletContextState
+): Promise<string> {
+  const program = getProgram(wallet)
+  if (!program) throw new Error('Wallet not connected')
+  if (!wallet.publicKey) throw new Error('Wallet not connected')
+
+  const [capsulePDA] = getCapsulePDA(wallet.publicKey)
+
+  const accounts = {
+    capsule: capsulePDA,
+    owner: wallet.publicKey,
+  }
+
+  console.log('[deactivateCapsule] Deactivating capsule...')
+
+  const tx = await program.methods
+    .deactivateCapsule()
+    // @ts-ignore
+    .accounts(accounts)
+    .rpc()
+
+  console.log('[deactivateCapsule] Success. Tx:', tx)
+  return tx
 }
 
 // Re-export types
