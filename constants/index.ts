@@ -4,7 +4,7 @@
 
 // Solana Configuration
 export const SOLANA_CONFIG = {
-  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM',
+  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU',
   NETWORK: process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet',
   HELIUS_API_KEY: process.env.NEXT_PUBLIC_HELIUS_API_KEY || '',
   /** Platform wallet for creation/execution fees (수수료 수령 지갑) */
@@ -46,13 +46,18 @@ export const MAGICBLOCK_ER = {
   /** Magic program ID for crank ScheduleTask CPI (matches ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID) */
   MAGIC_PROGRAM_ID: process.env.NEXT_PUBLIC_MAGIC_PROGRAM_ID || 'Magic11111111111111111111111111111111111111',
   /** Magic context PDA for commit/undelegate CPI */
-  MAGIC_CONTEXT: process.env.NEXT_PUBLIC_MAGIC_CONTEXT || 'Magic11111111111111111111111111111111111111',
+  MAGIC_CONTEXT: process.env.NEXT_PUBLIC_MAGIC_CONTEXT || 'MagicContext1111111111111111111111111111111',
+  /** Devnet ER RPC — Asia region (closest to KR) */
+  ER_RPC_URL: process.env.NEXT_PUBLIC_ER_RPC_URL || 'https://devnet-as.magicblock.app',
+  ER_WS_URL: process.env.NEXT_PUBLIC_ER_WS_URL || 'wss://devnet-as.magicblock.app',
   ROUTER_DEVNET: 'https://devnet-router.magicblock.app',
   ROUTER_WS: 'wss://devnet-router.magicblock.app',
+  /** Active validator — Asia devnet (default for delegation) */
+  ACTIVE_VALIDATOR: process.env.NEXT_PUBLIC_ER_VALIDATOR || 'MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57',
   VALIDATOR_ASIA: 'MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57',
   VALIDATOR_EU: 'MEUGGrYPxKk17hCr7wpT6s8dtNokZj5U2L57vjYMS8e',
   VALIDATOR_US: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
-  /** TEE validator for Private Ephemeral Rollup (PER); used by default when delegating for privacy */
+  /** TEE validator for Private Ephemeral Rollup (PER) */
   VALIDATOR_TEE: 'FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA',
   /** MagicBlock Permission Program ID for Access Control (PER) */
   PERMISSION_PROGRAM_ID: 'ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1',
@@ -61,11 +66,13 @@ export const MAGICBLOCK_ER = {
   CRANK_DEFAULT_ITERATIONS: 100_000,
 } as const
 
-/** Ephemeral Rollup (ER) - Devnet endpoint for delegation and scheduling */
+/** Ephemeral Rollup endpoints — ER (Asia devnet primary) + TEE (PER fallback) */
 export const PER_TEE = {
-  /** Devnet ER TEE RPC URL */
-  RPC_URL: process.env.NEXT_PUBLIC_TEE_RPC_URL || 'https://tee.magicblock.app',
-  /** Auth URL for TEE challenge-response */
+  /** Devnet ER RPC URL (Asia) — primary for delegation & scheduling */
+  RPC_URL: process.env.NEXT_PUBLIC_ER_RPC_URL || 'https://devnet-as.magicblock.app',
+  /** TEE RPC URL — for PER (private) flows */
+  TEE_RPC_URL: process.env.NEXT_PUBLIC_TEE_RPC_URL || 'https://tee.magicblock.app',
+  /** Auth URL for TEE challenge-response (PER only) */
   AUTH_URL: process.env.NEXT_PUBLIC_TEE_AUTH_URL || 'https://tee.magicblock.app',
   DOCS_URL: 'https://docs.magicblock.gg/pages/ephemeral-rollups-ers/introduction',
 } as const

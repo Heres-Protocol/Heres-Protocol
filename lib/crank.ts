@@ -8,12 +8,10 @@ class NodeWallet {
   async signTransaction(tx: any): Promise<any> { tx.partialSign(this.payer); return tx }
   async signAllTransactions(txs: any[]): Promise<any[]> { txs.forEach((tx: any) => tx.partialSign(this.payer)); return txs }
 }
-import nacl from 'tweetnacl'
-import { getAuthToken } from '@magicblock-labs/ephemeral-rollups-sdk'
 import idl from '../idl/HeresProgram.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
 import { getCapsulePDA, getCapsuleVaultPDA, getFeeConfigPDA } from './program'
-import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
+import { SOLANA_CONFIG, MAGICBLOCK_ER } from '@/constants'
 
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
@@ -168,13 +166,11 @@ export async function executeCapsuleIntent(
 
   const ix = new TransactionInstruction({ keys, programId, data: discriminator })
 
-  // Route through ER/TEE RPC if capsule is delegated
+  // Route through ER RPC (Asia devnet) if capsule is delegated
   let targetConnection = connection
   if (capsule.isDelegated) {
-    // Get TEE auth token using keypair signing
-    const signMessage = async (msg: Uint8Array) => nacl.sign.detached(msg, crankKeypair.secretKey)
-    const { token } = await getAuthToken(PER_TEE.AUTH_URL, crankKeypair.publicKey, signMessage)
-    targetConnection = new Connection(`${PER_TEE.RPC_URL}?token=${token}`, { commitment: 'confirmed' })
+    targetConnection = new Connection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
+    console.log(`[crank] Using ER RPC for delegated capsule: ${MAGICBLOCK_ER.ER_RPC_URL}`)
   }
 
   const { blockhash, lastValidBlockHeight } = await targetConnection.getLatestBlockhash('confirmed')

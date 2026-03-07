@@ -19,7 +19,7 @@ use anchor_spl::associated_token::AssociatedToken;
 #[cfg(feature = "oracle")]
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-declare_id!("CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM");
+declare_id!("HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU");
 
 /// TEE validator for Private Ephemeral Rollup (PER). Used as default when no validator account is passed.
 pub const TEE_VALIDATOR: Pubkey = pubkey!("FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA");
@@ -440,12 +440,17 @@ pub mod heres_program {
             ErrorCode::InvalidInstructionData
         })?;
 
+        // Magic Program's ScheduleTask CPI must include ALL accounts referenced
+        // by the inner execute_intent instruction, otherwise ER returns MissingAccount.
         let schedule_ix = Instruction::new_with_bytes(
             MAGIC_PROGRAM_ID,
             &ix_data,
             vec![
                 AccountMeta::new(ctx.accounts.payer.key(), true),
                 AccountMeta::new(ctx.accounts.capsule.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.vault.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.permission.key(), false),
             ],
         );
 
@@ -455,6 +460,9 @@ pub mod heres_program {
                 ctx.accounts.magic_program.to_account_info(),
                 ctx.accounts.payer.to_account_info(),
                 ctx.accounts.capsule.to_account_info(),
+                ctx.accounts.vault.to_account_info(),
+                ctx.accounts.permission_program.to_account_info(),
+                ctx.accounts.permission.to_account_info(),
             ],
             &[],
         )?;

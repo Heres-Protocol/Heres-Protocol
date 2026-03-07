@@ -1,5 +1,5 @@
 {
-  "address": "CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM",
+  "address": "HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU",
   "metadata": {
     "name": "heres_program",
     "version": "0.1.0",
@@ -7,96 +7,6 @@
     "description": "Created with Anchor"
   },
   "instructions": [
-    {
-      "name": "cancel_capsule",
-      "docs": [
-        "Deactivate and close a capsule (owner reclaims SOL and account space).",
-        "Used to clear stuck capsules or simply close them."
-      ],
-      "discriminator": [
-        27,
-        143,
-        220,
-        25,
-        39,
-        186,
-        66,
-        214
-      ],
-      "accounts": [
-        {
-          "name": "capsule",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  116,
-                  101,
-                  110,
-                  116,
-                  95,
-                  99,
-                  97,
-                  112,
-                  115,
-                  117,
-                  108,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  97,
-                  112,
-                  115,
-                  117,
-                  108,
-                  101,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
     {
       "name": "create_capsule",
       "docs": [
@@ -335,60 +245,6 @@
       ]
     },
     {
-      "name": "deactivate_capsule",
-      "docs": [
-        "Deactivate a capsule (owner can cancel before execution)"
-      ],
-      "discriminator": [
-        69,
-        57,
-        35,
-        120,
-        13,
-        21,
-        61,
-        1
-      ],
-      "accounts": [
-        {
-          "name": "capsule",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  116,
-                  101,
-                  110,
-                  116,
-                  95,
-                  99,
-                  97,
-                  112,
-                  115,
-                  117,
-                  108,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "delegate_capsule",
       "docs": [
         "Delegate capsule and vault PDAs to Magicblock ER/PER. When no validator is passed, defaults to TEE validator (PER).",
@@ -442,38 +298,38 @@
             "program": {
               "kind": "const",
               "value": [
-                171,
-                64,
-                2,
-                96,
-                10,
-                8,
-                71,
-                201,
+                245,
+                178,
+                198,
+                254,
                 114,
-                91,
-                150,
-                159,
-                147,
-                140,
-                75,
-                174,
-                21,
-                46,
-                156,
-                14,
-                206,
-                240,
-                91,
+                181,
+                154,
+                33,
+                77,
+                112,
+                207,
+                86,
+                201,
+                111,
+                161,
+                25,
+                64,
+                94,
+                201,
                 99,
-                17,
-                144,
-                243,
-                104,
-                187,
-                252,
-                1,
-                208
+                231,
+                188,
+                237,
+                222,
+                171,
+                237,
+                45,
+                172,
+                80,
+                143,
+                200,
+                147
               ]
             }
           }
@@ -604,38 +460,38 @@
             "program": {
               "kind": "const",
               "value": [
-                171,
-                64,
-                2,
-                96,
-                10,
-                8,
-                71,
-                201,
+                245,
+                178,
+                198,
+                254,
                 114,
-                91,
-                150,
-                159,
-                147,
-                140,
-                75,
-                174,
-                21,
-                46,
-                156,
-                14,
-                206,
-                240,
-                91,
+                181,
+                154,
+                33,
+                77,
+                112,
+                207,
+                86,
+                201,
+                111,
+                161,
+                25,
+                64,
+                94,
+                201,
                 99,
-                17,
-                144,
-                243,
-                104,
-                187,
-                252,
-                1,
-                208
+                231,
+                188,
+                237,
+                222,
+                171,
+                237,
+                45,
+                172,
+                80,
+                143,
+                200,
+                147
               ]
             }
           }
@@ -753,7 +609,7 @@
         },
         {
           "name": "owner_program",
-          "address": "CXVKwAjzQA95MPVyEbsMqSoFgHvbXAmSensTk6JJPKsM"
+          "address": "HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU"
         }
       ],
       "args": []
@@ -1239,6 +1095,66 @@
       ]
     },
     {
+      "name": "restart_timer",
+      "docs": [
+        "Reset the inactivity timer (Fail-safe / Auto-restart).",
+        "Allows the owner or the system (via TEE) to restart the 1-year (or set period) countdown.",
+        "This is used if the Crank needs to be rebooted or if the owner proves they are still active."
+      ],
+      "discriminator": [
+        0,
+        224,
+        238,
+        171,
+        193,
+        30,
+        90,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  116,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.owner",
+                "account": "IntentCapsule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Can be the owner or any authorized signer/crank"
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "sample_price",
       "docs": [
         "Read and log SOL/USD (or other) price from Pyth Lazer / ephemeral oracle price feed (for gating or monitoring).",
@@ -1382,111 +1298,6 @@
           }
         }
       ]
-    },
-    {
-      "name": "undelegate_capsule",
-      "docs": [
-        "Commit and undelegate capsule and vault from Ephemeral Rollup back to Solana base layer"
-      ],
-      "discriminator": [
-        93,
-        184,
-        89,
-        72,
-        183,
-        93,
-        123,
-        173
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "owner",
-          "signer": true
-        },
-        {
-          "name": "capsule",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  116,
-                  101,
-                  110,
-                  116,
-                  95,
-                  99,
-                  97,
-                  112,
-                  115,
-                  117,
-                  108,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  97,
-                  112,
-                  115,
-                  117,
-                  108,
-                  101,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "buffer",
-          "writable": true
-        },
-        {
-          "name": "magic_context",
-          "writable": true
-        },
-        {
-          "name": "magic_program",
-          "writable": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
     },
     {
       "name": "update_activity",
@@ -1852,6 +1663,10 @@
           {
             "name": "mint",
             "type": "pubkey"
+          },
+          {
+            "name": "retry_count",
+            "type": "u64"
           }
         ]
       }

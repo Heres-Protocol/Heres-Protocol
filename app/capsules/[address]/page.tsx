@@ -620,10 +620,10 @@ export default function CapsuleDetailPage() {
               <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Validator address</p>
                 <div className="flex items-center gap-1">
-                  <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={MAGICBLOCK_ER.VALIDATOR_TEE}>
-                    {maskAddress(MAGICBLOCK_ER.VALIDATOR_TEE)}
+                  <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={MAGICBLOCK_ER.ACTIVE_VALIDATOR}>
+                    {maskAddress(MAGICBLOCK_ER.ACTIVE_VALIDATOR)}
                   </p>
-                  <CopyButton value={MAGICBLOCK_ER.VALIDATOR_TEE} />
+                  <CopyButton value={MAGICBLOCK_ER.ACTIVE_VALIDATOR} />
                 </div>
               </div>
               <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">

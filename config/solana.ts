@@ -24,10 +24,20 @@ export function getSolanaConnection(): Connection {
 }
 
 /**
- * Get direct TEE RPC connection for delegated state queries.
+ * Get ER RPC connection (Asia devnet) for delegated state queries and scheduling.
+ */
+export function getErConnection(): Connection {
+  return new Connection(MAGICBLOCK_ER.ER_RPC_URL, {
+    commitment: 'confirmed',
+    wsEndpoint: MAGICBLOCK_ER.ER_WS_URL,
+  })
+}
+
+/**
+ * Get direct TEE RPC connection for PER (private) flows.
  */
 export function getTeeConnection(token?: string): Connection {
-  const url = token ? `${PER_TEE.RPC_URL}?token=${token}` : PER_TEE.RPC_URL
+  const url = token ? `${PER_TEE.TEE_RPC_URL}?token=${token}` : PER_TEE.TEE_RPC_URL
   return new Connection(url, {
     commitment: 'confirmed',
   })

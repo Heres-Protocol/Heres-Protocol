@@ -4,7 +4,24 @@ import { PER_TEE, MAGICBLOCK_ER } from '@/constants'
 import { getAuthToken } from '@magicblock-labs/ephemeral-rollups-sdk'
 
 /**
- * Get TEE authentication token for the current wallet
+ * Get ER connection (Asia devnet) — no auth needed for public ER
+ */
+export function getErConnection(): Connection {
+    return new Connection(MAGICBLOCK_ER.ER_RPC_URL, {
+        commitment: 'confirmed',
+        wsEndpoint: MAGICBLOCK_ER.ER_WS_URL,
+    })
+}
+
+/**
+ * Get ER RPC URL (Asia devnet)
+ */
+export function getErRpcUrl(): string {
+    return MAGICBLOCK_ER.ER_RPC_URL
+}
+
+/**
+ * Get TEE authentication token for PER (private) flows
  */
 export async function getTeeAuthToken(wallet: WalletContextState): Promise<string> {
     if (!wallet.publicKey || !wallet.signMessage) {
@@ -25,17 +42,17 @@ export async function getTeeAuthToken(wallet: WalletContextState): Promise<strin
 }
 
 /**
- * Get authenticated TEE connection URL
+ * Get authenticated TEE connection URL (PER only)
  */
 export function getAuthenticatedTeeUrl(token: string): string {
-    return `${PER_TEE.RPC_URL}?token=${token}`
+    return `${PER_TEE.TEE_RPC_URL}?token=${token}`
 }
 
 /**
- * Get TEE connection
+ * Get TEE connection (PER only)
  */
 export function getTeeConnection(token?: string): Connection {
-    const url = token ? getAuthenticatedTeeUrl(token) : PER_TEE.RPC_URL
+    const url = token ? getAuthenticatedTeeUrl(token) : PER_TEE.TEE_RPC_URL
     return new Connection(url, 'confirmed')
 }
 
@@ -43,16 +60,17 @@ export function getTeeConnection(token?: string): Connection {
  * Verify TEE RPC integrity (placeholder for future SDK feature)
  */
 export async function verifyTeeRpcIntegrity(connection: Connection): Promise<boolean> {
-    // Logic to verify TEE attestation or integrity via SDK
     return true
 }
 
 /**
- * TEE Authorization Utility
+ * TEE/ER Authorization Utility
  */
 export const TEE_AUTH = {
     getAuthToken: getTeeAuthToken,
     getAuthenticatedUrl: getAuthenticatedTeeUrl,
     getConnection: getTeeConnection,
+    getErConnection: getErConnection,
+    getErRpcUrl: getErRpcUrl,
     verifyIntegrity: verifyTeeRpcIntegrity,
 }

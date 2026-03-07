@@ -13,7 +13,6 @@ const WalletMultiButton = dynamic(
 )
 import Link from 'next/link'
 import { createCapsule, getCapsule, delegateCapsule, scheduleExecuteIntent } from '@/lib/solana'
-import { TEE_AUTH } from '@/lib/tee'
 import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
 import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, MAX_CAPSULE_MODIFICATIONS } from '@/constants'
@@ -472,11 +471,11 @@ export default function CreatePage() {
         localStorage.setItem(txKey, hash)
       }
 
-      // ===== Step 2: Delegate to TEE =====
-      setCurrentStep('Delegating to TEE...')
-      console.log('[Step 2/3] Delegating capsule to TEE validator...')
+      // ===== Step 2: Delegate to ER (Asia devnet) =====
+      setCurrentStep('Delegating to ER...')
+      console.log('[Step 2/3] Delegating capsule to Asia ER validator...')
       try {
-        const delegateTx = await delegateCapsule(wallet as any, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
+        const delegateTx = await delegateCapsule(wallet as any, new PublicKey(MAGICBLOCK_ER.ACTIVE_VALIDATOR))
         console.log('[Step 2/3] Delegation successful. Tx:', delegateTx)
       } catch (delegateErr: any) {
         console.warn('[Step 2/3] Delegation failed:', delegateErr?.message)
@@ -484,15 +483,14 @@ export default function CreatePage() {
       }
 
       // Wait for ER to sync the delegated account
-      setCurrentStep('Waiting for TEE sync...')
+      setCurrentStep('Waiting for ER sync...')
       await new Promise(resolve => setTimeout(resolve, 5000))
 
-      // ===== Step 3: Schedule Crank =====
+      // ===== Step 3: Schedule Crank on ER =====
       setCurrentStep('Scheduling crank...')
-      console.log('[Step 3/3] Scheduling crank on TEE ER...')
+      console.log('[Step 3/3] Scheduling crank on ER (Asia devnet)...')
       try {
-        const token = await TEE_AUTH.getAuthToken(wallet as any)
-        const scheduleTx = await scheduleExecuteIntent(wallet as any, publicKey, undefined, token)
+        const scheduleTx = await scheduleExecuteIntent(wallet as any, publicKey)
         console.log('[Step 3/3] Crank scheduled. Tx:', scheduleTx)
       } catch (scheduleErr: any) {
         console.warn('[Step 3/3] Crank scheduling failed:', scheduleErr?.message)
