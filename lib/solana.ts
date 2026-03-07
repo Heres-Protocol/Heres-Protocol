@@ -306,17 +306,26 @@ export async function executeIntent(
     return txSignature
   }
 
-  // Not delegated — send to base layer
-  const program = getProgram(wallet)
-  if (!program) throw new Error('Wallet not connected')
-
-  const tx = await program.methods
-    .executeIntent()
-    .accounts(accounts)
-    .remainingAccounts(remainingAccounts)
-    .rpc()
-
-  return tx
+  // Not delegated — send to base layer using manual instruction
+  // Deployed program's execute_intent only needs 4 accounts (IDL shows 10 but binary differs)
+  const { Transaction, TransactionInstruction } = await import('@solana/web3.js')
+  const programId = getProgramId()
+  const discriminator = Buffer.from([53, 130, 47, 154, 227, 220, 122, 212]) // execute_intent
+  const keys = [
+    { pubkey: capsulePDA, isSigner: false, isWritable: true },
+    { pubkey: vaultPDA, isSigner: false, isWritable: true },
+    { pubkey: permissionProgramId, isSigner: false, isWritable: false },
+    { pubkey: permissionPDA, isSigner: false, isWritable: true },
+  ]
+  const ix = new TransactionInstruction({ keys, programId, data: discriminator })
+  const connection = getSolanaConnection()
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
+  const tx = new Transaction({ feePayer: wallet.publicKey, blockhash, lastValidBlockHeight })
+  tx.add(ix)
+  const signedTx = await wallet.signTransaction!(tx)
+  const txSignature = await connection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
+  await connection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed')
+  return txSignature
 }
 
 /**
@@ -622,17 +631,53 @@ export async function distributeAssets(
     return txSignature
   }
 
-  // Not delegated — send to base layer
-  const program = getProgram(wallet)
-  if (!program) throw new Error('Wallet not connected')
+  // Not delegated — send to base layer using manual instruction
+  // distribute_assets is in the deployed binary but NOT in the IDL
+  const { Transaction, TransactionInstruction } = await import('@solana/web3.js')
+  const programId = getProgramId()
+  const isSpl = mint && !mint.equals(PublicKey.default)
 
-  const tx = await program.methods
-    .distributeAssets()
-    .accounts(accounts)
-    .remainingAccounts(remainingAccounts)
-    .rpc()
+  // Read on-chain fee_config to get actual fee_recipient
+  const baseConn = getSolanaConnection()
+  let feeRecipient: PublicKey
+  try {
+    const feeInfo = await baseConn.getAccountInfo(feeConfigPDA)
+    if (feeInfo) {
+      const { BorshAccountsCoder } = await import('@coral-xyz/anchor')
+      const coder = new BorshAccountsCoder(idl as any)
+      const feeData = coder.decode('FeeConfig', feeInfo.data)
+      feeRecipient = new PublicKey(feeData.fee_recipient ?? feeData.feeRecipient)
+    } else {
+      feeRecipient = platformFeeRecipient || new PublicKey('Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb')
+    }
+  } catch {
+    feeRecipient = platformFeeRecipient || new PublicKey('Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb')
+  }
 
-  return tx
+  // distribute_assets discriminator: sha256("global:distribute_assets")[0..8]
+  const discriminator = Buffer.from([239, 241, 19, 219, 144, 191, 154, 18])
+  const keys = [
+    { pubkey: capsulePDA, isSigner: false, isWritable: false },
+    { pubkey: vaultPDA, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: feeConfigPDA, isSigner: false, isWritable: false },
+    { pubkey: feeRecipient, isSigner: false, isWritable: true },
+    // optional: mint (sentinel for None)
+    { pubkey: isSpl ? mint : programId, isSigner: false, isWritable: false },
+    // optional: vault_token_account (sentinel for None)
+    { pubkey: isSpl ? getAssociatedTokenAddress(mint!, vaultPDA) : programId, isSigner: false, isWritable: !!isSpl },
+    ...remainingAccounts,
+  ]
+
+  const ix = new TransactionInstruction({ keys, programId, data: discriminator })
+  const { blockhash, lastValidBlockHeight } = await baseConn.getLatestBlockhash('confirmed')
+  const tx = new Transaction({ feePayer: wallet.publicKey, blockhash, lastValidBlockHeight })
+  tx.add(ix)
+  const signedTx = await wallet.signTransaction!(tx)
+  const txSignature = await baseConn.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
+  await baseConn.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed')
+  return txSignature
 }
 
 /**

@@ -156,22 +156,14 @@ export async function executeCapsuleIntent(
   )
   const programId = getProgramId()
 
-  // Build instruction manually — Anchor 0.32 account resolution breaks in Next.js bundle
+  // Deployed program's execute_intent only needs 4 accounts (state update only).
+  // The IDL shows 10 accounts but the on-chain binary hasn't been upgraded yet.
   const discriminator = Buffer.from([53, 130, 47, 154, 227, 220, 122, 212]) // execute_intent
   const keys = [
     { pubkey: capsulePDA, isSigner: false, isWritable: true },
     { pubkey: vaultPDA, isSigner: false, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    { pubkey: feeConfigPDA, isSigner: false, isWritable: false },
-    { pubkey: platformFeeRecipient, isSigner: false, isWritable: true },
-    // optional: mint (use program ID as sentinel for None)
-    { pubkey: isSpl ? mint : programId, isSigner: false, isWritable: false },
-    // optional: vault_token_account
-    { pubkey: isSpl ? getAssociatedTokenAddress(mint, vaultPDA) : programId, isSigner: false, isWritable: true },
     { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
     { pubkey: permissionPDA, isSigner: false, isWritable: true },
-    ...remainingAccounts,
   ]
 
   const ix = new TransactionInstruction({ keys, programId, data: discriminator })
@@ -195,7 +187,74 @@ export async function executeCapsuleIntent(
   return txSig
 }
 
+/**
+ * Distribute assets from vault to beneficiaries (call on base layer after execute_intent).
+ * This is a separate on-chain instruction that handles actual SOL/SPL transfers.
+ */
+export async function distributeCapsuleAssets(
+  connection: Connection,
+  crankKeypair: Keypair,
+  capsule: DecodedCapsule
+): Promise<string> {
+  const [capsulePDA] = getCapsulePDA(capsule.account.owner)
+  const [vaultPDA] = getCapsuleVaultPDA(capsule.account.owner)
+  const [feeConfigPDA] = getFeeConfigPDA()
+  const programId = getProgramId()
 
+  const beneficiaries = parseBeneficiaries(capsule.account.intentData)
+  const mint = capsule.account.mint
+  const isSpl = mint && !mint.equals(PublicKey.default) && !mint.equals(SystemProgram.programId)
+
+  // Read fee_config to get actual fee_recipient
+  const feeConfigInfo = await connection.getAccountInfo(feeConfigPDA)
+  let feeRecipient: PublicKey
+  if (feeConfigInfo) {
+    try {
+      const { BorshAccountsCoder } = await import('@coral-xyz/anchor')
+      const coder = new BorshAccountsCoder(idl as any)
+      const feeData = coder.decode('FeeConfig', feeConfigInfo.data)
+      feeRecipient = new PublicKey(feeData.fee_recipient ?? feeData.feeRecipient)
+    } catch {
+      feeRecipient = new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT || 'Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb')
+    }
+  } else {
+    feeRecipient = new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT || 'Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb')
+  }
+
+  const remainingAccounts = beneficiaries.map((b) => {
+    const beneficiaryOwner = new PublicKey(b.address)
+    if (isSpl) {
+      return { pubkey: getAssociatedTokenAddress(mint, beneficiaryOwner), isSigner: false, isWritable: true }
+    }
+    return { pubkey: beneficiaryOwner, isSigner: false, isWritable: true }
+  })
+
+  // distribute_assets discriminator: sha256("global:distribute_assets")[0..8]
+  const discriminator = Buffer.from([239, 241, 19, 219, 144, 191, 154, 18])
+  const keys = [
+    { pubkey: capsulePDA, isSigner: false, isWritable: false },
+    { pubkey: vaultPDA, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: feeConfigPDA, isSigner: false, isWritable: false },
+    { pubkey: feeRecipient, isSigner: false, isWritable: true },
+    // optional: mint (sentinel for None)
+    { pubkey: isSpl ? mint : programId, isSigner: false, isWritable: false },
+    // optional: vault_token_account (sentinel for None)
+    { pubkey: isSpl ? getAssociatedTokenAddress(mint, vaultPDA) : programId, isSigner: false, isWritable: isSpl },
+    ...remainingAccounts,
+  ]
+
+  const ix = new TransactionInstruction({ keys, programId, data: discriminator })
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
+  const tx = new Transaction({ feePayer: crankKeypair.publicKey, blockhash, lastValidBlockHeight })
+  tx.add(ix)
+  tx.sign(crankKeypair)
+
+  const txSig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
+  await connection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
+  return txSig
+}
 
 export type CrankResult = {
   ok: boolean
@@ -218,7 +277,15 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
       executedCount += 1
       console.log(`[crank] Executed ${capsule.publicKey.toBase58()} (delegated=${capsule.isDelegated}): ${txSig}`)
 
-      // execute_intent handles fee distribution internally, no separate distribute step needed
+      // Distribute assets on base layer (separate instruction for actual SOL/SPL transfers)
+      try {
+        const distTx = await distributeCapsuleAssets(connection, crankKeypair, capsule)
+        distributedCount += 1
+        console.log(`[crank] Distributed ${capsule.publicKey.toBase58()}: ${distTx}`)
+      } catch (distErr) {
+        const distMsg = distErr instanceof Error ? distErr.message : String(distErr)
+        errors.push(`${capsule.publicKey.toBase58()} distribute: ${distMsg}`)
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       errors.push(`${capsule.publicKey.toBase58()}: ${msg}`)
