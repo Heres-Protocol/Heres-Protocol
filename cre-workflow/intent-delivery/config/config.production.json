@@ -1,4 +1,6 @@
 {
   "publicKey": "",
-  "resendFromEmail": "Heres Protocol <onboarding@resend.dev>"
+  "resendFromEmail": "Heres Protocol <onboarding@resend.dev>",
+  "crankApiUrl": "https://heres.vercel.app/api/cron/execute-intent",
+  "crankSchedule": "*/30 * * * * *"
 }

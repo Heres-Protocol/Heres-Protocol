@@ -3,6 +3,7 @@ import { bytesToHex } from '@noble/hashes/utils'
 import {
 	consensusIdenticalAggregation,
 	cre,
+	type CronPayload,
 	type HTTPSendRequester,
 	type HTTPPayload,
 	Runner,
@@ -17,6 +18,8 @@ import {
 type Config = {
 	publicKey: string
 	resendFromEmail: string
+	crankApiUrl: string      // e.g. https://heres.vercel.app/api/cron/execute-intent
+	crankSchedule: string    // cron expression, e.g. "*/30 * * * * *"
 }
 
 type TriggerInput = {
@@ -219,13 +222,65 @@ const onHttpTrigger = (runtime: Runtime<Config>, payload: HTTPPayload): string =
 }
 
 // ---------------------------------------------------------------------------
-// Workflow init
+// Cron Trigger: CRE-powered crank (replaces MagicBlock's broken crank)
+// Periodically calls our server to execute eligible capsules (including
+// those delegated to MagicBlock ER/TEE) and trigger CRE intent delivery.
+// ---------------------------------------------------------------------------
+
+type CrankResult = {
+	statusCode: number
+}
+
+const callCrankApi = (
+	sendRequester: HTTPSendRequester,
+	config: Config,
+	cronSecret: string,
+): CrankResult => {
+	const resp = sendRequester
+		.sendRequest({
+			url: config.crankApiUrl,
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${cronSecret}`,
+			},
+			body: base64Encode('{}'),
+			cacheSettings: { store: false, maxAge: '0s' },
+		})
+		.result()
+
+	return { statusCode: resp.statusCode }
+}
+
+const onCronTrigger = (runtime: Runtime<Config>, _payload: CronPayload): string => {
+	runtime.log('[Heres CRE Crank] Running scheduled capsule execution check...')
+
+	const cronSecret = runtime.getSecret({ id: 'CRON_SECRET' }).result()
+
+	const httpClient = new cre.capabilities.HTTPClient()
+
+	const result = httpClient
+		.sendRequest(runtime, callCrankApi, consensusIdenticalAggregation<CrankResult>())(
+			runtime.config,
+			cronSecret.value,
+		)
+		.result()
+
+	runtime.log(`[Heres CRE Crank] Crank API responded: ${result.statusCode}`)
+
+	return JSON.stringify({ ok: result.statusCode < 300, statusCode: result.statusCode })
+}
+
+// ---------------------------------------------------------------------------
+// Workflow init: HTTP trigger (intent delivery) + Cron trigger (crank)
 // ---------------------------------------------------------------------------
 
 const initWorkflow = (config: Config) => {
 	const http = new cre.capabilities.HTTPCapability()
+	const cron = new cre.capabilities.CronCapability()
 
 	return [
+		// HTTP trigger: confidential intent delivery (decrypt + email)
 		cre.handler(
 			http.trigger({
 				authorizedKeys: [
@@ -236,6 +291,11 @@ const initWorkflow = (config: Config) => {
 				],
 			}),
 			onHttpTrigger,
+		),
+		// Cron trigger: CRE-powered crank for capsule execution
+		cre.handler(
+			cron.trigger({ schedule: config.crankSchedule }),
+			onCronTrigger,
 		),
 	]
 }
