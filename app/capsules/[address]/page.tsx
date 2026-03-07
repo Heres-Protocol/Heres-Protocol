@@ -8,6 +8,8 @@ import { useWallet } from '@solana/wallet-adapter-react'
 import { ArrowLeft, Copy, RefreshCw, Shield } from 'lucide-react'
 import {
   getCapsuleByAddress,
+  executeIntent,
+  distributeAssets,
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
@@ -156,8 +158,54 @@ export default function CapsuleDetailPage() {
   } | null>(null)
   const [creDeliveryLoading, setCreDeliveryLoading] = useState(false)
   const [creDeliveryError, setCreDeliveryError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const isOwner = Boolean(wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey))
+
+  const handleExecuteIntent = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    setActionLoading('execute')
+    setActionResult(null)
+    try {
+      const beneficiaries = intentParsed?.type === 'token' && 'beneficiaries' in intentParsed && intentParsed.beneficiaries
+        ? intentParsed.beneficiaries.filter((b: any) => b.address?.trim()).map((b: any) => ({
+            address: b.address,
+            amount: b.amount,
+            amountType: b.amountType,
+          }))
+        : undefined
+      const mint = capsule.mint && !capsule.mint.equals(PublicKey.default) ? capsule.mint : undefined
+      const tx = await executeIntent(wallet as any, capsule.owner, beneficiaries, mint)
+      setActionResult({ type: 'success', message: `Execute Intent TX: ${tx}` })
+    } catch (err: any) {
+      setActionResult({ type: 'error', message: err.message || 'Execute failed' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDistributeAssets = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    setActionLoading('distribute')
+    setActionResult(null)
+    try {
+      const beneficiaries = intentParsed?.type === 'token' && 'beneficiaries' in intentParsed && intentParsed.beneficiaries
+        ? intentParsed.beneficiaries.filter((b: any) => b.address?.trim()).map((b: any) => ({
+            address: b.address,
+            amount: b.amount,
+            amountType: b.amountType,
+          }))
+        : undefined
+      const mint = capsule.mint && !capsule.mint.equals(PublicKey.default) ? capsule.mint : undefined
+      const tx = await distributeAssets(wallet as any, capsule.owner, beneficiaries, mint)
+      setActionResult({ type: 'success', message: `Distribute Assets TX: ${tx}` })
+    } catch (err: any) {
+      setActionResult({ type: 'error', message: err.message || 'Distribution failed' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
 
   const intentParsed = useMemo(() => {
     if (!capsule?.intentData) return null
@@ -623,6 +671,43 @@ export default function CapsuleDetailPage() {
               )}
               {creDeliveryError && (
                 <p className="text-xs text-red-400 mt-3">{creDeliveryError}</p>
+              )}
+            </section>
+          )}
+
+          {/* Actions (test) */}
+          {isOwner && (
+            <section className="card-Heres p-6 mb-6 border-amber-500/30">
+              <h2 className="text-lg font-semibold text-Heres-white mb-2">Actions</h2>
+              <p className="text-sm text-Heres-muted mb-4">
+                Manually trigger on-chain instructions for testing. In production, the crank handles execute_intent automatically.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleExecuteIntent}
+                  disabled={!!actionLoading}
+                  className="rounded-lg border border-Heres-accent bg-Heres-accent/10 px-4 py-2 text-sm font-medium text-Heres-accent hover:bg-Heres-accent/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {actionLoading === 'execute' ? 'Executing...' : 'Execute Intent'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDistributeAssets}
+                  disabled={!!actionLoading}
+                  className="rounded-lg border border-Heres-purple bg-Heres-purple/10 px-4 py-2 text-sm font-medium text-Heres-purple hover:bg-Heres-purple/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {actionLoading === 'distribute' ? 'Distributing...' : 'Distribute Assets'}
+                </button>
+              </div>
+              {actionResult && (
+                <div className={`mt-4 rounded-lg border p-3 text-sm break-all ${
+                  actionResult.type === 'success'
+                    ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                    : 'border-red-500/30 bg-red-500/10 text-red-400'
+                }`}>
+                  {actionResult.message}
+                </div>
               )}
             </section>
           )}

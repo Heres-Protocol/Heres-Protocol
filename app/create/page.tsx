@@ -12,7 +12,7 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 )
 import Link from 'next/link'
-import { createCapsule, getCapsule, delegateCapsule, scheduleExecuteIntent, executeIntent, distributeAssets } from '@/lib/solana'
+import { createCapsule, getCapsule, delegateCapsule, scheduleExecuteIntent } from '@/lib/solana'
 import { TEE_AUTH } from '@/lib/tee'
 import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
@@ -444,7 +444,7 @@ export default function CreatePage() {
       }
 
       setTxHash(hash)
-      console.log('[Step 1/5] Capsule created. Tx:', hash)
+      console.log('[Step 1/3] Capsule created. Tx:', hash)
 
       // Increment modification count
       if (publicKey) {
@@ -469,12 +469,12 @@ export default function CreatePage() {
 
       // ===== Step 2: Delegate to TEE =====
       setCurrentStep('Delegating to TEE...')
-      console.log('[Step 2/5] Delegating capsule to TEE validator...')
+      console.log('[Step 2/3] Delegating capsule to TEE validator...')
       try {
         const delegateTx = await delegateCapsule(wallet as any, new PublicKey(MAGICBLOCK_ER.VALIDATOR_TEE))
-        console.log('[Step 2/5] Delegation successful. Tx:', delegateTx)
+        console.log('[Step 2/3] Delegation successful. Tx:', delegateTx)
       } catch (delegateErr: any) {
-        console.warn('[Step 2/5] Delegation failed:', delegateErr?.message)
+        console.warn('[Step 2/3] Delegation failed:', delegateErr?.message)
         // Continue — capsule is created, delegation can be retried
       }
 
@@ -484,49 +484,13 @@ export default function CreatePage() {
 
       // ===== Step 3: Schedule Crank =====
       setCurrentStep('Scheduling crank...')
-      console.log('[Step 3/5] Scheduling crank on TEE ER...')
+      console.log('[Step 3/3] Scheduling crank on TEE ER...')
       try {
         const token = await TEE_AUTH.getAuthToken(wallet as any)
         const scheduleTx = await scheduleExecuteIntent(wallet as any, publicKey, undefined, token)
-        console.log('[Step 3/5] Crank scheduled. Tx:', scheduleTx)
+        console.log('[Step 3/3] Crank scheduled. Tx:', scheduleTx)
       } catch (scheduleErr: any) {
-        console.warn('[Step 3/5] Crank scheduling failed:', scheduleErr?.message)
-      }
-
-      // ===== Step 4: Execute Intent =====
-      setCurrentStep('Executing intent...')
-      console.log('[Step 4/5] Executing intent on TEE...')
-      try {
-        const validBeneficiaries = capsuleType === 'token' && beneficiaries?.length
-          ? beneficiaries.filter(b => b.address.trim()).map(b => ({
-              address: b.address,
-              amount: b.amount,
-              amountType: b.amountType,
-            }))
-          : undefined
-        const executeTx = await executeIntent(wallet as any, publicKey, validBeneficiaries)
-        console.log('[Step 4/5] Execute successful. Tx:', executeTx)
-      } catch (executeErr: any) {
-        console.warn('[Step 4/5] Execute failed:', executeErr?.message)
-      }
-
-      // ===== Step 5: Distribute Assets =====
-      setCurrentStep('Distributing assets...')
-      console.log('[Step 5/5] Distributing assets...')
-      try {
-        const distBeneficiaries = capsuleType === 'token' && beneficiaries?.length
-          ? beneficiaries.filter(b => b.address.trim()).map(b => ({
-              address: b.address,
-              amount: b.amount,
-              amountType: b.amountType,
-            }))
-          : undefined
-        if (distBeneficiaries?.length) {
-          const distributeTx = await distributeAssets(wallet as any, publicKey, distBeneficiaries)
-          console.log('[Step 5/5] Distribution successful. Tx:', distributeTx)
-        }
-      } catch (distErr: any) {
-        console.warn('[Step 5/5] Distribution failed:', distErr?.message)
+        console.warn('[Step 3/3] Crank scheduling failed:', scheduleErr?.message)
       }
 
       setCurrentStep(null)

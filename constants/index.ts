@@ -58,7 +58,7 @@ export const MAGICBLOCK_ER = {
   PERMISSION_PROGRAM_ID: 'ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1',
   /** Default crank scheduling parameters */
   CRANK_DEFAULT_INTERVAL_MS: 10000,
-  CRANK_DEFAULT_ITERATIONS: 0,
+  CRANK_DEFAULT_ITERATIONS: 100_000,
 } as const
 
 /** Ephemeral Rollup (ER) - Devnet endpoint for delegation and scheduling */
