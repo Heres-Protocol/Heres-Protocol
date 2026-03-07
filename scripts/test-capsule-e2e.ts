@@ -136,6 +136,13 @@ async function main() {
   const owner = keypair.publicKey
   log('INIT', `Owner: ${owner.toBase58()}`)
 
+  // Derive a separate beneficiary address (index 1)
+  const beneficiarySeed = bip39.mnemonicToSeedSync(mnemonic)
+  const beneficiaryDerived = derivePath("m/44'/501'/1'/0'", beneficiarySeed.toString('hex')).key
+  const beneficiaryKeypair = Keypair.fromSeed(beneficiaryDerived)
+  const beneficiary = beneficiaryKeypair.publicKey
+  log('INIT', `Beneficiary: ${beneficiary.toBase58()}`)
+
   const connection = new Connection(RPC_URL, 'confirmed')
   const balance = await connection.getBalance(owner)
   log('INIT', `Balance: ${(balance / 1e9).toFixed(4)} SOL`)
@@ -226,7 +233,7 @@ async function main() {
   log('STEP 2', 'Creating capsule...')
   const intentData = JSON.stringify({
     intent: 'E2E crank test', totalAmount: TEST_SOL_AMOUNT, inactivityDays: 1, delayDays: 0,
-    beneficiaries: [{ address: owner.toBase58(), amount: TEST_SOL_AMOUNT, amountType: 'fixed' }],
+    beneficiaries: [{ address: beneficiary.toBase58(), amount: TEST_SOL_AMOUNT, amountType: 'fixed' }],
     cre: { enabled: true, secretRef: regJson.secretRef, secretHash: regJson.secretHash, recipientEmailHash, deliveryChannel: 'email' },
   })
   const createTx = await program.methods
@@ -389,7 +396,7 @@ async function main() {
         capsule: capsulePDA, vault: vaultPDA, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID,
         feeConfig: feeConfigPDA, platformFeeRecipient, mint: null, vaultTokenAccount: null,
       })
-      .remainingAccounts([{ pubkey: owner, isSigner: false, isWritable: true }])
+      .remainingAccounts([{ pubkey: beneficiary, isSigner: false, isWritable: true }])
       .rpc()
     log('STEP 6', `Distributed! TX: ${distributeTx}`)
   } catch (e: any) {
@@ -425,8 +432,11 @@ async function main() {
 
   // ─── Done ──────────────────────────────────────────────────────
   const finalBalance = await connection.getBalance(owner)
-  log('DONE', `Final balance: ${(finalBalance / 1e9).toFixed(4)} SOL`)
-  log('DONE', 'Full E2E with crank test complete!')
+  const beneficiaryBalance = await connection.getBalance(beneficiary)
+  log('DONE', `Owner final balance: ${(finalBalance / 1e9).toFixed(4)} SOL`)
+  log('DONE', `Beneficiary balance: ${(beneficiaryBalance / 1e9).toFixed(9)} SOL`)
+  log('DONE', beneficiaryBalance > 0 ? 'Beneficiary received SOL! Demo ready.' : 'Beneficiary did not receive SOL.')
+  log('DONE', 'Full E2E test complete!')
 }
 
 main().catch((err) => {

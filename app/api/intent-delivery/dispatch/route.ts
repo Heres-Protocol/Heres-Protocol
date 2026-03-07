@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
   const result = await dispatchCreDeliveryForCapsule(capsuleAddress)
   if (result.ok || result.skipped) {
-    return NextResponse.json({ ok: true, status: result.skipped ? 'skipped' : 'dispatched', ...result })
+    return NextResponse.json({ ok: true, status: result.skipped ? 'skipped' : 'dispatched' })
   }
   return NextResponse.json({ error: result.error || 'Dispatch failed' }, { status: 500 })
 }

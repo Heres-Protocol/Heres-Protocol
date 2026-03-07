@@ -18,6 +18,7 @@ export function getSolanaConnection(): Connection {
   cachedConnection = new Connection(rpcUrl, {
     commitment: 'confirmed',
     wsEndpoint: HELIUS_CONFIG.RPC_URL.replace('https', 'wss'),
+    disableRetryOnRateLimit: true,
   })
   return cachedConnection
 }

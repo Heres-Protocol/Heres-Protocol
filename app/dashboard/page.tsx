@@ -487,28 +487,23 @@ export default function DashboardPage() {
         const programId = getProgramId()
 
         let accounts: any = []
+        const fetchWithTimeout = (conn: Connection, timeout = 15000) =>
+          Promise.race([
+            conn.getProgramAccounts(programId, { commitment: 'confirmed' }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC request timed out')), timeout)),
+          ])
         try {
           console.log('Fetching program accounts from primary RPC...')
-          accounts = await connection.getProgramAccounts(programId, {
-            commitment: 'confirmed',
-          })
+          accounts = await fetchWithTimeout(connection)
         } catch (e: any) {
-          console.warn('Primary RPC failed:', e)
-          // Handle 403 or other RPC failures by falling back
-          if (e?.message?.includes('403') || e?.message?.includes('Forbidden') || e?.message?.includes('Bad request')) {
-            console.log('Detection of 403/Forbidden. Retrying with fallback RPC...')
-            try {
-              const fallbackConnection = new Connection(HELIUS_CONFIG.RPC_URL_DEVNET, 'confirmed')
-              accounts = await fallbackConnection.getProgramAccounts(programId, {
-                commitment: 'confirmed',
-              })
-              console.log('Successfully fetched from fallback RPC')
-            } catch (fallbackError: any) {
-              console.error('Fallback RPC also failed:', fallbackError)
-              throw fallbackError
-            }
-          } else {
-            throw e
+          console.warn('Primary RPC failed, trying fallback:', e?.message?.slice(0, 80))
+          try {
+            const fallbackConnection = new Connection(HELIUS_CONFIG.RPC_URL_DEVNET, 'confirmed')
+            accounts = await fetchWithTimeout(fallbackConnection)
+            console.log('Successfully fetched from fallback RPC')
+          } catch (fallbackError: any) {
+            console.error('Fallback RPC also failed:', fallbackError?.message?.slice(0, 80))
+            throw fallbackError
           }
         }
 
