@@ -22,6 +22,10 @@ declare global {
 function getStorePath(): string {
   const configuredPath = process.env.CRE_STORE_PATH?.trim()
   if (configuredPath) return configuredPath
+  // Vercel serverless has read-only filesystem except /tmp
+  if (process.env.VERCEL) {
+    return '/tmp/cre-store.json'
+  }
   return path.join(process.cwd(), '.data', 'cre-store.json')
 }
 
@@ -52,18 +56,23 @@ function loadStateFromDisk(): CreStoreState {
 }
 
 function persistState(state: CreStoreState): void {
-  const storePath = getStorePath()
-  const dir = path.dirname(storePath)
-  mkdirSync(dir, { recursive: true })
+  try {
+    const storePath = getStorePath()
+    const dir = path.dirname(storePath)
+    mkdirSync(dir, { recursive: true })
 
-  const data: PersistedCreStoreState = {
-    secrets: Array.from(state.secrets.values()),
-    deliveries: Array.from(state.deliveries.values()),
+    const data: PersistedCreStoreState = {
+      secrets: Array.from(state.secrets.values()),
+      deliveries: Array.from(state.deliveries.values()),
+    }
+
+    const tmpPath = `${storePath}.tmp`
+    writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8')
+    renameSync(tmpPath, storePath)
+  } catch (err) {
+    console.warn('[CRE store] persistState failed (read-only fs?):', err)
+    // In-memory state is still valid; disk persistence is best-effort
   }
-
-  const tmpPath = `${storePath}.tmp`
-  writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8')
-  renameSync(tmpPath, storePath)
 }
 
 function getState(): CreStoreState {

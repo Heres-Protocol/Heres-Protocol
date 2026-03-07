@@ -61,16 +61,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid or expired signature' }, { status: 401 })
   }
 
-  const registered = registerCreSecret({
-    owner,
-    recipientEmail,
-    encryptedPayload,
-  })
+  try {
+    const registered = registerCreSecret({
+      owner,
+      recipientEmail,
+      encryptedPayload,
+    })
 
-  return NextResponse.json({
-    ok: true,
-    secretRef: registered.secretRef,
-    secretHash: registered.secretHash,
-    recipientEmailHash: registered.recipientEmailHash,
-  })
+    return NextResponse.json({
+      ok: true,
+      secretRef: registered.secretRef,
+      secretHash: registered.secretHash,
+      recipientEmailHash: registered.recipientEmailHash,
+    })
+  } catch (err) {
+    console.error('[CRE register] Internal error:', err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Internal server error' },
+      { status: 500 }
+    )
+  }
 }

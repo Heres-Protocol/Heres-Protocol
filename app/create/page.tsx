@@ -371,7 +371,12 @@ export default function CreatePage() {
           signature,
         }),
       })
-      const secretJson = await secretRes.json()
+      let secretJson: any
+      try {
+        secretJson = await secretRes.json()
+      } catch {
+        throw new Error(`CRE register returned ${secretRes.status} with empty response`)
+      }
       if (!secretRes.ok) {
         throw new Error(secretJson?.error || 'Failed to register CRE secret')
       }
