@@ -23,9 +23,8 @@ const PLATFORM_FEE_RECIPIENT = new PublicKey('Covn3moA8qstPgXPgueRGMSmi94yXvuDCW
 // Actual fee_recipient stored in on-chain FeeConfig account
 const ACTUAL_FEE_RECIPIENT = new PublicKey('8DzPUhZ8Jd6Rfu9R7QWuZ7gMBjdrnrjH22FHyfDUPeHW');
 
-const crankKp = Keypair.fromSecretKey(bs58.decode(
-  '<CRANK_WALLET_PRIVATE_KEY>'
-));
+if (!process.env.CRANK_WALLET_PRIVATE_KEY) throw new Error('CRANK_WALLET_PRIVATE_KEY env required')
+const crankKp = Keypair.fromSecretKey(bs58.decode(process.env.CRANK_WALLET_PRIVATE_KEY));
 const ownerKp = Keypair.generate();
 const beneficiaryKp = Keypair.generate();
 const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
