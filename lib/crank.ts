@@ -8,6 +8,8 @@ class NodeWallet {
   async signTransaction(tx: any): Promise<any> { tx.partialSign(this.payer); return tx }
   async signAllTransactions(txs: any[]): Promise<any[]> { txs.forEach((tx: any) => tx.partialSign(this.payer)); return txs }
 }
+import nacl from 'tweetnacl'
+import { getAuthToken } from '@magicblock-labs/ephemeral-rollups-sdk'
 import idl from '../idl/HeresProgram.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
 import { getCapsulePDA, getCapsuleVaultPDA, getFeeConfigPDA } from './program'
@@ -50,23 +52,61 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
   const wallet = new NodeWallet(crankKeypair)
   const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' })
   const program = new Program(idl as any, provider)
+  const programId = getProgramId()
 
   // @ts-ignore
   const capsules = (await program.account.intentCapsule.all()) as any[]
   const now = Math.floor(Date.now() / 1000)
   const eligible: DecodedCapsule[] = []
 
+  // 1. Non-delegated capsules (owned by our program)
   for (const capsule of capsules) {
     const data = capsule.account
     if (!data.isActive || data.executedAt != null) continue
     if (data.lastActivity.toNumber() + data.inactivityPeriod.toNumber() > now) continue
-
-    // Check if capsule is delegated to ER/TEE
-    const accountInfo = await connection.getAccountInfo(capsule.publicKey)
-    const isDelegated = accountInfo && accountInfo.owner.equals(DELEGATION_PROGRAM_ID)
-
-    eligible.push({ ...capsule, isDelegated: Boolean(isDelegated) })
+    eligible.push({ ...capsule, isDelegated: false })
   }
+
+  // 2. Delegated capsules (owned by Delegation Program, filtered by discriminator)
+  try {
+    const discriminator = idl.accounts?.find(
+      (a: any) => a.name === 'IntentCapsule' || a.name === 'intentCapsule'
+    )?.discriminator as number[] | undefined
+    if (discriminator) {
+      const bs58Mod = await import('bs58')
+      const encode = bs58Mod.default?.encode || (bs58Mod as any).encode
+      const delegatedAccounts = await connection.getProgramAccounts(DELEGATION_PROGRAM_ID, {
+        filters: [{ memcmp: { offset: 0, bytes: encode(Buffer.from(discriminator)) } }],
+      })
+      // @ts-ignore
+      const coder = new (await import('@coral-xyz/anchor')).BorshAccountsCoder(idl)
+      for (const acc of delegatedAccounts) {
+        try {
+          const raw = coder.decode('IntentCapsule', acc.account.data)
+          // BorshAccountsCoder returns snake_case fields; normalise to camelCase
+          const decoded = {
+            owner: raw.owner,
+            inactivityPeriod: raw.inactivity_period ?? raw.inactivityPeriod,
+            lastActivity: raw.last_activity ?? raw.lastActivity,
+            intentData: raw.intent_data ?? raw.intentData,
+            isActive: raw.is_active ?? raw.isActive,
+            executedAt: raw.executed_at ?? raw.executedAt,
+            mint: raw.mint,
+          }
+          if (!decoded.isActive || decoded.executedAt != null) continue
+          if (decoded.lastActivity.toNumber() + decoded.inactivityPeriod.toNumber() > now) continue
+          eligible.push({
+            publicKey: acc.pubkey,
+            isDelegated: true,
+            account: decoded as any,
+          })
+        } catch { /* skip non-matching accounts */ }
+      }
+    }
+  } catch (e) {
+    console.error('[crank] Error scanning delegated capsules:', e instanceof Error ? e.message : e)
+  }
+
   return eligible
 }
 
@@ -137,9 +177,13 @@ export async function executeCapsuleIntent(
   const ix = new TransactionInstruction({ keys, programId, data: discriminator })
 
   // Route through ER/TEE RPC if capsule is delegated
-  const targetConnection = capsule.isDelegated
-    ? new Connection(PER_TEE.RPC_URL, { commitment: 'confirmed' })
-    : connection
+  let targetConnection = connection
+  if (capsule.isDelegated) {
+    // Get TEE auth token using keypair signing
+    const signMessage = async (msg: Uint8Array) => nacl.sign.detached(msg, crankKeypair.secretKey)
+    const { token } = await getAuthToken(PER_TEE.AUTH_URL, crankKeypair.publicKey, signMessage)
+    targetConnection = new Connection(`${PER_TEE.RPC_URL}?token=${token}`, { commitment: 'confirmed' })
+  }
 
   const { blockhash, lastValidBlockHeight } = await targetConnection.getLatestBlockhash('confirmed')
   const tx = new Transaction({ feePayer: crankKeypair.publicKey, blockhash, lastValidBlockHeight })

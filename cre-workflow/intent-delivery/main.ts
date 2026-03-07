@@ -37,25 +37,46 @@ type EmailResult = {
 }
 
 // ---------------------------------------------------------------------------
-// Base64 helpers (no Buffer dependency — QuickJS compatible)
+// Base64 helpers — pure JS, no atob/btoa/Buffer (QuickJS compatible)
 // ---------------------------------------------------------------------------
 
-function base64Decode(b64: string): string {
-	const binStr = atob(b64)
-	const bytes = new Uint8Array(binStr.length)
-	for (let i = 0; i < binStr.length; i++) {
-		bytes[i] = binStr.charCodeAt(i)
-	}
-	return new TextDecoder().decode(bytes)
-}
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 function base64Encode(str: string): string {
 	const bytes = new TextEncoder().encode(str)
-	let binStr = ''
-	for (let i = 0; i < bytes.length; i++) {
-		binStr += String.fromCharCode(bytes[i])
+	let result = ''
+	let i = 0
+	const len = bytes.length
+	while (i < len) {
+		const a = bytes[i++] ?? 0
+		const b = i < len ? bytes[i++] : (i++, -1)
+		const c = i < len ? bytes[i++] : (i++, -1)
+		result += B64[a >> 2]
+		result += B64[((a & 3) << 4) | (b >= 0 ? b >> 4 : 0)]
+		result += b >= 0 ? B64[((b & 15) << 2) | (c >= 0 ? c >> 6 : 0)] : '='
+		result += c >= 0 ? B64[c & 63] : '='
 	}
-	return btoa(binStr)
+	return result
+}
+
+function base64Decode(b64: string): string {
+	const lookup: Record<string, number> = {}
+	for (let i = 0; i < B64.length; i++) lookup[B64[i]] = i
+	const clean = b64.replace(/[^A-Za-z0-9+/]/g, '')
+	const bytes: number[] = []
+	for (let i = 0; i < clean.length; i += 4) {
+		const a = lookup[clean[i]] ?? 0
+		const b = lookup[clean[i + 1]] ?? 0
+		const c = lookup[clean[i + 2]] ?? 0
+		const d = lookup[clean[i + 3]] ?? 0
+		bytes.push((a << 2) | (b >> 4))
+		if (clean[i + 2] !== undefined) bytes.push(((b & 15) << 4) | (c >> 2))
+		if (clean[i + 3] !== undefined) bytes.push(((c & 3) << 6) | d)
+	}
+	// trim padding bytes
+	const padCount = (b64.match(/=+$/) || [''])[0].length
+	const trimmed = bytes.slice(0, bytes.length - padCount)
+	return new TextDecoder().decode(Uint8Array.from(trimmed))
 }
 
 // ---------------------------------------------------------------------------
