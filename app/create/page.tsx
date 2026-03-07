@@ -21,12 +21,13 @@ import { encodeIntentData, daysToSeconds } from '@/utils/intent'
 import { buildCreSignedMessage } from '@/utils/creAuth'
 import { bytesToBase64, encryptPrivateMessage, sha256Hex } from '@/utils/creCrypto'
 import {
+  isValidBeneficiaryAddress,
   validateBeneficiaryAddresses,
   validateBeneficiaryAmounts,
   validatePercentageTotals,
   isValidEmail,
 } from '@/utils/validation'
-import { isValidSolanaAddress, getSolanaConnection } from '@/config/solana'
+import { getSolanaConnection, isValidSolanaAddress } from '@/config/solana'
 import { PublicKey } from '@solana/web3.js'
 
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
@@ -42,7 +43,7 @@ export default function CreatePage() {
   const [intent, setIntent] = useState('')
   const [capsuleType, setCapsuleType] = useState<CapsuleAssetType>(null)
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([
-    { address: '', amount: '', amountType: 'fixed' }
+    { chain: 'solana', address: '', amount: '', amountType: 'fixed' }
   ])
   const [totalAmount, setTotalAmount] = useState('')
   const [targetDate, setTargetDate] = useState('')
@@ -166,7 +167,7 @@ export default function CreatePage() {
   }, [connected, publicKey])
 
   const addBeneficiary = () => {
-    setBeneficiaries([...beneficiaries, { address: '', amount: '', amountType: 'fixed' }])
+    setBeneficiaries([...beneficiaries, { chain: 'solana', address: '', amount: '', amountType: 'fixed' }])
   }
 
   const removeBeneficiary = (index: number) => {
@@ -203,7 +204,11 @@ export default function CreatePage() {
     setNftAssignments((prev) => ({ ...prev, [mint]: recipientIndex }))
   }
 
-  const updateBeneficiary = (index: number, field: keyof Beneficiary, value: string | 'fixed' | 'percentage') => {
+  const updateBeneficiary = (
+    index: number,
+    field: keyof Beneficiary,
+    value: string | 'fixed' | 'percentage' | 'solana' | 'evm'
+  ) => {
     const updated = [...beneficiaries]
     const oldBeneficiary = updated[index]
     updated[index] = { ...updated[index], [field]: value }
@@ -249,7 +254,7 @@ export default function CreatePage() {
 
   const validateBeneficiaries = (): boolean => {
     if (!validateBeneficiaryAddresses(beneficiaries)) {
-      alert('Please enter valid Solana addresses for all beneficiaries.')
+      alert('Please enter valid beneficiary addresses (Solana: base58, EVM: 0x...).')
       return false
     }
 
@@ -772,11 +777,27 @@ export default function CreatePage() {
                       <div key={index} className="space-y-2">
                         <div className="flex flex-col sm:flex-row gap-3 items-start">
                           <div className="flex-1 w-full min-w-0">
+                            <div className="mb-2 inline-flex rounded-xl overflow-hidden border border-Heres-border bg-Heres-surface/80 h-[36px]">
+                              <button
+                                type="button"
+                                onClick={() => updateBeneficiary(index, 'chain', 'solana')}
+                                className={`px-3 text-xs font-semibold transition-colors h-full ${beneficiary.chain !== 'evm' ? 'bg-Heres-accent text-Heres-bg' : 'text-Heres-muted hover:text-Heres-white'}`}
+                              >
+                                SOL
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateBeneficiary(index, 'chain', 'evm')}
+                                className={`px-3 text-xs font-semibold transition-colors h-full ${beneficiary.chain === 'evm' ? 'bg-Heres-accent text-Heres-bg' : 'text-Heres-muted hover:text-Heres-white'}`}
+                              >
+                                EVM
+                              </button>
+                            </div>
                             <input
                               type="text"
                               value={beneficiary.address}
                               onChange={(e) => updateBeneficiary(index, 'address', e.target.value.trim())}
-                              placeholder="Solana address..."
+                              placeholder={beneficiary.chain === 'evm' ? '0xEvmAddress...' : 'Solana address...'}
                               className="w-full rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50 font-mono text-sm"
                             />
                           </div>
@@ -818,8 +839,10 @@ export default function CreatePage() {
                             )}
                           </div>
                         </div>
-                        {beneficiary.address && !isValidSolanaAddress(beneficiary.address) && (
-                          <p className="text-xs text-red-400">Invalid Solana address</p>
+                        {beneficiary.address && !isValidBeneficiaryAddress(beneficiary) && (
+                          <p className="text-xs text-red-400">
+                            {beneficiary.chain === 'evm' ? 'Invalid EVM address (0x...)' : 'Invalid Solana address'}
+                          </p>
                         )}
                         {beneficiary.address && beneficiary.amount && totalAmount && (
                           <div className="mt-2 p-3 rounded-xl border border-Heres-border bg-Heres-surface/50">
@@ -1233,7 +1256,9 @@ export default function CreatePage() {
                           <div className="space-y-2">
                             {beneficiaries.map((b, i) => (
                               <div key={i} className="flex justify-between p-2 rounded-lg bg-Heres-card/80">
-                                <p className="font-mono text-sm text-Heres-white truncate max-w-[200px]">{b.address || 'Not set'}</p>
+                                <p className="font-mono text-sm text-Heres-white truncate max-w-[200px]">
+                                  [{(b.chain ?? 'solana').toUpperCase()}] {b.address || 'Not set'}
+                                </p>
                                 <p className="text-Heres-accent font-semibold text-sm">{b.amount} {b.amountType === 'percentage' ? '%' : 'SOL'}</p>
                               </div>
                             ))}

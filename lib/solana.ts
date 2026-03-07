@@ -71,7 +71,7 @@ export function getProgram(wallet: WalletContextState): Program | null {
   const provider = getProvider(wallet)
   if (!provider) return null
 
-  const programId = new PublicKey('HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU')
+  const programId = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW')
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
 
@@ -108,7 +108,7 @@ export function getErProgram(wallet: WalletContextState): Program | null {
     commitment: 'confirmed',
   })
 
-  const programId = new PublicKey('HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU')
+  const programId = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW')
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
 
@@ -132,7 +132,7 @@ export function getTeeProgram(wallet: WalletContextState, token?: string): Progr
     commitment: 'confirmed',
   })
 
-  const programId = new PublicKey('HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU')
+  const programId = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW')
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
 
@@ -270,7 +270,7 @@ export async function updateIntent(
 export async function executeIntent(
   wallet: WalletContextState,
   ownerPublicKey: PublicKey,
-  beneficiaries?: Array<{ address: string; amount: string; amountType: string }>,
+  beneficiaries?: Array<{ chain?: 'solana' | 'evm'; address: string; amount: string; amountType: string }>,
   mint?: PublicKey
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
@@ -288,7 +288,9 @@ export async function executeIntent(
     permission: permissionPDA,
   }
 
-  const remainingAccounts = beneficiaries?.map(b => {
+  const remainingAccounts = beneficiaries
+    ?.filter((b) => (b.chain ?? 'solana') === 'solana')
+    .map((b) => {
     const beneficiaryOwner = new PublicKey(b.address)
     if (mint && !mint.equals(PublicKey.default)) {
       const beneficiaryAta = getAssociatedTokenAddress(mint, beneficiaryOwner)
@@ -464,10 +466,9 @@ export async function scheduleExecuteIntent(
   console.log('[scheduleExecuteIntent] Capsule:', capsulePDA.toBase58())
   console.log('[scheduleExecuteIntent] Payer:', wallet.publicKey.toBase58())
 
-  // Build manual TransactionInstruction matching deployed binary (6 accounts only).
-  // The IDL shows 12 accounts but the deployed on-chain binary's ScheduleExecuteIntent
-  // context only has 6: magic_program, payer, capsule, vault, permission_program, permission.
-  // Using Anchor's .methods builder sends 12 accounts causing position mismatch errors.
+  // Build manual TransactionInstruction matching deployed binary (7 accounts).
+  // magic_program, payer, capsule, vault, permission_program, permission, magic_context.
+  // Using Anchor's .methods builder causes position mismatch; use raw TX instead.
   const discriminator = Buffer.from([88, 30, 30, 42, 9, 75, 31, 189]) // schedule_execute_intent
   const argsBuf = Buffer.alloc(24)
   argsBuf.writeBigUInt64LE(BigInt(taskId.toString()), 0)
@@ -475,13 +476,15 @@ export async function scheduleExecuteIntent(
   argsBuf.writeBigUInt64LE(BigInt(iterations.toString()), 16)
   const data = Buffer.concat([discriminator, argsBuf])
 
+  const magicContextId = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
   const keys = [
     { pubkey: magicProgram, isSigner: false, isWritable: false },
     { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
     { pubkey: capsulePDA, isSigner: false, isWritable: true },
-    { pubkey: vaultPDA, isSigner: false, isWritable: false },
+    { pubkey: vaultPDA, isSigner: false, isWritable: true },
     { pubkey: permissionProgramId, isSigner: false, isWritable: false },
     { pubkey: permissionPDA, isSigner: false, isWritable: false },
+    { pubkey: magicContextId, isSigner: false, isWritable: true },
   ]
 
   const ix = new TransactionInstruction({ keys, programId, data })
@@ -562,7 +565,7 @@ export async function scheduleExecuteIntent(
 export async function distributeAssets(
   wallet: WalletContextState,
   ownerPublicKey: PublicKey,
-  beneficiaries?: Array<{ address: string; amount: string; amountType: string }>,
+  beneficiaries?: Array<{ chain?: 'solana' | 'evm'; address: string; amount: string; amountType: string }>,
   mint?: PublicKey
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
@@ -585,7 +588,9 @@ export async function distributeAssets(
     vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : null,
   }
 
-  const remainingAccounts = beneficiaries?.map(b => {
+  const remainingAccounts = beneficiaries
+    ?.filter((b) => (b.chain ?? 'solana') === 'solana')
+    .map((b) => {
     const beneficiaryOwner = new PublicKey(b.address)
     if (mint && !mint.equals(PublicKey.default)) {
       const beneficiaryAta = getAssociatedTokenAddress(mint, beneficiaryOwner)

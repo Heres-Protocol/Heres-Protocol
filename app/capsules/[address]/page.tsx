@@ -172,6 +172,7 @@ export default function CapsuleDetailPage() {
     try {
       const beneficiaries = intentParsed?.type === 'token' && 'beneficiaries' in intentParsed && intentParsed.beneficiaries
         ? intentParsed.beneficiaries.filter((b: any) => b.address?.trim()).map((b: any) => ({
+            chain: b.chain ?? 'solana',
             address: b.address,
             amount: b.amount,
             amountType: b.amountType,
@@ -195,6 +196,7 @@ export default function CapsuleDetailPage() {
     try {
       const beneficiaries = intentParsed?.type === 'token' && 'beneficiaries' in intentParsed && intentParsed.beneficiaries
         ? intentParsed.beneficiaries.filter((b: any) => b.address?.trim()).map((b: any) => ({
+            chain: b.chain ?? 'solana',
             address: b.address,
             amount: b.amount,
             amountType: b.amountType,

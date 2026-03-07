@@ -6,9 +6,11 @@ import { PublicKey } from '@solana/web3.js'
 
 // Beneficiary types
 export interface Beneficiary {
+  chain: 'solana' | 'evm'
   address: string
   amount: string
   amountType: 'fixed' | 'percentage'
+  destinationChainSelector?: string
 }
 
 // Intent Capsule types

@@ -15,7 +15,7 @@ import bs58 from 'bs58';
 import { readFileSync } from 'fs';
 
 const idl = JSON.parse(readFileSync('./idl/HeresProgram.json', 'utf-8'));
-const PROGRAM_ID = new PublicKey('HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU');
+const PROGRAM_ID = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW');
 const PERMISSION_PROGRAM_ID = new PublicKey('ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1');
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 const ASSOC_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');

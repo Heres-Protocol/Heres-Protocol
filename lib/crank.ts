@@ -108,15 +108,20 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
   return eligible
 }
 
-function parseBeneficiaries(intentData: Buffer | Uint8Array): Array<{ address: string; amount: string; amountType: string }> {
+function parseBeneficiaries(
+  intentData: Buffer | Uint8Array
+): Array<{ chain: 'solana' | 'evm'; address: string; amount: string; amountType: string }> {
   try {
     const json = new TextDecoder().decode(intentData)
-    const data = JSON.parse(json) as { beneficiaries?: Array<{ address?: string; amount?: string; amountType?: string }> }
+    const data = JSON.parse(json) as {
+      beneficiaries?: Array<{ chain?: 'solana' | 'evm'; address?: string; amount?: string; amountType?: string }>
+    }
     const list = data?.beneficiaries
     if (!Array.isArray(list)) return []
     return list
       .filter((b) => b?.address)
       .map((b) => ({
+        chain: b.chain ?? 'solana',
         address: b.address!,
         amount: typeof b.amount === 'string' ? b.amount : String(b.amount ?? '0'),
         amountType: b.amountType ?? 'fixed',
@@ -140,7 +145,9 @@ export async function executeCapsuleIntent(
   const mint = capsule.account.mint
   const isSpl = mint && !mint.equals(PublicKey.default) && !mint.equals(SystemProgram.programId)
 
-  const remainingAccounts = beneficiaries.map((b) => {
+  const remainingAccounts = beneficiaries
+    .filter((b) => b.chain === 'solana')
+    .map((b) => {
     const beneficiaryOwner = new PublicKey(b.address)
     if (isSpl) {
       return { pubkey: getAssociatedTokenAddress(mint, beneficiaryOwner), isSigner: false, isWritable: true }
@@ -217,7 +224,9 @@ export async function distributeCapsuleAssets(
     feeRecipient = new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT || 'Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb')
   }
 
-  const remainingAccounts = beneficiaries.map((b) => {
+  const remainingAccounts = beneficiaries
+    .filter((b) => b.chain === 'solana')
+    .map((b) => {
     const beneficiaryOwner = new PublicKey(b.address)
     if (isSpl) {
       return { pubkey: getAssociatedTokenAddress(mint, beneficiaryOwner), isSigner: false, isWritable: true }

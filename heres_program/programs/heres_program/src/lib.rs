@@ -7,7 +7,6 @@ use anchor_lang::solana_program::{
 };
 use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
 use ephemeral_rollups_sdk::cpi::DelegateConfig;
-use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
 use ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID;
 use ephemeral_rollups_sdk::access_control::{
     instructions::CreatePermissionCpiBuilder,
@@ -19,7 +18,7 @@ use anchor_spl::associated_token::AssociatedToken;
 #[cfg(feature = "oracle")]
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-declare_id!("HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU");
+declare_id!("AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW");
 
 /// TEE validator for Private Ephemeral Rollup (PER). Used as default when no validator account is passed.
 pub const TEE_VALIDATOR: Pubkey = pubkey!("FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA");
@@ -186,14 +185,19 @@ pub mod heres_program {
         
         capsule.is_active = false;
         capsule.executed_at = Some(current_time);
-        
+
         msg!("Intent executed (state updated) for capsule: {:?}", capsule.key());
         emit!(IntentExecuted {
             capsule: capsule.key(),
             owner: capsule.owner,
             executed_at: current_time,
         });
-        
+
+        // NOTE: commit_and_undelegate cannot be in the same instruction as state changes
+        // because Solana runtime detects ExternalAccountDataModified when Magic program
+        // changes ownership metadata on accounts we already modified.
+        // Undelegation must be handled in a separate transaction after execution.
+
         Ok(())
     }
 
@@ -287,13 +291,14 @@ pub mod heres_program {
         let beneficiary_count = beneficiaries.len();
         
         for (idx, beneficiary) in beneficiaries.iter().enumerate() {
+            let beneficiary_chain = beneficiary.get("chain")
+                .and_then(|c| c.as_str())
+                .unwrap_or("solana");
+
             let address_str = beneficiary.get("address")
                 .and_then(|a| a.as_str())
                 .ok_or(ErrorCode::InvalidIntentData)?;
-            
-            let beneficiary_pubkey = address_str.parse::<Pubkey>()
-                .map_err(|_| ErrorCode::InvalidBeneficiaryAddress)?;
-            
+
             let amount_str = beneficiary.get("amount")
                 .and_then(|a| a.as_str())
                 .ok_or(ErrorCode::InvalidIntentData)?;
@@ -322,8 +327,34 @@ pub mod heres_program {
                     .unwrap_or(0)
             };
             distributed = distributed.saturating_add(to_send);
-            
+
+            if beneficiary_chain == "evm" {
+                if to_send > 0 {
+                    let destination_chain_selector = beneficiary
+                        .get("destinationChainSelector")
+                        .and_then(|s| s.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+
+                    emit!(CcipTransferRequested {
+                        capsule: ctx.accounts.capsule.key(),
+                        beneficiary_index: idx as u16,
+                        evm_address: address_str.to_string(),
+                        destination_chain_selector,
+                        amount_lamports: to_send,
+                    });
+                    msg!("Queued CCIP transfer for EVM beneficiary {}: {} lamports", address_str, to_send);
+                }
+                continue;
+            }
+
+            if beneficiary_chain != "solana" {
+                return err!(ErrorCode::UnsupportedBeneficiaryChain);
+            }
+
             if to_send > 0 {
+                let beneficiary_pubkey = address_str.parse::<Pubkey>()
+                    .map_err(|_| ErrorCode::InvalidBeneficiaryAddress)?;
                 let beneficiary_account = ctx.remaining_accounts
                     .iter()
                     .find(|acc| acc.key() == beneficiary_pubkey)
@@ -412,13 +443,11 @@ pub mod heres_program {
         msg!("Scheduling execute_intent on TEE for capsule: {:?}", ctx.accounts.capsule.key());
 
 
-        // CRITICAL: Only include accounts that execute_intent actually needs
-        // execute_intent only updates capsule.is_active and capsule.executed_at
-        // It does NOT touch vault, permission, or any other accounts
-        // Including unnecessary accounts causes "account not delegated" errors on TEE
+        // Accounts for the inner execute_intent instruction called by the ER crank.
+        // Only 4 required accounts — undelegation handled separately after execution.
         let accounts = vec![
             AccountMeta::new(ctx.accounts.capsule.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.vault.key(), false),
+            AccountMeta::new(ctx.accounts.vault.key(), false),
             AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false),
             AccountMeta::new_readonly(ctx.accounts.permission.key(), false),
         ];
@@ -448,7 +477,7 @@ pub mod heres_program {
             vec![
                 AccountMeta::new(ctx.accounts.payer.key(), true),
                 AccountMeta::new(ctx.accounts.capsule.key(), false),
-                AccountMeta::new_readonly(ctx.accounts.vault.key(), false),
+                AccountMeta::new(ctx.accounts.vault.key(), false),
                 AccountMeta::new_readonly(ctx.accounts.permission_program.key(), false),
                 AccountMeta::new_readonly(ctx.accounts.permission.key(), false),
             ],
@@ -589,6 +618,7 @@ pub struct ScheduleExecuteIntent<'info> {
     #[account(mut)]
     pub capsule: AccountInfo<'info>,
     /// CHECK: Vault PDA
+    #[account(mut)]
     pub vault: AccountInfo<'info>,
     /// MagicBlock Permission Program
     /// CHECK: Validated by address
@@ -725,9 +755,10 @@ pub struct ExecuteIntent<'info> {
         bump = capsule.bump
     )]
     pub capsule: Box<Account<'info, IntentCapsule>>,
-    
-    /// CHECK: Vault PDA (read-only for state check)
+
+    /// CHECK: Vault PDA
     #[account(
+        mut,
         seeds = [b"capsule_vault", capsule.owner.as_ref()],
         bump = capsule.vault_bump
     )]
@@ -872,6 +903,15 @@ pub struct IntentExecuted {
     pub executed_at: i64,
 }
 
+#[event]
+pub struct CcipTransferRequested {
+    pub capsule: Pubkey,
+    pub beneficiary_index: u16,
+    pub evm_address: String,
+    pub destination_chain_selector: String,
+    pub amount_lamports: u64,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Unauthorized: Only the owner can perform this action")]
@@ -896,6 +936,8 @@ pub enum ErrorCode {
     InvalidFeeConfig,
     #[msg("Invalid token account provided")]
     InvalidTokenAccount,
+    #[msg("Unsupported beneficiary chain")]
+    UnsupportedBeneficiaryChain,
 }
 
 /// Parse SOL amount string to lamports

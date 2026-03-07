@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-heres_program = "HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU"
+heres_program = "AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW"
 
 [programs.localnet]
-heres_program = "HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU"
+heres_program = "AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW"
 
 [registry]
 url = "https://api.apr.dev"

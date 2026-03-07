@@ -11,9 +11,10 @@ import bs58 from 'bs58';
 import { readFileSync } from 'fs';
 
 const idl = JSON.parse(readFileSync('./idl/HeresProgram.json', 'utf-8'));
-const PROGRAM_ID = new PublicKey('HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU');
+const PROGRAM_ID = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW');
 const DELEGATION_PROGRAM_ID = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
 const MAGIC_PROGRAM_ID = new PublicKey('Magic11111111111111111111111111111111111111');
+const MAGIC_CONTEXT_ID = new PublicKey('MagicContext1111111111111111111111111111111');
 const PERMISSION_PROGRAM_ID = new PublicKey('ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1');
 const ACTIVE_VALIDATOR = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57');
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
@@ -136,9 +137,10 @@ try {
       { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: ownerKp.publicKey, isSigner: true, isWritable: true },
       { pubkey: capsulePDA, isSigner: false, isWritable: true },
-      { pubkey: vaultPDA, isSigner: false, isWritable: false },
+      { pubkey: vaultPDA, isSigner: false, isWritable: true },
       { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: permissionPDA, isSigner: false, isWritable: false },
+      { pubkey: MAGIC_CONTEXT_ID, isSigner: false, isWritable: true },
     ],
     programId: PROGRAM_ID,
     data: ixData,
