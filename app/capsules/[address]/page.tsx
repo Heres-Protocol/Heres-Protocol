@@ -160,6 +160,8 @@ export default function CapsuleDetailPage() {
   const [creDeliveryError, setCreDeliveryError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [creDispatchLoading, setCreDispatchLoading] = useState(false)
+  const [creDispatchResult, setCreDispatchResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const isOwner = Boolean(wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey))
 
@@ -204,6 +206,35 @@ export default function CapsuleDetailPage() {
       setActionResult({ type: 'error', message: err.message || 'Distribution failed' })
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  const handleCreDispatch = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule || !wallet.signMessage) return
+    setCreDispatchLoading(true)
+    setCreDispatchResult(null)
+    try {
+      const owner = wallet.publicKey.toBase58()
+      const timestamp = Date.now()
+      const message = buildCreSignedMessage({
+        action: 'dispatch',
+        owner,
+        capsuleAddress: capsule.capsuleAddress,
+        timestamp,
+      })
+      const signature = bytesToBase64(await wallet.signMessage(new TextEncoder().encode(message)))
+      const res = await fetch('/api/intent-delivery/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-cre-signature': signature },
+        body: JSON.stringify({ capsule: capsule.capsuleAddress, owner, timestamp }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'CRE dispatch failed')
+      setCreDispatchResult({ type: 'success', message: `Intent Statement delivery dispatched (${data.status || 'queued'})` })
+    } catch (err: any) {
+      setCreDispatchResult({ type: 'error', message: err.message || 'CRE dispatch failed' })
+    } finally {
+      setCreDispatchLoading(false)
     }
   }
 
@@ -675,42 +706,141 @@ export default function CapsuleDetailPage() {
             </section>
           )}
 
-          {/* Actions (test) */}
-          {isOwner && (
-            <section className="card-Heres p-6 mb-6 border-amber-500/30">
-              <h2 className="text-lg font-semibold text-Heres-white mb-2">Actions</h2>
-              <p className="text-sm text-Heres-muted mb-4">
-                Manually trigger on-chain instructions for testing. In production, the crank handles execute_intent automatically.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={handleExecuteIntent}
-                  disabled={!!actionLoading}
-                  className="rounded-lg border border-Heres-accent bg-Heres-accent/10 px-4 py-2 text-sm font-medium text-Heres-accent hover:bg-Heres-accent/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {actionLoading === 'execute' ? 'Executing...' : 'Execute Intent'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDistributeAssets}
-                  disabled={!!actionLoading}
-                  className="rounded-lg border border-Heres-purple bg-Heres-purple/10 px-4 py-2 text-sm font-medium text-Heres-purple hover:bg-Heres-purple/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {actionLoading === 'distribute' ? 'Distributing...' : 'Distribute Assets'}
-                </button>
-              </div>
-              {actionResult && (
-                <div className={`mt-4 rounded-lg border p-3 text-sm break-all ${
-                  actionResult.type === 'success'
-                    ? 'border-green-500/30 bg-green-500/10 text-green-400'
-                    : 'border-red-500/30 bg-red-500/10 text-red-400'
-                }`}>
-                  {actionResult.message}
+          {/* Actions — status-based flow */}
+          {isOwner && (() => {
+            const isExecuted = status === 'Executed' || (!capsule.isActive && capsule.executedAt)
+            const isExpired = status === 'Expired'
+            const isActive = status === 'Active'
+            const canExecute = isExpired && !isExecuted
+            const canDistribute = Boolean(isExecuted)
+            const canDispatchCre = Boolean(isExecuted && isCreEnabled)
+            const allDone = Boolean(isExecuted && creDeliveryStatus?.status === 'delivered')
+
+            // Determine current step (1-based)
+            const currentStep = allDone ? 4 : isExecuted ? 2 : canExecute ? 1 : 0
+
+            const steps = [
+              { num: 1, label: 'Execute Intent', desc: 'Deactivate capsule when inactivity condition met' },
+              { num: 2, label: 'Distribute Assets', desc: 'Transfer SOL/tokens to beneficiaries' },
+              ...(isCreEnabled ? [{ num: 3, label: 'Deliver Intent Statement', desc: 'Dispatch encrypted intent via CRE' }] : []),
+            ]
+
+            return (
+              <section className="card-Heres p-6 mb-6 border-amber-500/30">
+                <h2 className="text-lg font-semibold text-Heres-white mb-2">Actions</h2>
+
+                {/* Status guidance */}
+                <div className="rounded-lg border border-Heres-border/50 bg-Heres-surface/30 p-3 mb-5">
+                  {isActive && (
+                    <p className="text-sm text-Heres-muted">
+                      Capsule is <span className="text-Heres-accent font-medium">Active</span>. The inactivity period has not elapsed yet. Actions will become available once the capsule expires.
+                    </p>
+                  )}
+                  {canExecute && (
+                    <p className="text-sm text-amber-400">
+                      Inactivity period has elapsed. You can now <strong>Execute Intent</strong> to deactivate the capsule, then distribute assets.
+                    </p>
+                  )}
+                  {isExecuted && !allDone && (
+                    <p className="text-sm text-Heres-accent">
+                      Capsule executed. Proceed to <strong>Distribute Assets</strong>{isCreEnabled ? ' and then dispatch Intent Statement delivery via CRE.' : '.'}
+                    </p>
+                  )}
+                  {allDone && (
+                    <p className="text-sm text-green-400">
+                      All steps complete. Assets distributed and intent statement delivered.
+                    </p>
+                  )}
+                  {status === 'Waiting' && (
+                    <p className="text-sm text-Heres-purple">
+                      Capsule is in <span className="font-medium">Waiting</span> state. No actions available.
+                    </p>
+                  )}
                 </div>
-              )}
-            </section>
-          )}
+
+                {/* Step indicator */}
+                <div className="flex items-center gap-2 mb-5 overflow-x-auto">
+                  {steps.map((step, i) => {
+                    const done = step.num < currentStep || (step.num === 3 && allDone)
+                    const active = step.num === currentStep || (step.num === 2 && currentStep === 2) || (step.num === 3 && currentStep >= 2 && !allDone)
+                    return (
+                      <div key={step.num} className="flex items-center gap-2">
+                        {i > 0 && <div className={`w-8 h-px ${done ? 'bg-green-500' : 'bg-Heres-border'}`} />}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                            done ? 'bg-green-500/20 text-green-400 border border-green-500/40' :
+                            active ? 'bg-Heres-accent/20 text-Heres-accent border border-Heres-accent/40' :
+                            'bg-Heres-surface/50 text-Heres-muted border border-Heres-border'
+                          }`}>
+                            {done ? '✓' : step.num}
+                          </div>
+                          <div>
+                            <p className={`text-xs font-medium ${done ? 'text-green-400' : active ? 'text-Heres-white' : 'text-Heres-muted'}`}>
+                              {step.label}
+                            </p>
+                            <p className="text-[10px] text-Heres-muted hidden sm:block">{step.desc}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleExecuteIntent}
+                    disabled={!canExecute || !!actionLoading}
+                    title={!canExecute ? (isActive ? 'Inactivity period not elapsed' : isExecuted ? 'Already executed' : 'Not available') : 'Execute intent on-chain'}
+                    className="rounded-lg border border-Heres-accent px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-Heres-accent/10 text-Heres-accent hover:bg-Heres-accent/20"
+                  >
+                    {actionLoading === 'execute' ? 'Executing...' : isExecuted ? 'Executed ✓' : 'Execute Intent'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDistributeAssets}
+                    disabled={!canDistribute || !!actionLoading}
+                    title={!canDistribute ? 'Execute intent first' : 'Distribute SOL/tokens to beneficiaries'}
+                    className="rounded-lg border border-Heres-purple px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-Heres-purple/10 text-Heres-purple hover:bg-Heres-purple/20"
+                  >
+                    {actionLoading === 'distribute' ? 'Distributing...' : 'Distribute Assets'}
+                  </button>
+                  {isCreEnabled && (
+                    <button
+                      type="button"
+                      onClick={handleCreDispatch}
+                      disabled={!canDispatchCre || creDispatchLoading || !!actionLoading}
+                      title={!canDispatchCre ? 'Execute intent first' : 'Dispatch encrypted intent statement via CRE'}
+                      className="rounded-lg border border-blue-500 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                    >
+                      {creDispatchLoading ? 'Dispatching...' : 'Deliver Intent Statement'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Result messages */}
+                {actionResult && (
+                  <div className={`mt-4 rounded-lg border p-3 text-sm break-all ${
+                    actionResult.type === 'success'
+                      ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                      : 'border-red-500/30 bg-red-500/10 text-red-400'
+                  }`}>
+                    {actionResult.message}
+                  </div>
+                )}
+                {creDispatchResult && (
+                  <div className={`mt-3 rounded-lg border p-3 text-sm break-all ${
+                    creDispatchResult.type === 'success'
+                      ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                      : 'border-red-500/30 bg-red-500/10 text-red-400'
+                  }`}>
+                    {creDispatchResult.message}
+                  </div>
+                )}
+              </section>
+            )
+          })()}
 
           {/* Price / Value chart (Graph Explorer style) */}
           <section className="card-Heres p-6 mb-6">
