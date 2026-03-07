@@ -1,16 +1,16 @@
 /**
- * E2E test with crank: CRE register -> Create -> Delegate TEE -> Schedule crank -> wait for auto-execute -> distribute -> CRE dispatch
+ * E2E test: CRE register -> Create -> (optional ER: Delegate -> Crank -> Execute -> Undelegate) -> distribute -> CRE dispatch
  *
  * Prerequisites:
- *   1. Add TEST_MNEMONIC="..." to .env.local
+ *   1. Add TEST_MNEMONIC="..." to .env.local (used to fund fresh test keypair)
  *   2. Run the Next.js dev server: pnpm dev  (for CRE API routes)
- *   3. npx tsx scripts/test-capsule-e2e.ts
+ *   3. SKIP_DELEGATION=true npx tsx scripts/test-capsule-e2e.ts   (base layer)
+ *      SKIP_DELEGATION=false npx tsx scripts/test-capsule-e2e.ts  (ER flow)
  */
 
-import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js'
-import { Program, AnchorProvider, BN, Wallet } from '@coral-xyz/anchor'
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction, LAMPORTS_PER_SOL, sendAndConfirmTransaction } from '@solana/web3.js'
+import { Program, AnchorProvider, BN, Wallet, BorshAccountsCoder } from '@coral-xyz/anchor'
 import { createHash, sign as cryptoSign, createPrivateKey } from 'crypto'
-import { getAuthToken, createCommitAndUndelegateInstruction } from '@magicblock-labs/ephemeral-rollups-sdk'
 import * as bip39 from 'bip39'
 import { derivePath } from 'ed25519-hd-key'
 import * as fs from 'fs'
@@ -24,20 +24,17 @@ const PERMISSION_PROGRAM_ID = new PublicKey('ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19
 const DELEGATION_PROGRAM_ID = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh')
 const MAGIC_PROGRAM_ID = new PublicKey('Magic11111111111111111111111111111111111111')
 const MAGIC_CONTEXT = new PublicKey('MagicContext1111111111111111111111111111111')
+// #[delegate] macro derives buffer PDAs using the program's own ID at compile time
+const BUFFER_SEED_PROGRAM_ID = PROGRAM_ID
 
-// Toggle between TEE (PER) and regular ER
-const SKIP_DELEGATION = (process.env.SKIP_DELEGATION ?? 'true') === 'true' // set SKIP_DELEGATION=false to test ER
-const USE_TEE = false
-const TEE_VALIDATOR = new PublicKey('FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA')
+const SKIP_DELEGATION = (process.env.SKIP_DELEGATION ?? 'true') === 'true'
 const ER_VALIDATOR = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57')
-const ACTIVE_VALIDATOR = USE_TEE ? TEE_VALIDATOR : ER_VALIDATOR
-const TEE_RPC_URL = USE_TEE ? 'https://tee.magicblock.app' : 'https://devnet.magicblock.app'
+const ER_RPC_URL = 'https://devnet.magicblock.app'
 const APP_BASE_URL = 'http://localhost:3000'
 
-const INACTIVITY_SECONDS = 60 // 1 minute
-const TEST_SOL_AMOUNT = '0.01'
+const INACTIVITY_SECONDS = 10 // short for testing
+const TEST_SOL_AMOUNT = '0.003'
 const TEST_EMAIL = 'test@example.com'
-const TEST_UNLOCK_CODE = 'testcode123456'
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
@@ -75,14 +72,14 @@ function getFeeConfigPDA(): [PublicKey, number] {
 function getPermissionPDA(capsule: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([Buffer.from('permission'), capsule.toBuffer()], PERMISSION_PROGRAM_ID)
 }
-function getBufferPDA(pda: PublicKey, programId: PublicKey): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync([Buffer.from('buffer'), pda.toBuffer()], programId)
+function getBufferPDA(pda: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from('buffer'), pda.toBuffer()], BUFFER_SEED_PROGRAM_ID)
 }
-function getDelegationRecordPDA(pda: PublicKey, programId: PublicKey): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync([Buffer.from('delegation'), pda.toBuffer()], programId)
+function getDelegationRecordPDA(pda: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from('delegation'), pda.toBuffer()], DELEGATION_PROGRAM_ID)
 }
-function getDelegationMetadataPDA(pda: PublicKey, programId: PublicKey): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pda.toBuffer()], programId)
+function getDelegationMetadataPDA(pda: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pda.toBuffer()], DELEGATION_PROGRAM_ID)
 }
 
 function sha256Hex(value: string): string {
@@ -94,16 +91,6 @@ function signMessageWithKeypair(keypair: Keypair, message: string): string {
   const pkcs8Der = Buffer.concat([ED25519_PKCS8_PREFIX, Buffer.from(keypair.secretKey.slice(0, 32))])
   const privateKey = createPrivateKey({ key: pkcs8Der, format: 'der', type: 'pkcs8' })
   return cryptoSign(null, Buffer.from(message, 'utf8'), privateKey).toString('base64')
-}
-
-/** signMessage callback compatible with wallet adapter & TEE SDK */
-function makeSignMessage(keypair: Keypair): (message: Uint8Array) => Promise<Uint8Array> {
-  return async (message: Uint8Array) => {
-    const ED25519_PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex')
-    const pkcs8Der = Buffer.concat([ED25519_PKCS8_PREFIX, Buffer.from(keypair.secretKey.slice(0, 32))])
-    const privateKey = createPrivateKey({ key: pkcs8Der, format: 'der', type: 'pkcs8' })
-    return new Uint8Array(cryptoSign(null, Buffer.from(message), privateKey))
-  }
 }
 
 function buildCreSignedMessage(input: {
@@ -121,6 +108,13 @@ function buildCreSignedMessage(input: {
 }
 
 function sleep(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)) }
+
+let passed = 0, failed = 0, skipped = 0
+function assert(cond: boolean, label: string) {
+  if (cond) { console.log(`  [PASS] ${label}`); passed++ }
+  else { console.log(`  [FAIL] ${label}`); failed++ }
+}
+function skip(label: string) { console.log(`  [SKIP] ${label}`); skipped++ }
 function log(step: string, msg: string) {
   console.log(`[${new Date().toISOString().slice(11, 19)}] [${step}] ${msg}`)
 }
@@ -132,28 +126,37 @@ async function main() {
   const mnemonic = process.env.TEST_MNEMONIC
   if (!mnemonic) throw new Error('TEST_MNEMONIC not set in .env.local')
 
-  const keypair = keypairFromMnemonic(mnemonic)
-  const owner = keypair.publicKey
-  log('INIT', `Owner: ${owner.toBase58()}`)
+  // Use mnemonic keypair as funder, generate fresh owner for each test run
+  const funder = keypairFromMnemonic(mnemonic)
+  const ownerKp = Keypair.generate()
+  const owner = ownerKp.publicKey
 
-  // Derive a separate beneficiary address (index 1)
-  const beneficiarySeed = bip39.mnemonicToSeedSync(mnemonic)
-  const beneficiaryDerived = derivePath("m/44'/501'/1'/0'", beneficiarySeed.toString('hex')).key
-  const beneficiaryKeypair = Keypair.fromSeed(beneficiaryDerived)
-  const beneficiary = beneficiaryKeypair.publicKey
-  log('INIT', `Beneficiary: ${beneficiary.toBase58()}`)
+  console.log('=== Heres Protocol E2E Test ===')
+  console.log(`Mode: ${SKIP_DELEGATION ? 'Base Layer' : 'Ephemeral Rollup'}`)
+  console.log(`Funder: ${funder.publicKey.toBase58()}`)
+  console.log(`Owner:  ${owner.toBase58()} (fresh)`)
 
   const connection = new Connection(RPC_URL, 'confirmed')
-  const balance = await connection.getBalance(owner)
-  log('INIT', `Balance: ${(balance / 1e9).toFixed(4)} SOL`)
-  if (balance < 0.05 * 1e9) throw new Error('Insufficient balance')
+
+  // Check funder balance
+  const funderBalance = await connection.getBalance(funder.publicKey)
+  log('INIT', `Funder balance: ${(funderBalance / 1e9).toFixed(4)} SOL`)
+  if (funderBalance < 0.05 * LAMPORTS_PER_SOL) throw new Error('Funder has insufficient balance')
 
   // Check dev server
   try { await fetch(`${APP_BASE_URL}/api/intent-delivery/status?capsule=test&owner=test&timestamp=0`) }
   catch { throw new Error(`Dev server not running at ${APP_BASE_URL}. Run: pnpm dev`) }
   log('INIT', 'Dev server running')
 
-  const wallet = new Wallet(keypair)
+  // Fund fresh owner
+  log('INIT', 'Funding fresh owner...')
+  const fundAmount = SKIP_DELEGATION ? 0.02 : 0.05
+  await sendAndConfirmTransaction(connection, new Transaction().add(
+    SystemProgram.transfer({ fromPubkey: funder.publicKey, toPubkey: owner, lamports: Math.floor(fundAmount * LAMPORTS_PER_SOL) })
+  ), [funder])
+  log('INIT', `Owner funded with ${fundAmount} SOL`)
+
+  const wallet = new Wallet(ownerKp)
   const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' })
   const idl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'idl', 'heres_program.json'), 'utf-8'))
   idl.address = PROGRAM_ID.toBase58()
@@ -162,63 +165,32 @@ async function main() {
   const [capsulePDA] = getCapsulePDA(owner)
   const [vaultPDA] = getCapsuleVaultPDA(owner)
   const [feeConfigPDA] = getFeeConfigPDA()
+  const [permissionPDA] = getPermissionPDA(capsulePDA)
 
   const feeConfigAccount = await connection.getAccountInfo(feeConfigPDA)
   const platformFeeRecipient = feeConfigAccount && feeConfigAccount.data.length >= 72
     ? new PublicKey(feeConfigAccount.data.slice(40, 72))
     : owner
-  log('INIT', `Fee recipient: ${platformFeeRecipient.toBase58()}`)
   log('INIT', `Capsule PDA: ${capsulePDA.toBase58()}`)
 
-  // ─── Cancel existing capsule ───────────────────────────────────
-  const existing = await connection.getAccountInfo(capsulePDA)
-  if (existing) {
-    // If capsule is delegated, undelegate first
-    if (existing.owner.equals(DELEGATION_PROGRAM_ID)) {
-      log('INIT', 'Capsule is delegated. Committing & undelegating on base layer...')
-      try {
-        const undelegateIx = createCommitAndUndelegateInstruction(owner, [capsulePDA, vaultPDA])
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
-        const tx = new Transaction({ feePayer: owner, blockhash, lastValidBlockHeight })
-        tx.add(undelegateIx)
-        tx.sign(keypair)
-        const txSig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
-        await connection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
-        log('INIT', `Commit & undelegate TX: ${txSig}`)
-
-        for (let i = 0; i < 20; i++) {
-          await sleep(3000)
-          const acct = await connection.getAccountInfo(capsulePDA)
-          if (acct && acct.owner.equals(PROGRAM_ID)) { log('INIT', 'Capsule back on base layer.'); break }
-          if (i % 3 === 2) log('INIT', `Waiting for undelegation... ${(i+1)*3}s`)
-        }
-      } catch (e: any) {
-        log('INIT', `Undelegate failed: ${e.message?.slice(0, 200)}`)
-      }
-    }
-
-    log('INIT', 'Cancelling existing capsule...')
-    try {
-      const tx = await program.methods.cancelCapsule()
-        .accounts({ capsule: capsulePDA, vault: vaultPDA, owner, systemProgram: SystemProgram.programId }).rpc()
-      log('INIT', `Cancelled. TX: ${tx}`)
-      await sleep(2000)
-    } catch (e: any) { log('INIT', `Cancel failed: ${e.message?.slice(0, 80)}`) }
-  }
+  // Derive beneficiary (separate from owner)
+  const beneficiaryKp = Keypair.generate()
+  const beneficiary = beneficiaryKp.publicKey
+  log('INIT', `Beneficiary: ${beneficiary.toBase58()}`)
 
   // ═══ Step 1: CRE Register ═════════════════════════════════════
-  log('STEP 1', 'Registering CRE secret...')
+  console.log('\n--- Step 1: CRE Register ---')
   const fakeEncryptedPayload = JSON.stringify({
     v: 1, alg: 'AES-GCM', kdf: 'PBKDF2', hash: 'SHA-256', iterations: 120000,
     salt: Buffer.from('test-salt-12345678').toString('base64'),
     iv: Buffer.from('test-iv-1234').toString('base64'),
-    ciphertext: Buffer.from('E2E test encrypted with ' + TEST_UNLOCK_CODE).toString('base64'),
+    ciphertext: Buffer.from('E2E test encrypted payload').toString('base64'),
   })
   const normalizedEmail = TEST_EMAIL.trim().toLowerCase()
   const recipientEmailHash = sha256Hex(normalizedEmail)
   const encryptedPayloadHash = sha256Hex(fakeEncryptedPayload)
   const ts1 = Date.now()
-  const sig1 = signMessageWithKeypair(keypair, buildCreSignedMessage({
+  const sig1 = signMessageWithKeypair(ownerKp, buildCreSignedMessage({
     action: 'register-secret', owner: owner.toBase58(), timestamp: ts1, recipientEmailHash, encryptedPayloadHash,
   }))
   const regRes = await fetch(`${APP_BASE_URL}/api/intent-delivery/register`, {
@@ -226,220 +198,355 @@ async function main() {
     body: JSON.stringify({ owner: owner.toBase58(), recipientEmail: normalizedEmail, encryptedPayload: fakeEncryptedPayload, timestamp: ts1, signature: sig1 }),
   })
   const regJson = await regRes.json() as any
-  if (!regRes.ok) throw new Error(`CRE register failed: ${regJson.error}`)
-  log('STEP 1', `CRE registered! ref=${regJson.secretRef}`)
+  if (!regRes.ok) {
+    log('STEP 1', `CRE register failed [${regRes.status}]: ${JSON.stringify(regJson)}`)
+    assert(false, 'CRE register')
+  } else {
+    log('STEP 1', `CRE registered! ref=${regJson.secretRef}`)
+    assert(true, 'CRE register')
+  }
 
   // ═══ Step 2: Create Capsule ═══════════════════════════════════
-  log('STEP 2', 'Creating capsule...')
+  console.log('\n--- Step 2: Create Capsule ---')
   const intentData = JSON.stringify({
-    intent: 'E2E crank test', totalAmount: TEST_SOL_AMOUNT, inactivityDays: 1, delayDays: 0,
+    intent: 'E2E test', totalAmount: TEST_SOL_AMOUNT, inactivityDays: 0, delayDays: 0,
     beneficiaries: [{ address: beneficiary.toBase58(), amount: TEST_SOL_AMOUNT, amountType: 'fixed' }],
-    cre: { enabled: true, secretRef: regJson.secretRef, secretHash: regJson.secretHash, recipientEmailHash, deliveryChannel: 'email' },
+    cre: regJson.secretRef ? {
+      enabled: true, secretRef: regJson.secretRef, secretHash: regJson.secretHash,
+      recipientEmailHash, deliveryChannel: 'email',
+    } : undefined,
   })
-  const createTx = await program.methods
-    .createCapsule(new BN(INACTIVITY_SECONDS), Buffer.from(intentData))
-    .accounts({
-      capsule: capsulePDA, vault: vaultPDA, owner, feeConfig: feeConfigPDA, platformFeeRecipient,
-      systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID,
-      mint: null, sourceTokenAccount: null, vaultTokenAccount: null,
-      associatedTokenProgram: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
-    }).rpc()
-  log('STEP 2', `Capsule created! TX: ${createTx}`)
+  try {
+    const createTx = await program.methods
+      .createCapsule(new BN(INACTIVITY_SECONDS), Buffer.from(intentData))
+      .accounts({
+        capsule: capsulePDA, vault: vaultPDA, owner, feeConfig: feeConfigPDA,
+        platformFeeRecipient, systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        mint: null, sourceTokenAccount: null, vaultTokenAccount: null,
+        associatedTokenProgram: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+      }).rpc()
+    log('STEP 2', `Capsule created! TX: ${createTx}`)
+    assert(true, 'Capsule created')
+  } catch (e: any) {
+    log('STEP 2', `Create failed: ${e.message?.slice(0, 200)}`)
+    if (e.logs) e.logs.slice(-5).forEach((l: string) => console.log('  ', l))
+    assert(false, 'Capsule created')
+    return printSummary()
+  }
+
+  // Verify capsule state
+  await sleep(2000)
+  try {
+    const coder = new BorshAccountsCoder(idl)
+    const capsuleInfo = await connection.getAccountInfo(capsulePDA)
+    if (capsuleInfo) {
+      const data = coder.decode('IntentCapsule', capsuleInfo.data)
+      assert(data.is_active === true, 'Capsule is_active = true')
+      assert(data.owner.equals(owner), 'Capsule owner matches')
+    } else {
+      assert(false, 'Capsule account exists')
+    }
+  } catch (e: any) {
+    log('STEP 2', `Verify failed: ${e.message?.slice(0, 100)}`)
+    assert(false, 'Capsule state verify')
+  }
 
   if (SKIP_DELEGATION) {
-    // ═══ Base Layer Flow: Wait for inactivity period, then execute directly ═══
-    log('STEP 3', `Skipping delegation. Waiting ${INACTIVITY_SECONDS}s for inactivity period...`)
-    for (let elapsed = 0; elapsed < INACTIVITY_SECONDS + 10; elapsed += 10) {
-      await sleep(10000)
-      log('STEP 3', `${elapsed + 10}s / ${INACTIVITY_SECONDS}s`)
+    // ═══ Base Layer Flow ═══════════════════════════════════════════
+    console.log(`\n--- Step 3: Wait ${INACTIVITY_SECONDS}s for inactivity ---`)
+    for (let elapsed = 0; elapsed < INACTIVITY_SECONDS + 5; elapsed += 5) {
+      await sleep(5000)
+      log('STEP 3', `${elapsed + 5}s / ${INACTIVITY_SECONDS}s`)
     }
 
-    log('STEP 4', 'Executing intent on base layer...')
-    const [permissionPDA] = getPermissionPDA(capsulePDA)
+    console.log('\n--- Step 4: Execute Intent (base layer) ---')
     try {
       const executeTx = await program.methods.executeIntent()
-        .accounts({ capsule: capsulePDA, vault: vaultPDA, permissionProgram: PERMISSION_PROGRAM_ID, permission: permissionPDA }).rpc()
+        .accounts({ capsule: capsulePDA, vault: vaultPDA, permissionProgram: PERMISSION_PROGRAM_ID, permission: permissionPDA })
+        .rpc()
       log('STEP 4', `Execute TX: ${executeTx}`)
+      assert(true, 'Execute intent')
     } catch (e: any) {
       log('STEP 4', `Execute failed: ${e.message?.slice(0, 200)}`)
-      if (e.logs) console.log('Logs:', e.logs.slice(-5))
+      if (e.logs) e.logs.slice(-5).forEach((l: string) => console.log('  ', l))
+      assert(false, 'Execute intent')
+      return printSummary()
     }
     await sleep(2000)
 
   } else {
-    // ═══ ER Flow: Delegate → Crank → Execute on ER → Undelegate ═══
-    log('STEP 3', 'Delegating capsule to ER...')
-    const [bufferPDA] = getBufferPDA(capsulePDA, MAGIC_PROGRAM_ID)
-    const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA, DELEGATION_PROGRAM_ID)
-    const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA, DELEGATION_PROGRAM_ID)
-    const [vaultBufferPDA] = getBufferPDA(vaultPDA, MAGIC_PROGRAM_ID)
-    const [vaultDelegationRecordPDA] = getDelegationRecordPDA(vaultPDA, DELEGATION_PROGRAM_ID)
-    const [vaultDelegationMetadataPDA] = getDelegationMetadataPDA(vaultPDA, DELEGATION_PROGRAM_ID)
+    // ═══ ER Flow ══════════════════════════════════════════════════
+    console.log('\n--- Step 3: Delegate to ER ---')
+    const [bufferPDA] = getBufferPDA(capsulePDA)
+    const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA)
+    const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA)
+    const [vaultBufferPDA] = getBufferPDA(vaultPDA)
+    const [vaultDelegationRecordPDA] = getDelegationRecordPDA(vaultPDA)
+    const [vaultDelegationMetadataPDA] = getDelegationMetadataPDA(vaultPDA)
 
     try {
       const delegateTx = await program.methods.delegateCapsule()
         .accounts({
-          payer: owner, owner, validator: ACTIVE_VALIDATOR,
+          payer: owner, owner, validator: ER_VALIDATOR,
           pda: capsulePDA, pdaBuffer: bufferPDA, pdaDelegationRecord: delegationRecordPDA, pdaDelegationMetadata: delegationMetadataPDA,
           vault: vaultPDA, vaultBuffer: vaultBufferPDA, vaultDelegationRecord: vaultDelegationRecordPDA, vaultDelegationMetadata: vaultDelegationMetadataPDA,
           magicProgram: MAGIC_PROGRAM_ID, delegationProgram: DELEGATION_PROGRAM_ID, systemProgram: SystemProgram.programId,
         }).rpc()
       log('STEP 3', `Delegated! TX: ${delegateTx}`)
+      assert(true, 'Delegation')
     } catch (e: any) {
-      log('STEP 3', `Delegation failed: ${e.message?.slice(0, 120)}`)
+      log('STEP 3', `Delegation failed: ${e.message?.slice(0, 200)}`)
+      if (e.logs) e.logs.slice(-5).forEach((l: string) => console.log('  ', l))
+      assert(false, 'Delegation')
+      return printSummary()
     }
 
     await sleep(5000)
+    const postInfo = await connection.getAccountInfo(capsulePDA)
+    assert(postInfo !== null && postInfo.owner.equals(DELEGATION_PROGRAM_ID), 'Capsule owner = Delegation Program')
 
-    let erRpcUrl = TEE_RPC_URL
-    if (USE_TEE) {
-      log('STEP 4', 'Getting TEE auth token...')
-      try {
-        const result = await getAuthToken(TEE_RPC_URL, owner, makeSignMessage(keypair))
-        erRpcUrl = `${TEE_RPC_URL}?token=${result.token}`
-        log('STEP 4', 'TEE auth obtained!')
-      } catch (e: any) { log('STEP 4', `TEE auth failed: ${e.message?.slice(0, 100)}`) }
-    } else {
-      log('STEP 4', 'Using regular ER (no auth)')
-    }
+    console.log('\n--- Step 4: Verify on ER + Schedule crank ---')
+    const erConn = new Connection(ER_RPC_URL, 'confirmed')
+    const erInfo = await erConn.getAccountInfo(capsulePDA)
+    assert(erInfo !== null, 'Capsule visible on ER')
 
-    log('STEP 4', 'Scheduling crank on ER...')
-    const erConn = new Connection(erRpcUrl, 'confirmed')
-    const erProv = new AnchorProvider(erConn, wallet, { commitment: 'confirmed' })
-    const erIdl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'idl', 'heres_program.json'), 'utf-8'))
-    erIdl.address = PROGRAM_ID.toBase58()
-    const erProg = new Program(erIdl as any, erProv)
-    const [permissionPDA] = getPermissionPDA(capsulePDA)
-
+    // Schedule crank with raw instruction (deployed binary has 7 accounts)
     try {
-      const ix = await erProg.methods
-        .scheduleExecuteIntent({ taskId: new BN(Date.now()), executionIntervalMillis: new BN(10000), iterations: new BN(100) })
-        .accounts({ magicProgram: MAGIC_PROGRAM_ID, payer: owner, capsule: capsulePDA, vault: vaultPDA, permissionProgram: PERMISSION_PROGRAM_ID, permission: permissionPDA })
-        .instruction()
+      const discriminator = Buffer.from([88, 30, 30, 42, 9, 75, 31, 189]) // schedule_execute_intent
+      const argsBuf = Buffer.alloc(24)
+      argsBuf.writeBigUInt64LE(BigInt(Date.now()), 0)
+      argsBuf.writeBigUInt64LE(BigInt(5000), 8)  // 5s interval
+      argsBuf.writeBigUInt64LE(BigInt(100), 16)   // 100 iterations
+      const ix = new TransactionInstruction({
+        keys: [
+          { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: owner, isSigner: true, isWritable: true },
+          { pubkey: capsulePDA, isSigner: false, isWritable: true },
+          { pubkey: vaultPDA, isSigner: false, isWritable: true },
+          { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: permissionPDA, isSigner: false, isWritable: false },
+          { pubkey: MAGIC_CONTEXT, isSigner: false, isWritable: true },
+        ],
+        programId: PROGRAM_ID,
+        data: Buffer.concat([discriminator, argsBuf]),
+      })
       const { blockhash, lastValidBlockHeight } = await erConn.getLatestBlockhash('confirmed')
       const tx = new Transaction({ feePayer: owner, blockhash, lastValidBlockHeight })
       tx.add(ix)
-      tx.sign(keypair)
+      tx.sign(ownerKp)
       const txSig = await erConn.sendRawTransaction(tx.serialize(), { skipPreflight: true })
       await erConn.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
       log('STEP 4', `Crank scheduled! TX: ${txSig}`)
+      assert(true, 'Crank scheduled')
     } catch (e: any) {
-      log('STEP 4', `Crank scheduling failed: ${e.message?.slice(0, 120)}`)
+      log('STEP 4', `Schedule failed: ${e.message?.slice(0, 200)}`)
+      assert(false, 'Crank scheduled')
     }
 
-    // Wait for crank or manual execute
-    const maxWait = INACTIVITY_SECONDS + 60
-    log('STEP 5', `Waiting up to ${maxWait}s for crank...`)
+    // Wait for crank execution
+    console.log('\n--- Step 5: Wait for execution on ER ---')
+    const maxWait = INACTIVITY_SECONDS + 30
     let executed = false
-    for (let elapsed = 0; elapsed < maxWait; elapsed += 10) {
-      await sleep(10000)
+    for (let elapsed = 0; elapsed < maxWait; elapsed += 5) {
+      await sleep(5000)
       try {
+        const coder = new BorshAccountsCoder(idl)
         const erAccount = await erConn.getAccountInfo(capsulePDA)
-        if (erAccount && erAccount.data.length > 60) {
-          const off = 8 + 32 + 8 + 8
-          const iLen = erAccount.data[off] | (erAccount.data[off+1] << 8) | (erAccount.data[off+2] << 16) | (erAccount.data[off+3] << 24)
-          if (erAccount.data[off + 4 + iLen] !== 1) {
-            log('STEP 5', `Crank executed on ER after ${elapsed + 10}s!`)
+        if (erAccount) {
+          const data = coder.decode('IntentCapsule', erAccount.data)
+          if (data.is_active === false && data.executed_at) {
+            log('STEP 5', `Executed on ER after ${elapsed + 5}s!`)
             executed = true
             break
           }
         }
       } catch {}
-      log('STEP 5', `${elapsed + 10}s elapsed...`)
+      log('STEP 5', `${elapsed + 5}s / ${maxWait}s...`)
     }
 
     if (!executed) {
-      log('STEP 5', 'Fallback: manual execute on ER...')
+      log('STEP 5', 'Auto-crank did not fire. Manual execute fallback...')
       try {
-        const ix = await erProg.methods.executeIntent()
-          .accounts({ capsule: capsulePDA, vault: vaultPDA, permissionProgram: PERMISSION_PROGRAM_ID, permission: permissionPDA }).instruction()
+        const executeTx = await program.methods.executeIntent()
+          .accounts({ capsule: capsulePDA, vault: vaultPDA, permissionProgram: PERMISSION_PROGRAM_ID, permission: permissionPDA })
+          .instruction()
         const { blockhash, lastValidBlockHeight } = await erConn.getLatestBlockhash('confirmed')
         const tx = new Transaction({ feePayer: owner, blockhash, lastValidBlockHeight })
-        tx.add(ix)
-        tx.sign(keypair)
+        tx.add(executeTx)
+        tx.sign(ownerKp)
         const txSig = await erConn.sendRawTransaction(tx.serialize(), { skipPreflight: true })
         await erConn.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
         log('STEP 5', `Manual execute TX: ${txSig}`)
-      } catch (e: any) { log('STEP 5', `Execute failed: ${e.message?.slice(0, 150)}`) }
+        executed = true
+      } catch (e: any) {
+        log('STEP 5', `Manual execute failed: ${e.message?.slice(0, 200)}`)
+      }
     }
+    assert(executed, 'Capsule executed on ER')
 
-    // Undelegate
-    log('STEP 5b', 'Undelegating on ER...')
+    // Commit & Undelegate
+    console.log('\n--- Step 5b: Commit & Undelegate from ER ---')
     try {
-      const [bufPDA] = getBufferPDA(capsulePDA, MAGIC_PROGRAM_ID)
-      const ix = await erProg.methods.undelegateCapsule()
-        .accounts({ payer: owner, owner, capsule: capsulePDA, vault: vaultPDA, buffer: bufPDA, magicContext: MAGIC_CONTEXT, magicProgram: MAGIC_PROGRAM_ID, systemProgram: SystemProgram.programId })
-        .instruction()
+      // CommitAndUndelegatePermission for capsule (disc=5 as borsh u64 LE)
+      const discBuf = Buffer.alloc(8)
+      discBuf.writeBigUInt64LE(BigInt(5), 0)
+      const capsulePermIx = new TransactionInstruction({
+        programId: PERMISSION_PROGRAM_ID,
+        keys: [
+          { pubkey: owner, isSigner: true, isWritable: true },
+          { pubkey: capsulePDA, isSigner: false, isWritable: true },
+          { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: permissionPDA, isSigner: false, isWritable: false },
+          { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: MAGIC_CONTEXT, isSigner: false, isWritable: true },
+        ],
+        data: discBuf,
+      })
+
+      // ScheduleBaseIntent(CommitAndUndelegate) for vault — no permission PDA needed
+      // Bincode: variant 6 (ScheduleBaseIntent) + variant 2 (CommitAndUndelegate) +
+      //   CommitTypeArgs::Standalone([indices]) + UndelegateTypeArgs::Standalone
+      const scheduleData = Buffer.from([
+        6, 0, 0, 0,  // ScheduleBaseIntent
+        2, 0, 0, 0,  // CommitAndUndelegate
+        0, 0, 0, 0,  // CommitTypeArgs::Standalone
+        1, 0, 0, 0, 0, // vec![0] (1 element, value 0)
+        0, 0, 0, 0,  // UndelegateTypeArgs::Standalone
+      ])
+      const vaultUndelegateIx = new TransactionInstruction({
+        programId: MAGIC_PROGRAM_ID,
+        keys: [
+          { pubkey: owner, isSigner: true, isWritable: true },
+          { pubkey: vaultPDA, isSigner: false, isWritable: true },
+          { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: MAGIC_CONTEXT, isSigner: false, isWritable: true },
+        ],
+        data: scheduleData,
+      })
+
       const { blockhash, lastValidBlockHeight } = await erConn.getLatestBlockhash('confirmed')
       const tx = new Transaction({ feePayer: owner, blockhash, lastValidBlockHeight })
-      tx.add(ix)
-      tx.sign(keypair)
+      tx.add(capsulePermIx, vaultUndelegateIx)
+      tx.sign(ownerKp)
       const txSig = await erConn.sendRawTransaction(tx.serialize(), { skipPreflight: true })
       await erConn.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
-      log('STEP 5b', `Undelegate TX: ${txSig}`)
-    } catch (e: any) { log('STEP 5b', `Undelegate failed: ${e.message?.slice(0, 150)}`) }
+      log('STEP 5b', `Commit+Undelegate TX: ${txSig}`)
+      assert(true, 'Commit & undelegate sent')
+    } catch (e: any) {
+      log('STEP 5b', `Commit+Undelegate failed: ${e.message?.slice(0, 200)}`)
+      assert(false, 'Commit & undelegate sent')
+    }
 
+    // Wait for undelegation propagation
     log('STEP 5b', 'Waiting for base layer propagation...')
-    for (let i = 0; i < 30; i++) {
+    let backOnBase = false
+    for (let i = 0; i < 60; i++) { // up to 5 min for propagation
       await sleep(5000)
       const acct = await connection.getAccountInfo(capsulePDA)
-      if (acct && acct.owner.equals(PROGRAM_ID)) { log('STEP 5b', `Back on base layer after ${(i+1)*5}s`); break }
-      if (i % 3 === 2) log('STEP 5b', `${(i+1)*5}s elapsed... still delegated`)
+      if (acct && acct.owner.equals(PROGRAM_ID)) {
+        log('STEP 5b', `Back on base layer after ${(i + 1) * 5}s`)
+        backOnBase = true
+        break
+      }
+      if (i % 3 === 2) log('STEP 5b', `${(i + 1) * 5}s elapsed...`)
+    }
+    assert(backOnBase, 'Capsule back on base layer')
+    if (!backOnBase) {
+      log('STEP 5b', 'Capsule still delegated — cannot distribute. Stopping.')
+      return printSummary()
     }
   }
 
-  // ═══ Step 6: Distribute Assets ════════════════════════════════
-  log('STEP 6', 'Distributing assets...')
+  // Verify executed state on base layer
+  console.log('\n--- Step 6: Verify executed state ---')
+  try {
+    const coder = new BorshAccountsCoder(idl)
+    const capsuleInfo = await connection.getAccountInfo(capsulePDA)
+    if (capsuleInfo) {
+      const data = coder.decode('IntentCapsule', capsuleInfo.data)
+      assert(data.is_active === false, 'is_active = false')
+      assert(data.executed_at !== null && data.executed_at !== undefined, 'executed_at is set')
+      log('STEP 6', `executed_at: ${data.executed_at?.toString()}`)
+    } else {
+      assert(false, 'Capsule exists on base layer')
+    }
+  } catch (e: any) {
+    log('STEP 6', `Decode failed: ${e.message?.slice(0, 100)}`)
+    assert(false, 'Capsule state decode')
+  }
+
+  // ═══ Step 7: Distribute Assets ════════════════════════════════
+  console.log('\n--- Step 7: Distribute Assets ---')
+  const beneficiaryBalanceBefore = await connection.getBalance(beneficiary)
   try {
     const distributeTx = await program.methods.distributeAssets()
       .accounts({
-        capsule: capsulePDA, vault: vaultPDA, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID,
-        feeConfig: feeConfigPDA, platformFeeRecipient, mint: null, vaultTokenAccount: null,
+        capsule: capsulePDA, vault: vaultPDA, systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID, feeConfig: feeConfigPDA, platformFeeRecipient,
+        mint: null, vaultTokenAccount: null,
       })
       .remainingAccounts([{ pubkey: beneficiary, isSigner: false, isWritable: true }])
       .rpc()
-    log('STEP 6', `Distributed! TX: ${distributeTx}`)
+    log('STEP 7', `Distributed! TX: ${distributeTx}`)
+    assert(true, 'Distribute assets')
   } catch (e: any) {
-    log('STEP 6', `Distribute failed: ${e.message?.slice(0, 120)}`)
+    log('STEP 7', `Distribute failed: ${e.message?.slice(0, 200)}`)
+    if (e.logs) e.logs.slice(-5).forEach((l: string) => console.log('  ', l))
+    assert(false, 'Distribute assets')
   }
   await sleep(2000)
+  const beneficiaryBalanceAfter = await connection.getBalance(beneficiary)
+  const received = beneficiaryBalanceAfter - beneficiaryBalanceBefore
+  log('STEP 7', `Beneficiary received: ${(received / LAMPORTS_PER_SOL).toFixed(9)} SOL`)
+  assert(received > 0, 'Beneficiary received SOL')
 
-  // ═══ Step 7: CRE Dispatch ═════════════════════════════════════
-  log('STEP 7', 'Triggering CRE delivery...')
+  // ═══ Step 8: CRE Dispatch ═════════════════════════════════════
+  console.log('\n--- Step 8: CRE Dispatch ---')
   const dispatchSecret = process.env.CRE_DISPATCH_SECRET || process.env.CRON_SECRET || ''
-  const cronRes = await fetch(`${APP_BASE_URL}/api/cre/dispatch`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dispatchSecret}` },
-    body: JSON.stringify({ capsuleAddress: capsulePDA.toBase58() }),
-  })
-  const cronJson = await cronRes.json() as any
-  log('STEP 7', `CRE dispatch [${cronRes.status}]: ${JSON.stringify(cronJson)}`)
-
-  // ═══ Step 8: Check CRE Status ═════════════════════════════════
-  log('STEP 8', 'Checking CRE delivery status...')
-  const ts8 = Date.now()
-  const statusSig = signMessageWithKeypair(keypair, buildCreSignedMessage({
-    action: 'delivery-status', owner: owner.toBase58(), timestamp: ts8, capsuleAddress: capsulePDA.toBase58(),
-  }))
-  const statusRes = await fetch(`${APP_BASE_URL}/api/intent-delivery/status?${new URLSearchParams({
-    capsule: capsulePDA.toBase58(), owner: owner.toBase58(), timestamp: String(ts8),
-  })}`, { headers: { 'x-cre-signature': statusSig } })
-  if (statusRes.ok) {
-    log('STEP 8', `Status: ${JSON.stringify(await statusRes.json())}`)
+  if (!dispatchSecret) {
+    skip('CRE dispatch (no CRE_DISPATCH_SECRET/CRON_SECRET)')
   } else {
-    log('STEP 8', `Status check [${statusRes.status}]: ${await statusRes.text()}`)
+    const cronRes = await fetch(`${APP_BASE_URL}/api/cre/dispatch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dispatchSecret}` },
+      body: JSON.stringify({ capsuleAddress: capsulePDA.toBase58() }),
+    })
+    const cronJson = await cronRes.json() as any
+    log('STEP 8', `CRE dispatch [${cronRes.status}]: ${JSON.stringify(cronJson)}`)
+    assert(cronRes.status === 200, 'CRE dispatch OK')
   }
 
-  // ─── Done ──────────────────────────────────────────────────────
-  const finalBalance = await connection.getBalance(owner)
-  const beneficiaryBalance = await connection.getBalance(beneficiary)
-  log('DONE', `Owner final balance: ${(finalBalance / 1e9).toFixed(4)} SOL`)
-  log('DONE', `Beneficiary balance: ${(beneficiaryBalance / 1e9).toFixed(9)} SOL`)
-  log('DONE', beneficiaryBalance > 0 ? 'Beneficiary received SOL! Demo ready.' : 'Beneficiary did not receive SOL.')
-  log('DONE', 'Full E2E test complete!')
+  // ═══ Step 9: CRE Status Check ═════════════════════════════════
+  console.log('\n--- Step 9: CRE Status ---')
+  const ts9 = Date.now()
+  const statusSig = signMessageWithKeypair(ownerKp, buildCreSignedMessage({
+    action: 'delivery-status', owner: owner.toBase58(), timestamp: ts9, capsuleAddress: capsulePDA.toBase58(),
+  }))
+  const statusRes = await fetch(`${APP_BASE_URL}/api/intent-delivery/status?${new URLSearchParams({
+    capsule: capsulePDA.toBase58(), owner: owner.toBase58(), timestamp: String(ts9),
+  })}`, { headers: { 'x-cre-signature': statusSig } })
+  if (statusRes.ok) {
+    const statusJson = await statusRes.json() as any
+    log('STEP 9', `Status: ${JSON.stringify(statusJson)}`)
+    assert(true, 'CRE status check')
+  } else {
+    log('STEP 9', `Status [${statusRes.status}]: ${await statusRes.text()}`)
+    assert(false, 'CRE status check')
+  }
+
+  printSummary()
+}
+
+function printSummary() {
+  console.log('\n========================================')
+  console.log(`E2E Results: ${passed} passed, ${failed} failed, ${skipped} skipped`)
+  console.log('========================================')
+  process.exit(failed > 0 ? 1 : 0)
 }
 
 main().catch((err) => {
   console.error('\nTest failed:', err.message)
+  if (err.stack) console.error(err.stack.split('\n').slice(1, 4).join('\n'))
   process.exit(1)
 })

@@ -14,6 +14,8 @@ const idl = JSON.parse(readFileSync('./idl/HeresProgram.json', 'utf-8'));
 const PROGRAM_ID = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW');
 const DELEGATION_PROGRAM_ID = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
 const MAGIC_PROGRAM_ID = new PublicKey('Magic11111111111111111111111111111111111111');
+// #[delegate] macro derives buffer PDAs using the program's own ID at runtime
+const BUFFER_SEED_PROGRAM_ID = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW');
 const MAGIC_CONTEXT_ID = new PublicKey('MagicContext1111111111111111111111111111111');
 const PERMISSION_PROGRAM_ID = new PublicKey('ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1');
 const ACTIVE_VALIDATOR = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57');
@@ -44,10 +46,10 @@ const [feeConfigPDA] = PublicKey.findProgramAddressSync([Buffer.from('fee_config
 const [permissionPDA] = PublicKey.findProgramAddressSync([Buffer.from('permission'), capsulePDA.toBuffer()], PERMISSION_PROGRAM_ID);
 
 // Delegation PDAs
-const [bufferPDA] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), capsulePDA.toBuffer()], MAGIC_PROGRAM_ID);
+const [bufferPDA] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), capsulePDA.toBuffer()], BUFFER_SEED_PROGRAM_ID);
 const [delegationRecordPDA] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), capsulePDA.toBuffer()], DELEGATION_PROGRAM_ID);
 const [delegationMetadataPDA] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), capsulePDA.toBuffer()], DELEGATION_PROGRAM_ID);
-const [vaultBufferPDA] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), vaultPDA.toBuffer()], MAGIC_PROGRAM_ID);
+const [vaultBufferPDA] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), vaultPDA.toBuffer()], BUFFER_SEED_PROGRAM_ID);
 const [vaultDelegationRecordPDA] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), vaultPDA.toBuffer()], DELEGATION_PROGRAM_ID);
 const [vaultDelegationMetadataPDA] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), vaultPDA.toBuffer()], DELEGATION_PROGRAM_ID);
 
@@ -74,6 +76,7 @@ assert(true, 'Owner funded');
 // ========= Step 2: Create capsule =========
 console.log('\nStep 2: Create capsule');
 const ownerProv = new AnchorProvider(conn, new W(ownerKp), { commitment: 'confirmed' });
+idl.address = PROGRAM_ID.toBase58();
 const ownerProg = new Program(idl, ownerProv);
 const intent = JSON.stringify({
   intent: 'er-crank-test',

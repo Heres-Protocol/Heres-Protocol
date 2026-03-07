@@ -315,23 +315,25 @@ export async function executeIntent(
 
   if (isDelegated) {
     console.log('[executeIntent] Capsule is delegated, routing through ER RPC')
-    const erProgram = getErProgram(wallet)
-    if (!erProgram) throw new Error('Failed to initialize ER program')
+    // Use raw instruction with 4 required accounts (deployed binary accepts 4-7 accounts;
+    // optional accounts default to None when not provided)
+    const programId = getProgramId()
+    const discriminator = Buffer.from([53, 130, 47, 154, 227, 220, 122, 212]) // execute_intent
+    const keys = [
+      { pubkey: capsulePDA, isSigner: false, isWritable: true },
+      { pubkey: vaultPDA, isSigner: false, isWritable: true },
+      { pubkey: permissionProgramId, isSigner: false, isWritable: false },
+      { pubkey: permissionPDA, isSigner: false, isWritable: false },
+    ]
+    const ix = new TransactionInstruction({ keys, programId, data: discriminator })
 
-    const ix = await erProgram.methods
-      .executeIntent()
-      .accounts(accounts)
-      .remainingAccounts(remainingAccounts)
-      .instruction()
-
-    const { Transaction } = await import('@solana/web3.js')
-    const erConnection = (erProgram.provider as AnchorProvider).connection
+    const erConnection = new Connection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
     const { blockhash, lastValidBlockHeight } = await erConnection.getLatestBlockhash('confirmed')
 
     const tx = new Transaction({ feePayer: wallet.publicKey, blockhash, lastValidBlockHeight })
     tx.add(ix)
 
-    const signedTx = await wallet.signTransaction(tx)
+    const signedTx = await wallet.signTransaction!(tx)
     const txSignature = await erConnection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
     await erConnection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed')
 
@@ -340,14 +342,14 @@ export async function executeIntent(
 
   // Not delegated — send to base layer using manual instruction
   // Deployed program's execute_intent only needs 4 accounts (IDL shows 10 but binary differs)
-  const { Transaction, TransactionInstruction } = await import('@solana/web3.js')
+
   const programId = getProgramId()
   const discriminator = Buffer.from([53, 130, 47, 154, 227, 220, 122, 212]) // execute_intent
   const keys = [
     { pubkey: capsulePDA, isSigner: false, isWritable: true },
     { pubkey: vaultPDA, isSigner: false, isWritable: true },
     { pubkey: permissionProgramId, isSigner: false, isWritable: false },
-    { pubkey: permissionPDA, isSigner: false, isWritable: true },
+    { pubkey: permissionPDA, isSigner: false, isWritable: false },
   ]
   const ix = new TransactionInstruction({ keys, programId, data: discriminator })
   const connection = getSolanaConnection()
@@ -398,13 +400,14 @@ export async function delegateCapsule(
 
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
 
-  // Derive PDAs for Capsule delegation (Correct Owners: magicProgramId for buffer, delegationProgramId for others)
-  const [bufferPDA] = getBufferPDA(capsulePDA, magicProgramId)
+  // Buffer PDAs use BUFFER_SEED_PROGRAM_ID (deployed program baked its own ID into #[delegate] macro)
+  const bufferSeedProgramId = new PublicKey(MAGICBLOCK_ER.BUFFER_SEED_PROGRAM_ID)
+  const [bufferPDA] = getBufferPDA(capsulePDA, bufferSeedProgramId)
   const [delegationRecordPDA] = getDelegationRecordPDA(capsulePDA, delegationProgramId)
   const [delegationMetadataPDA] = getDelegationMetadataPDA(capsulePDA, delegationProgramId)
 
   // Derive PDAs for Vault delegation
-  const [vaultBufferPDA] = getBufferPDA(vaultPDA, magicProgramId)
+  const [vaultBufferPDA] = getBufferPDA(vaultPDA, bufferSeedProgramId)
   const [vaultDelegationRecordPDA] = getDelegationRecordPDA(vaultPDA, delegationProgramId)
   const [vaultDelegationMetadataPDA] = getDelegationMetadataPDA(vaultPDA, delegationProgramId)
 
@@ -616,33 +619,14 @@ export async function distributeAssets(
   const isDelegated = accountInfo && accountInfo.owner.equals(delegationProgramId)
 
   if (isDelegated) {
-    console.log('[distributeAssets] Capsule is delegated, routing through ER RPC')
-    const erProgram = getErProgram(wallet)
-    if (!erProgram) throw new Error('Failed to initialize ER program')
-
-    const ix = await erProgram.methods
-      .distributeAssets()
-      .accounts(accounts)
-      .remainingAccounts(remainingAccounts)
-      .instruction()
-
-    const { Transaction } = await import('@solana/web3.js')
-    const erConnection = (erProgram.provider as AnchorProvider).connection
-    const { blockhash, lastValidBlockHeight } = await erConnection.getLatestBlockhash('confirmed')
-
-    const tx = new Transaction({ feePayer: wallet.publicKey, blockhash, lastValidBlockHeight })
-    tx.add(ix)
-
-    const signedTx = await wallet.signTransaction(tx)
-    const txSignature = await erConnection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
-    await erConnection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed')
-
-    return txSignature
+    // distribute_assets transfers SOL via invoke_signed, which cannot run on ER.
+    // The capsule must be undelegated back to base layer first.
+    throw new Error('Capsule is still delegated to ER. Please undelegate first before distributing assets.')
   }
 
   // Not delegated — send to base layer using manual instruction
   // distribute_assets is in the deployed binary but NOT in the IDL
-  const { Transaction, TransactionInstruction } = await import('@solana/web3.js')
+
   const programId = getProgramId()
   const isSpl = mint && !mint.equals(PublicKey.default)
 
@@ -1095,47 +1079,76 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
 
 /**
  * Undelegate capsule and vault from Ephemeral Rollup back to Solana base layer.
- * Commits state from ER and undelegates both capsule and vault PDAs.
+ * Uses the MagicBlock Permission Program's CommitAndUndelegatePermission instruction
+ * (discriminator = 5 as borsh u64 LE) which commits ER state and undelegates the account.
  */
 export async function undelegateCapsule(
   wallet: WalletContextState
 ): Promise<string> {
-  const program = getProgram(wallet)
-  if (!program) throw new Error('Wallet not connected')
-  if (!wallet.publicKey) throw new Error('Wallet not connected')
+  if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey)
   const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
 
   const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
-  const magicContext = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
-
-  // Buffer PDA for capsule (needed for commit)
-  const [bufferPDA] = getBufferPDA(capsulePDA, magicProgramId)
-
-  const accounts = {
-    payer: wallet.publicKey,
-    owner: wallet.publicKey,
-    capsule: capsulePDA,
-    vault: vaultPDA,
-    buffer: bufferPDA,
-    magicContext: magicContext,
-    magicProgram: magicProgramId,
-    systemProgram: SystemProgram.programId,
-  }
+  const magicContextId = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
+  const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
+  const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
 
   console.log('[undelegateCapsule] Committing and undelegating from ER...')
   console.log(' - Capsule:', capsulePDA.toBase58())
   console.log(' - Vault:', vaultPDA.toBase58())
 
-  const tx = await program.methods
-    .undelegateCapsule()
-    // @ts-ignore
-    .accounts(accounts)
-    .rpc()
+  // CommitAndUndelegatePermission: borsh u64 discriminator = 5
+  const discBuf = Buffer.alloc(8)
+  discBuf.writeBigUInt64LE(BigInt(5), 0)
 
-  console.log('[undelegateCapsule] Success. Tx:', tx)
-  return tx
+  // Undelegate capsule via Permission Program
+  const ixCapsule = new TransactionInstruction({
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },  // authority
+      { pubkey: capsulePDA, isSigner: false, isWritable: true },         // permissioned_account
+      { pubkey: permissionPDA, isSigner: false, isWritable: false },     // permission
+      { pubkey: magicProgramId, isSigner: false, isWritable: false },    // magic_program
+      { pubkey: magicContextId, isSigner: false, isWritable: true },     // magic_context
+    ],
+    programId: permissionProgramId,
+    data: discBuf,
+  })
+
+  // Undelegate vault via ScheduleBaseIntent(CommitAndUndelegate) — vault has no permission PDA
+  // Variant 6 = ScheduleBaseIntent, Variant 2 = CommitAndUndelegate
+  // CommitTypeArgs::Standalone([0]) + UndelegateTypeArgs::Standalone
+  const scheduleData = Buffer.from([
+    6, 0, 0, 0,  // ScheduleBaseIntent (u32 LE)
+    2, 0, 0, 0,  // CommitAndUndelegate (u32 LE)
+    0,            // CommitTypeArgs::Standalone variant
+    1, 0, 0, 0,  // vec length = 1
+    0,            // account index 0
+    0,            // UndelegateTypeArgs::Standalone variant
+  ])
+  const ixVault = new TransactionInstruction({
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: vaultPDA, isSigner: false, isWritable: true },
+      { pubkey: magicContextId, isSigner: false, isWritable: true },
+    ],
+    programId: magicProgramId,
+    data: scheduleData,
+  })
+
+  const erConnection = new Connection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
+  const { blockhash, lastValidBlockHeight } = await erConnection.getLatestBlockhash('confirmed')
+  const tx = new Transaction({ feePayer: wallet.publicKey, blockhash, lastValidBlockHeight })
+  tx.add(ixCapsule)
+  tx.add(ixVault)
+
+  const signedTx = await wallet.signTransaction(tx)
+  const txSig = await erConnection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
+  await erConnection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
+
+  console.log('[undelegateCapsule] Success. Tx:', txSig)
+  return txSig
 }
 
 /**
@@ -1151,8 +1164,8 @@ export async function processUndelegation(
   if (!program) throw new Error('Wallet not connected')
   if (!wallet.publicKey) throw new Error('Wallet not connected')
 
-  const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
-  const [bufferPDA] = getBufferPDA(baseAccount, magicProgramId)
+  const bufferSeedProgramId = new PublicKey(MAGICBLOCK_ER.BUFFER_SEED_PROGRAM_ID)
+  const [bufferPDA] = getBufferPDA(baseAccount, bufferSeedProgramId)
 
   const accounts = {
     baseAccount: baseAccount,

@@ -1,5 +1,5 @@
 {
-  "address": "HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU",
+  "address": "AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW",
   "metadata": {
     "name": "heres_program",
     "version": "0.1.0",
@@ -298,38 +298,38 @@
             "program": {
               "kind": "const",
               "value": [
-                245,
-                178,
-                198,
-                254,
-                114,
-                181,
-                154,
-                33,
-                77,
-                112,
-                207,
-                86,
-                201,
-                111,
-                161,
-                25,
-                64,
-                94,
-                201,
-                99,
-                231,
-                188,
-                237,
-                222,
-                171,
-                237,
+                145,
                 45,
-                172,
-                80,
-                143,
-                200,
-                147
+                120,
+                49,
+                246,
+                167,
+                185,
+                74,
+                17,
+                186,
+                254,
+                150,
+                181,
+                89,
+                127,
+                31,
+                72,
+                250,
+                35,
+                140,
+                40,
+                240,
+                8,
+                234,
+                152,
+                190,
+                47,
+                230,
+                209,
+                207,
+                131,
+                209
               ]
             }
           }
@@ -460,38 +460,38 @@
             "program": {
               "kind": "const",
               "value": [
-                245,
-                178,
-                198,
-                254,
-                114,
-                181,
-                154,
-                33,
-                77,
-                112,
-                207,
-                86,
-                201,
-                111,
-                161,
-                25,
-                64,
-                94,
-                201,
-                99,
-                231,
-                188,
-                237,
-                222,
-                171,
-                237,
+                145,
                 45,
-                172,
-                80,
-                143,
-                200,
-                147
+                120,
+                49,
+                246,
+                167,
+                185,
+                74,
+                17,
+                186,
+                254,
+                150,
+                181,
+                89,
+                127,
+                31,
+                72,
+                250,
+                35,
+                140,
+                40,
+                240,
+                8,
+                234,
+                152,
+                190,
+                47,
+                230,
+                209,
+                207,
+                131,
+                209
               ]
             }
           }
@@ -609,7 +609,7 @@
         },
         {
           "name": "owner_program",
-          "address": "HY6zrf4JhRMVUJMpPFxjSsQwiiPxryJYP3JqHWW8VBqU"
+          "address": "AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW"
         }
       ],
       "args": []
@@ -794,6 +794,7 @@
         },
         {
           "name": "vault",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -1215,7 +1216,8 @@
           "writable": true
         },
         {
-          "name": "vault"
+          "name": "vault",
+          "writable": true
         },
         {
           "name": "permission_program",
@@ -1296,6 +1298,120 @@
               "name": "ScheduleExecuteIntentArgs"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "send_ccip_from_vault",
+      "docs": [
+        "Send a queued EVM beneficiary transfer through CCIP Router from vault PDA custody.",
+        "The message fields (receiver/amount/selector) are derived from intent_data on-chain.",
+        "Caller only provides the router account list in remaining_accounts."
+      ],
+      "discriminator": [
+        40,
+        216,
+        105,
+        132,
+        83,
+        51,
+        109,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  116,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.owner",
+                "account": "IntentCapsule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.owner",
+                "account": "IntentCapsule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ccip_router"
+        }
+      ],
+      "args": [
+        {
+          "name": "beneficiary_index",
+          "type": "u16"
         }
       ]
     },
@@ -1511,6 +1627,32 @@
   ],
   "events": [
     {
+      "name": "CcipTransferRequested",
+      "discriminator": [
+        160,
+        160,
+        225,
+        230,
+        173,
+        3,
+        59,
+        129
+      ]
+    },
+    {
+      "name": "CcipTransferSent",
+      "discriminator": [
+        217,
+        0,
+        139,
+        144,
+        143,
+        62,
+        107,
+        206
+      ]
+    },
+    {
       "name": "IntentExecuted",
       "discriminator": [
         179,
@@ -1579,6 +1721,21 @@
       "code": 6010,
       "name": "InvalidTokenAccount",
       "msg": "Invalid token account provided"
+    },
+    {
+      "code": 6011,
+      "name": "UnsupportedBeneficiaryChain",
+      "msg": "Unsupported beneficiary chain"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidCcipAccounts",
+      "msg": "Invalid CCIP account set provided"
+    },
+    {
+      "code": 6013,
+      "name": "CcipAlreadySent",
+      "msg": "CCIP transfer already sent for this beneficiary"
     }
   ],
   "types": [
@@ -1593,6 +1750,62 @@
           {
             "name": "dummy",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipTransferRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "capsule",
+            "type": "pubkey"
+          },
+          {
+            "name": "beneficiary_index",
+            "type": "u16"
+          },
+          {
+            "name": "evm_address",
+            "type": "string"
+          },
+          {
+            "name": "destination_chain_selector",
+            "type": "string"
+          },
+          {
+            "name": "amount_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipTransferSent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "capsule",
+            "type": "pubkey"
+          },
+          {
+            "name": "beneficiary_index",
+            "type": "u16"
+          },
+          {
+            "name": "evm_address",
+            "type": "string"
+          },
+          {
+            "name": "destination_chain_selector",
+            "type": "string"
+          },
+          {
+            "name": "amount_lamports",
+            "type": "u64"
           }
         ]
       }
@@ -1667,6 +1880,10 @@
           {
             "name": "retry_count",
             "type": "u64"
+          },
+          {
+            "name": "ccip_sent_bitmap",
+            "type": "u16"
           }
         ]
       }

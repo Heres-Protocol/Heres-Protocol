@@ -307,7 +307,13 @@ export function applyCreDeliveryCallback(input: CallbackInput): CreDeliveryLedge
 
 export function verifyCreCallbackSignature(rawBody: string, signature: string | null): boolean {
   const secret = getRequiredEnv('CHAINLINK_CRE_CALLBACK_SECRET')
-  if (!secret) return true
+  if (!secret) {
+    // In production, reject if callback secret is not configured
+    if (process.env.NODE_ENV === 'production') return false
+    // In development, allow unsigned callbacks with a warning
+    console.warn('[CRE] CHAINLINK_CRE_CALLBACK_SECRET not set — skipping signature verification (dev only)')
+    return true
+  }
   if (!signature) return false
 
   const expected = createHmac('sha256', secret).update(rawBody).digest('hex')

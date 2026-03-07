@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
   }
 
   const auth = request.headers.get('authorization')
-  if (auth !== `Bearer ${secret}`) {
+  const expected = `Bearer ${secret}`
+  if (!auth || auth.length !== expected.length || !require('crypto').timingSafeEqual(Buffer.from(auth), Buffer.from(expected))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

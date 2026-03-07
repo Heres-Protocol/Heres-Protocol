@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.32.1",
+    "@coral-xyz/borsh": "^0.32.1",
     "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5",
+    "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.23",
     "@solana/wallet-adapter-react": "^0.15.35",
     "@solana/wallet-adapter-react-ui": "^0.9.35",
@@ -24,6 +26,7 @@
     "bs58": "^5.0.0",
     "clsx": "^2.1.0",
     "gsap": "^3.14.2",
+    "loglevel": "^1.9.2",
     "lucide-react": "^0.303.0",
     "micromatch": "^4.0.8",
     "next": "14.0.4",

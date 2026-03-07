@@ -12,6 +12,7 @@ import idl from '../idl/HeresProgram.json'
 import { getSolanaConnection, getProgramId } from '@/config/solana'
 import { getCapsulePDA, getCapsuleVaultPDA, getFeeConfigPDA } from './program'
 import { SOLANA_CONFIG, MAGICBLOCK_ER } from '@/constants'
+import { buildCcipAccountsForVaultSend } from '@/lib/ccip'
 
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
@@ -110,11 +111,23 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
 
 function parseBeneficiaries(
   intentData: Buffer | Uint8Array
-): Array<{ chain: 'solana' | 'evm'; address: string; amount: string; amountType: string }> {
+): Array<{
+  chain: 'solana' | 'evm'
+  address: string
+  amount: string
+  amountType: string
+  destinationChainSelector?: string
+}> {
   try {
     const json = new TextDecoder().decode(intentData)
     const data = JSON.parse(json) as {
-      beneficiaries?: Array<{ chain?: 'solana' | 'evm'; address?: string; amount?: string; amountType?: string }>
+      beneficiaries?: Array<{
+        chain?: 'solana' | 'evm'
+        address?: string
+        amount?: string
+        amountType?: string
+        destinationChainSelector?: string
+      }>
     }
     const list = data?.beneficiaries
     if (!Array.isArray(list)) return []
@@ -125,10 +138,37 @@ function parseBeneficiaries(
         address: b.address!,
         amount: typeof b.amount === 'string' ? b.amount : String(b.amount ?? '0'),
         amountType: b.amountType ?? 'fixed',
+        destinationChainSelector: b.destinationChainSelector,
       }))
   } catch {
     return []
   }
+}
+
+function parseTotalAmountLamports(intentData: Buffer | Uint8Array): number {
+  try {
+    const json = new TextDecoder().decode(intentData)
+    const payload = JSON.parse(json) as { totalAmount?: string }
+    const total = Number.parseFloat(payload.totalAmount || '0')
+    if (!Number.isFinite(total) || total <= 0) return 0
+    return Math.floor(total * 1_000_000_000)
+  } catch {
+    return 0
+  }
+}
+
+function computeBeneficiaryAmountLamports(
+  beneficiary: { amount: string; amountType: string },
+  totalAmountLamports: number
+): number {
+  if (beneficiary.amountType === 'percentage') {
+    const pct = Number.parseFloat(beneficiary.amount || '0')
+    if (!Number.isFinite(pct) || pct <= 0) return 0
+    return Math.floor((totalAmountLamports * pct) / 100)
+  }
+  const fixed = Number.parseFloat(beneficiary.amount || '0')
+  if (!Number.isFinite(fixed) || fixed <= 0) return 0
+  return Math.floor(fixed * 1_000_000_000)
 }
 
 export async function executeCapsuleIntent(
@@ -168,7 +208,7 @@ export async function executeCapsuleIntent(
     { pubkey: capsulePDA, isSigner: false, isWritable: true },
     { pubkey: vaultPDA, isSigner: false, isWritable: true },
     { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
-    { pubkey: permissionPDA, isSigner: false, isWritable: true },
+    { pubkey: permissionPDA, isSigner: false, isWritable: false },
   ]
 
   const ix = new TransactionInstruction({ keys, programId, data: discriminator })
@@ -188,6 +228,89 @@ export async function executeCapsuleIntent(
   const txSig = await targetConnection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
   await targetConnection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
   return txSig
+}
+
+/**
+ * Commit state from ER and undelegate capsule + vault back to base layer.
+ * Uses Permission Program CommitAndUndelegatePermission (disc=5) for capsule,
+ * and ScheduleBaseIntent(CommitAndUndelegate) for vault (no permission PDA).
+ */
+export async function commitAndUndelegateFromER(
+  crankKeypair: Keypair,
+  capsule: DecodedCapsule
+): Promise<string> {
+  const erConnection = new Connection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
+  const [capsulePDA] = getCapsulePDA(capsule.account.owner)
+  const [vaultPDA] = getCapsuleVaultPDA(capsule.account.owner)
+  const [permissionPDA] = getPermissionPDA(capsulePDA)
+
+  const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
+  const magicContextId = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
+
+  // CommitAndUndelegatePermission: borsh u64 discriminator = 5
+  const discBuf = Buffer.alloc(8)
+  discBuf.writeBigUInt64LE(BigInt(5), 0)
+
+  const ixCapsule = new TransactionInstruction({
+    keys: [
+      { pubkey: crankKeypair.publicKey, isSigner: true, isWritable: false },
+      { pubkey: capsulePDA, isSigner: false, isWritable: true },
+      { pubkey: permissionPDA, isSigner: false, isWritable: false },
+      { pubkey: magicProgramId, isSigner: false, isWritable: false },
+      { pubkey: magicContextId, isSigner: false, isWritable: true },
+    ],
+    programId: PERMISSION_PROGRAM_ID,
+    data: discBuf,
+  })
+
+  // Vault: ScheduleBaseIntent(CommitAndUndelegate) — no permission PDA
+  const scheduleData = Buffer.from([
+    6, 0, 0, 0,  // ScheduleBaseIntent (u32 LE)
+    2, 0, 0, 0,  // CommitAndUndelegate (u32 LE)
+    0,            // CommitTypeArgs::Standalone
+    1, 0, 0, 0,  // vec len = 1
+    0,            // account index 0
+    0,            // UndelegateTypeArgs::Standalone
+  ])
+  const ixVault = new TransactionInstruction({
+    keys: [
+      { pubkey: crankKeypair.publicKey, isSigner: true, isWritable: true },
+      { pubkey: vaultPDA, isSigner: false, isWritable: true },
+      { pubkey: magicContextId, isSigner: false, isWritable: true },
+    ],
+    programId: magicProgramId,
+    data: scheduleData,
+  })
+
+  const { blockhash, lastValidBlockHeight } = await erConnection.getLatestBlockhash('confirmed')
+  const tx = new Transaction({ feePayer: crankKeypair.publicKey, blockhash, lastValidBlockHeight })
+  tx.add(ixCapsule)
+  tx.add(ixVault)
+  tx.sign(crankKeypair)
+
+  const txSig = await erConnection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
+  await erConnection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
+  console.log(`[crank] Commit+undelegate from ER: ${txSig}`)
+  return txSig
+}
+
+/**
+ * Wait for undelegation to propagate from ER to base layer.
+ * Polls base layer until account owner returns to our program.
+ */
+async function waitForUndelegation(
+  connection: Connection,
+  account: PublicKey,
+  timeoutMs: number = 30000
+): Promise<boolean> {
+  const programId = getProgramId()
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const info = await connection.getAccountInfo(account)
+    if (info && info.owner.equals(programId)) return true
+    await new Promise(r => setTimeout(r, 2000))
+  }
+  return false
 }
 
 /**
@@ -266,27 +389,109 @@ export type CrankResult = {
   eligibleCount: number
   executedCount: number
   distributedCount: number
+  ccipSentCount: number
   errors: string[]
 }
 
 export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
   const connection = getSolanaConnection()
+  const programId = getProgramId()
   const eligible = await getEligibleCapsules(connection, crankKeypair)
   const errors: string[] = []
   let executedCount = 0
   let distributedCount = 0
+  let ccipSentCount = 0
 
   for (const capsule of eligible) {
     try {
+      const [capsulePDA] = getCapsulePDA(capsule.account.owner)
+      const [vaultPDA] = getCapsuleVaultPDA(capsule.account.owner)
       const txSig = await executeCapsuleIntent(connection, crankKeypair, capsule)
       executedCount += 1
       console.log(`[crank] Executed ${capsule.publicKey.toBase58()} (delegated=${capsule.isDelegated}): ${txSig}`)
+
+      // If delegated, commit+undelegate from ER and wait for propagation to base layer
+      if (capsule.isDelegated) {
+        try {
+          const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
+          console.log(`[crank] Commit+undelegate sent: ${undelegTx}`)
+
+          const [capsulePDAForWait] = getCapsulePDA(capsule.account.owner)
+          const returned = await waitForUndelegation(connection, capsulePDAForWait, 30000)
+          if (!returned) {
+            errors.push(`${capsule.publicKey.toBase58()}: undelegation timeout (30s) — will retry on next crank cycle`)
+            continue
+          }
+          console.log(`[crank] Undelegation confirmed on base layer`)
+        } catch (undelegErr) {
+          const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
+          errors.push(`${capsule.publicKey.toBase58()} undelegate: ${msg}`)
+          continue
+        }
+      }
 
       // Distribute assets on base layer (separate instruction for actual SOL/SPL transfers)
       try {
         const distTx = await distributeCapsuleAssets(connection, crankKeypair, capsule)
         distributedCount += 1
         console.log(`[crank] Distributed ${capsule.publicKey.toBase58()}: ${distTx}`)
+
+        const mint = capsule.account.mint
+        const isSpl = mint && !mint.equals(PublicKey.default) && !mint.equals(SystemProgram.programId)
+        const beneficiaries = parseBeneficiaries(capsule.account.intentData)
+        const totalAmountLamports = parseTotalAmountLamports(capsule.account.intentData)
+
+        const ccipSentSet = new Set<number>() // track sent indexes to prevent double-send
+        for (const [beneficiaryIndex, beneficiary] of beneficiaries.entries()) {
+          if (beneficiary.chain !== 'evm') continue
+          if (!isSpl) {
+            errors.push(`${capsule.publicKey.toBase58()} ccip: only SPL token source is supported`)
+            continue
+          }
+          if (ccipSentSet.has(beneficiaryIndex)) continue
+          ccipSentSet.add(beneficiaryIndex)
+
+          const selector = beneficiary.destinationChainSelector || '16015286601757825753'
+          const tokenAmount = computeBeneficiaryAmountLamports(beneficiary, totalAmountLamports)
+          if (tokenAmount <= 0) continue
+
+          try {
+            const ccipAccounts = await buildCcipAccountsForVaultSend({
+              connection,
+              signer: crankKeypair,
+              vaultAuthority: vaultPDA,
+              tokenMint: mint.toBase58(),
+              destinationChainSelector: selector,
+            })
+            const [feeConfigPDA] = getFeeConfigPDA()
+            const discriminator = Buffer.from([40, 216, 105, 132, 83, 51, 109, 225]) // send_ccip_from_vault
+            const arg = Buffer.alloc(2)
+            arg.writeUInt16LE(beneficiaryIndex, 0)
+            const ix = new TransactionInstruction({
+              programId,
+              keys: [
+                { pubkey: capsulePDA, isSigner: false, isWritable: true },
+                { pubkey: vaultPDA, isSigner: false, isWritable: true },
+                { pubkey: feeConfigPDA, isSigner: false, isWritable: false },
+                { pubkey: ccipAccounts.ccipRouter, isSigner: false, isWritable: false },
+                ...ccipAccounts.remainingAccounts,
+              ],
+              data: Buffer.concat([discriminator, arg]),
+            })
+
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
+            const tx = new Transaction({ feePayer: crankKeypair.publicKey, blockhash, lastValidBlockHeight })
+            tx.add(ix)
+            tx.sign(crankKeypair)
+            const ccipTx = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
+            await connection.confirmTransaction({ signature: ccipTx, blockhash, lastValidBlockHeight }, 'confirmed')
+            ccipSentCount += 1
+            console.log(`[crank] CCIP sent(on-chain CPI) ${capsule.publicKey.toBase58()} -> ${beneficiary.address} tx=${ccipTx}`)
+          } catch (ccipErr) {
+            const msg = ccipErr instanceof Error ? ccipErr.message : String(ccipErr)
+            errors.push(`${capsule.publicKey.toBase58()} ccip: ${msg}`)
+          }
+        }
       } catch (distErr) {
         const distMsg = distErr instanceof Error ? distErr.message : String(distErr)
         errors.push(`${capsule.publicKey.toBase58()} distribute: ${distMsg}`)
@@ -302,6 +507,7 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
     eligibleCount: eligible.length,
     executedCount,
     distributedCount,
+    ccipSentCount,
     errors,
   }
 }

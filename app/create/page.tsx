@@ -43,7 +43,7 @@ export default function CreatePage() {
   const [intent, setIntent] = useState('')
   const [capsuleType, setCapsuleType] = useState<CapsuleAssetType>(null)
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([
-    { chain: 'solana', address: '', amount: '', amountType: 'fixed' }
+    { chain: 'solana', address: '', amount: '', amountType: 'fixed', destinationChainSelector: '' }
   ])
   const [totalAmount, setTotalAmount] = useState('')
   const [targetDate, setTargetDate] = useState('')
@@ -167,7 +167,7 @@ export default function CreatePage() {
   }, [connected, publicKey])
 
   const addBeneficiary = () => {
-    setBeneficiaries([...beneficiaries, { chain: 'solana', address: '', amount: '', amountType: 'fixed' }])
+    setBeneficiaries([...beneficiaries, { chain: 'solana', address: '', amount: '', amountType: 'fixed', destinationChainSelector: '' }])
   }
 
   const removeBeneficiary = (index: number) => {
@@ -800,6 +800,15 @@ export default function CreatePage() {
                               placeholder={beneficiary.chain === 'evm' ? '0xEvmAddress...' : 'Solana address...'}
                               className="w-full rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50 font-mono text-sm"
                             />
+                            {beneficiary.chain === 'evm' && (
+                              <input
+                                type="text"
+                                value={beneficiary.destinationChainSelector || ''}
+                                onChange={(e) => updateBeneficiary(index, 'destinationChainSelector', e.target.value.trim())}
+                                placeholder="Destination chain selector (default: Ethereum Sepolia)"
+                                className="w-full mt-2 rounded-xl border border-Heres-border bg-Heres-surface/80 p-3 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50 font-mono text-xs"
+                              />
+                            )}
                           </div>
                           <div className="flex gap-2 items-center flex-shrink-0">
                             <input
