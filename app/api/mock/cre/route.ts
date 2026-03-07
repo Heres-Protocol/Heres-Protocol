@@ -169,31 +169,16 @@ export async function POST(request: NextRequest) {
       headers['x-cre-signature'] = sign(callbackSecret, callbackBody)
     }
 
-    try {
-      const callbackRes = await fetch(`${getBaseUrl(request)}/api/cre/callback`, {
-        method: 'POST',
-        headers,
-        body: callbackBody,
-      })
-      if (!callbackRes.ok) {
-        const callbackErrorBody = await callbackRes.text()
-        return NextResponse.json(
-          {
-            ok: false,
-            error: `Callback failed ${callbackRes.status}: ${callbackErrorBody || callbackRes.statusText}`,
-          },
-          { status: 502 }
-        )
-      }
-    } catch (error) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { status: 500 }
-      )
-    }
+    // Fire-and-forget: avoid self-fetch deadlock in Next.js dev mode
+    // (dispatch -> mock/cre -> callback all on same server)
+    const baseUrl = getBaseUrl(request)
+    fetch(`${baseUrl}/api/cre/callback`, {
+      method: 'POST',
+      headers,
+      body: callbackBody,
+    }).catch((err) => {
+      console.error('[Mock CRE] Callback fire-and-forget error:', err instanceof Error ? err.message : err)
+    })
   }
 
   return NextResponse.json({
