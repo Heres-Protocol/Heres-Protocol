@@ -181,6 +181,7 @@ export default function CapsuleDetailPage() {
       const tx = await executeIntent(wallet as any, capsule.owner, beneficiaries, mint)
       setActionResult({ type: 'success', message: `Execute Intent TX: ${tx}` })
     } catch (err: any) {
+      console.error('[Execute Intent] Error:', err)
       setActionResult({ type: 'error', message: err.message || 'Execute failed' })
     } finally {
       setActionLoading(null)
@@ -203,6 +204,7 @@ export default function CapsuleDetailPage() {
       const tx = await distributeAssets(wallet as any, capsule.owner, beneficiaries, mint)
       setActionResult({ type: 'success', message: `Distribute Assets TX: ${tx}` })
     } catch (err: any) {
+      console.error('[Distribute Assets] Error:', err)
       setActionResult({ type: 'error', message: err.message || 'Distribution failed' })
     } finally {
       setActionLoading(null)
