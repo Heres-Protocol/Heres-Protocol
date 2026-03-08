@@ -16,7 +16,7 @@ import {
 import { Connection, PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
-import { SOLANA_CONFIG, PLATFORM_FEE, HELIUS_CONFIG } from '@/constants'
+import { SOLANA_CONFIG, PLATFORM_FEE, HELIUS_CONFIG, MAGICBLOCK_ER } from '@/constants'
 import { getEnhancedTransactions } from '@/lib/helius'
 import { initFeeConfig } from '@/lib/solana'
 import { getFeeConfigPDA } from '@/lib/program'
@@ -46,6 +46,7 @@ type CapsuleRow = {
   payloadSize: number | null
   signature: string | null
   isActive: boolean | null
+  isDelegated: boolean
   events: CapsuleEvent[]
   tokenDelta: string | null
   solDelta: number | null
@@ -507,6 +508,7 @@ export default function DashboardPage() {
           }
         }
 
+        const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
         const decodedCapsules = accounts
           .map((account: any) => {
             try {
@@ -520,6 +522,7 @@ export default function DashboardPage() {
                 intentData: decoded.intentData,
                 isActive: decoded.isActive,
                 executedAt: decoded.executedAt,
+                isDelegated: account.account.owner.equals(delegationProgramId),
               }
             } catch {
               return null
@@ -533,6 +536,7 @@ export default function DashboardPage() {
             intentData: Uint8Array
             isActive: boolean
             executedAt: number | null
+            isDelegated: boolean
           }>
 
         const nowSeconds = Math.floor(Date.now() / 1000)
@@ -670,6 +674,7 @@ export default function DashboardPage() {
                 payloadSize: null,
                 signature: record.signature,
                 isActive: null,
+                isDelegated: false,
                 events: [event],
                 tokenDelta,
                 solDelta,
@@ -706,6 +711,7 @@ export default function DashboardPage() {
               payloadSize: capsule.intentData.length,
               signature: latestSignature,
               isActive: capsule.isActive,
+              isDelegated: capsule.isDelegated,
               events,
               tokenDelta: null,
               solDelta: null,
@@ -1027,6 +1033,11 @@ export default function DashboardPage() {
                           >
                             {capsule.status}
                           </span>
+                          {capsule.isDelegated && (
+                            <span className="rounded-lg px-2 py-1 text-[11px] font-medium uppercase tracking-wider bg-blue-500/20 text-blue-400">
+                              Delegated
+                            </span>
+                          )}
                           <span className="font-mono text-Heres-muted break-all max-w-full min-w-0">
                             {capsule.signature ? maskAddress(capsule.signature) : '...'}
                           </span>

@@ -485,6 +485,7 @@ export default function CapsuleDetailPage() {
       : capsule.lastActivity + capsule.inactivityPeriod < Math.floor(Date.now() / 1000)
         ? 'Expired'
         : 'Active'
+  const isDelegated = capsule.accountOwner?.equals?.(new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)) ?? false
   const lastUpdatedMs = capsule.lastActivity ? capsule.lastActivity * 1000 : null
 
   return (
@@ -524,6 +525,11 @@ export default function CapsuleDetailPage() {
                 >
                   {status}
                 </span>
+                {isDelegated && (
+                  <span className="rounded-lg px-2.5 py-1 text-xs font-medium bg-blue-500/20 text-blue-400">
+                    Delegated (PER)
+                  </span>
+                )}
               </div>
               <p className="text-sm text-Heres-muted">
                 Updated {timeAgo(lastUpdatedMs)}
