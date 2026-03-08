@@ -105,18 +105,18 @@ async function callChainlinkWorkflow(payload: {
   }
 }
 
-export function registerCreSecret(input: RegisterSecretInput): {
+export async function registerCreSecret(input: RegisterSecretInput): Promise<{
   secretRef: string
   secretHash: string
   recipientEmailHash: string
-} {
+}> {
   const normalizedEmail = normalizeEmail(input.recipientEmail)
   const recipientEmailHash = computeRecipientHash(normalizedEmail)
   const secretRef = `sec_${crypto.randomUUID().replace(/-/g, '')}`
   const secretHash = computeSecretHash(input.encryptedPayload)
   const now = Date.now()
 
-  upsertCreSecret({
+  await upsertCreSecret({
     secretRef,
     secretHash,
     encryptedPayload: input.encryptedPayload,
@@ -169,7 +169,7 @@ export async function dispatchCreDeliveryForCapsule(
   }
 
   const idempotencyKey = createIdempotencyKey(capsule.capsuleAddress, capsule.executedAt)
-  const existing = getDeliveryLedger(idempotencyKey)
+  const existing = await getDeliveryLedger(idempotencyKey)
   if (existing && (existing.status === 'dispatched' || existing.status === 'delivered' || existing.status === 'pending')) {
     return {
       ok: true,
@@ -181,11 +181,11 @@ export async function dispatchCreDeliveryForCapsule(
     }
   }
 
-  const secret = getCreSecret(creConfig.secretRef)
+  const secret = await getCreSecret(creConfig.secretRef)
   const nextAttempts = (existing?.attempts ?? 0) + 1
 
   if (!secret) {
-    upsertDeliveryLedger(idempotencyKey, {
+    await upsertDeliveryLedger(idempotencyKey, {
       capsuleAddress: capsule.capsuleAddress,
       owner: capsule.owner.toBase58(),
       executedAt: capsule.executedAt,
@@ -198,7 +198,7 @@ export async function dispatchCreDeliveryForCapsule(
   }
 
   if (secret.owner !== capsule.owner.toBase58()) {
-    upsertDeliveryLedger(idempotencyKey, {
+    await upsertDeliveryLedger(idempotencyKey, {
       capsuleAddress: capsule.capsuleAddress,
       owner: capsule.owner.toBase58(),
       executedAt: capsule.executedAt,
@@ -212,7 +212,7 @@ export async function dispatchCreDeliveryForCapsule(
   }
 
   if (!safeEqualHex(secret.secretHash, creConfig.secretHash)) {
-    upsertDeliveryLedger(idempotencyKey, {
+    await upsertDeliveryLedger(idempotencyKey, {
       capsuleAddress: capsule.capsuleAddress,
       owner: capsule.owner.toBase58(),
       executedAt: capsule.executedAt,
@@ -226,7 +226,7 @@ export async function dispatchCreDeliveryForCapsule(
   }
 
   if (!safeEqualHex(secret.recipientEmailHash, creRecipientHash)) {
-    upsertDeliveryLedger(idempotencyKey, {
+    await upsertDeliveryLedger(idempotencyKey, {
       capsuleAddress: capsule.capsuleAddress,
       owner: capsule.owner.toBase58(),
       executedAt: capsule.executedAt,
@@ -239,7 +239,7 @@ export async function dispatchCreDeliveryForCapsule(
     return { ok: false, error: 'Recipient email hash mismatch', idempotencyKey, status: 'failed' }
   }
 
-  upsertDeliveryLedger(idempotencyKey, {
+  await upsertDeliveryLedger(idempotencyKey, {
     capsuleAddress: capsule.capsuleAddress,
     owner: capsule.owner.toBase58(),
     executedAt: capsule.executedAt,
@@ -260,7 +260,7 @@ export async function dispatchCreDeliveryForCapsule(
       secretHash: creConfig.secretHash,
       encryptedPayload: secret.encryptedPayload,
     })
-    upsertDeliveryLedger(idempotencyKey, {
+    await upsertDeliveryLedger(idempotencyKey, {
       capsuleAddress: capsule.capsuleAddress,
       owner: capsule.owner.toBase58(),
       executedAt: capsule.executedAt,
@@ -272,7 +272,7 @@ export async function dispatchCreDeliveryForCapsule(
     return { ok: true, idempotencyKey, status: 'dispatched' }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    upsertDeliveryLedger(idempotencyKey, {
+    await upsertDeliveryLedger(idempotencyKey, {
       capsuleAddress: capsule.capsuleAddress,
       owner: capsule.owner.toBase58(),
       executedAt: capsule.executedAt,
@@ -287,12 +287,12 @@ export async function dispatchCreDeliveryForCapsule(
   }
 }
 
-export function applyCreDeliveryCallback(input: CallbackInput): CreDeliveryLedgerRecord {
+export async function applyCreDeliveryCallback(input: CallbackInput): Promise<CreDeliveryLedgerRecord> {
   const idempotencyKey =
     input.idempotencyKey || createIdempotencyKey(input.capsuleAddress, Number(input.executedAt))
-  const existing = getDeliveryLedger(idempotencyKey)
+  const existing = await getDeliveryLedger(idempotencyKey)
 
-  return upsertDeliveryLedger(idempotencyKey, {
+  return await upsertDeliveryLedger(idempotencyKey, {
     capsuleAddress: input.capsuleAddress,
     owner: existing?.owner,
     executedAt: Number(input.executedAt),
@@ -320,8 +320,8 @@ export function verifyCreCallbackSignature(rawBody: string, signature: string | 
   return safeEqualHex(expected, signature)
 }
 
-export function getDeliveryStatus(capsuleAddress: string): CreDeliveryLedgerRecord[] {
-  return listDeliveryByCapsule(capsuleAddress)
+export async function getDeliveryStatus(capsuleAddress: string): Promise<CreDeliveryLedgerRecord[]> {
+  return await listDeliveryByCapsule(capsuleAddress)
 }
 
 export async function reconcileCreDeliveries(): Promise<{
@@ -330,7 +330,7 @@ export async function reconcileCreDeliveries(): Promise<{
   dispatched: number
   failed: number
 }> {
-  const secrets = listCreSecrets()
+  const secrets = await listCreSecrets()
   let executedCreCapsules = 0
   let dispatched = 0
   let failed = 0

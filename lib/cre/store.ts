@@ -1,110 +1,119 @@
 import 'server-only'
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
-import path from 'path'
+import { Redis } from '@upstash/redis'
 import { CreDeliveryLedgerRecord, CreSecretRecord } from '@/lib/cre/types'
 
-type CreStoreState = {
-  secrets: Map<string, CreSecretRecord>
-  deliveries: Map<string, CreDeliveryLedgerRecord>
+// Redis keys
+const SECRET_PREFIX = 'cre:secret:'       // cre:secret:{secretRef} → CreSecretRecord
+const SECRET_INDEX = 'cre:secret-refs'    // SET of all secretRefs
+const DELIVERY_PREFIX = 'cre:delivery:'   // cre:delivery:{idempotencyKey} → CreDeliveryLedgerRecord
+const DELIVERY_INDEX = 'cre:delivery-keys' // SET of all idempotencyKeys
+const DELIVERY_BY_CAPSULE = 'cre:delivery-by-capsule:' // cre:delivery-by-capsule:{addr} → SET of idempotencyKeys
+
+// ---------------------------------------------------------------------------
+// Redis client
+// ---------------------------------------------------------------------------
+function getRedis(): Redis | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!url || !token) return null
+  return new Redis({ url, token })
 }
 
-type PersistedCreStoreState = {
+// ---------------------------------------------------------------------------
+// File-based fallback for local dev
+// ---------------------------------------------------------------------------
+function getLocalPath(): string {
+  const path = require('path')
+  return path.join(process.cwd(), '.data', 'cre-store.json')
+}
+
+type LocalState = {
   secrets: CreSecretRecord[]
   deliveries: CreDeliveryLedgerRecord[]
 }
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __heresCreStore: CreStoreState | undefined
-}
-
-function getStorePath(): string {
-  const configuredPath = process.env.CRE_STORE_PATH?.trim()
-  if (configuredPath) return configuredPath
-  // Vercel serverless has read-only filesystem except /tmp
-  if (process.env.VERCEL) {
-    return '/tmp/cre-store.json'
-  }
-  return path.join(process.cwd(), '.data', 'cre-store.json')
-}
-
-function loadStateFromDisk(): CreStoreState {
-  const storePath = getStorePath()
-  if (!existsSync(storePath)) {
-    return {
-      secrets: new Map<string, CreSecretRecord>(),
-      deliveries: new Map<string, CreDeliveryLedgerRecord>(),
-    }
-  }
-
+function loadLocal(): LocalState {
   try {
-    const parsed = JSON.parse(readFileSync(storePath, 'utf8')) as PersistedCreStoreState
-    const secrets = Array.isArray(parsed.secrets) ? parsed.secrets : []
-    const deliveries = Array.isArray(parsed.deliveries) ? parsed.deliveries : []
-
-    return {
-      secrets: new Map(secrets.map((entry) => [entry.secretRef, entry])),
-      deliveries: new Map(deliveries.map((entry) => [entry.idempotencyKey, entry])),
-    }
+    const fs = require('fs')
+    const p = getLocalPath()
+    if (!fs.existsSync(p)) return { secrets: [], deliveries: [] }
+    return JSON.parse(fs.readFileSync(p, 'utf8')) as LocalState
   } catch {
-    return {
-      secrets: new Map<string, CreSecretRecord>(),
-      deliveries: new Map<string, CreDeliveryLedgerRecord>(),
-    }
+    return { secrets: [], deliveries: [] }
   }
 }
 
-function persistState(state: CreStoreState): void {
+function saveLocal(state: LocalState) {
   try {
-    const storePath = getStorePath()
-    const dir = path.dirname(storePath)
-    mkdirSync(dir, { recursive: true })
-
-    const data: PersistedCreStoreState = {
-      secrets: Array.from(state.secrets.values()),
-      deliveries: Array.from(state.deliveries.values()),
-    }
-
-    const tmpPath = `${storePath}.tmp`
-    writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8')
-    renameSync(tmpPath, storePath)
+    const fs = require('fs')
+    const path = require('path')
+    const p = getLocalPath()
+    const dir = path.dirname(p)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    const tmp = `${p}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify(state, null, 2))
+    fs.renameSync(tmp, p)
   } catch (err) {
-    console.warn('[CRE store] persistState failed (read-only fs?):', err)
-    // In-memory state is still valid; disk persistence is best-effort
+    console.warn('[CRE store] local save failed:', err)
   }
 }
 
-function getState(): CreStoreState {
-  if (!globalThis.__heresCreStore) {
-    globalThis.__heresCreStore = loadStateFromDisk()
+// ---------------------------------------------------------------------------
+// Secrets
+// ---------------------------------------------------------------------------
+
+export async function upsertCreSecret(secret: CreSecretRecord): Promise<CreSecretRecord> {
+  const redis = getRedis()
+  if (!redis) {
+    const state = loadLocal()
+    const idx = state.secrets.findIndex(s => s.secretRef === secret.secretRef)
+    if (idx >= 0) state.secrets[idx] = secret
+    else state.secrets.push(secret)
+    saveLocal(state)
+    return secret
   }
-  return globalThis.__heresCreStore
+  await redis.set(`${SECRET_PREFIX}${secret.secretRef}`, JSON.stringify(secret))
+  await redis.sadd(SECRET_INDEX, secret.secretRef)
+  return secret
 }
+
+export async function getCreSecret(secretRef: string): Promise<CreSecretRecord | null> {
+  const redis = getRedis()
+  if (!redis) {
+    const state = loadLocal()
+    return state.secrets.find(s => s.secretRef === secretRef) ?? null
+  }
+  const raw = await redis.get<string>(`${SECRET_PREFIX}${secretRef}`)
+  if (!raw) return null
+  return typeof raw === 'string' ? JSON.parse(raw) as CreSecretRecord : raw as unknown as CreSecretRecord
+}
+
+export async function listCreSecrets(): Promise<CreSecretRecord[]> {
+  const redis = getRedis()
+  if (!redis) {
+    return loadLocal().secrets
+  }
+  const refs = await redis.smembers(SECRET_INDEX)
+  if (!refs.length) return []
+  const pipeline = redis.pipeline()
+  for (const ref of refs) pipeline.get(`${SECRET_PREFIX}${ref}`)
+  const results = await pipeline.exec()
+  return results
+    .filter((r): r is string | CreSecretRecord => r != null)
+    .map(r => typeof r === 'string' ? JSON.parse(r) as CreSecretRecord : r as CreSecretRecord)
+}
+
+// ---------------------------------------------------------------------------
+// Delivery Ledger
+// ---------------------------------------------------------------------------
 
 function coalesceNonEmpty(nextValue: string | undefined, existingValue: string | undefined): string {
   if (typeof nextValue === 'string' && nextValue.trim().length > 0) return nextValue
   return existingValue ?? ''
 }
 
-export function upsertCreSecret(secret: CreSecretRecord): CreSecretRecord {
-  const state = getState()
-  state.secrets.set(secret.secretRef, secret)
-  persistState(state)
-  return secret
-}
-
-export function getCreSecret(secretRef: string): CreSecretRecord | null {
-  const state = getState()
-  return state.secrets.get(secretRef) ?? null
-}
-
-export function listCreSecrets(): CreSecretRecord[] {
-  const state = getState()
-  return Array.from(state.secrets.values())
-}
-
-export function upsertDeliveryLedger(
+export async function upsertDeliveryLedger(
   idempotencyKey: string,
   patch: Partial<CreDeliveryLedgerRecord> & {
     capsuleAddress: string
@@ -114,10 +123,9 @@ export function upsertDeliveryLedger(
     secretRef?: string
     status: CreDeliveryLedgerRecord['status']
   }
-): CreDeliveryLedgerRecord {
-  const state = getState()
+): Promise<CreDeliveryLedgerRecord> {
   const now = Date.now()
-  const existing = state.deliveries.get(idempotencyKey)
+  const existing = await getDeliveryLedger(idempotencyKey)
   const next: CreDeliveryLedgerRecord = {
     idempotencyKey,
     capsuleAddress: patch.capsuleAddress,
@@ -133,19 +141,47 @@ export function upsertDeliveryLedger(
     updatedAt: now,
   }
 
-  state.deliveries.set(idempotencyKey, next)
-  persistState(state)
+  const redis = getRedis()
+  if (!redis) {
+    const state = loadLocal()
+    const idx = state.deliveries.findIndex(d => d.idempotencyKey === idempotencyKey)
+    if (idx >= 0) state.deliveries[idx] = next
+    else state.deliveries.push(next)
+    saveLocal(state)
+    return next
+  }
+
+  await redis.set(`${DELIVERY_PREFIX}${idempotencyKey}`, JSON.stringify(next))
+  await redis.sadd(DELIVERY_INDEX, idempotencyKey)
+  await redis.sadd(`${DELIVERY_BY_CAPSULE}${patch.capsuleAddress}`, idempotencyKey)
   return next
 }
 
-export function getDeliveryLedger(idempotencyKey: string): CreDeliveryLedgerRecord | null {
-  const state = getState()
-  return state.deliveries.get(idempotencyKey) ?? null
+export async function getDeliveryLedger(idempotencyKey: string): Promise<CreDeliveryLedgerRecord | null> {
+  const redis = getRedis()
+  if (!redis) {
+    const state = loadLocal()
+    return state.deliveries.find(d => d.idempotencyKey === idempotencyKey) ?? null
+  }
+  const raw = await redis.get<string>(`${DELIVERY_PREFIX}${idempotencyKey}`)
+  if (!raw) return null
+  return typeof raw === 'string' ? JSON.parse(raw) as CreDeliveryLedgerRecord : raw as unknown as CreDeliveryLedgerRecord
 }
 
-export function listDeliveryByCapsule(capsuleAddress: string): CreDeliveryLedgerRecord[] {
-  const state = getState()
-  return Array.from(state.deliveries.values())
-    .filter((entry) => entry.capsuleAddress === capsuleAddress)
+export async function listDeliveryByCapsule(capsuleAddress: string): Promise<CreDeliveryLedgerRecord[]> {
+  const redis = getRedis()
+  if (!redis) {
+    return loadLocal().deliveries
+      .filter(d => d.capsuleAddress === capsuleAddress)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+  }
+  const keys = await redis.smembers(`${DELIVERY_BY_CAPSULE}${capsuleAddress}`)
+  if (!keys.length) return []
+  const pipeline = redis.pipeline()
+  for (const key of keys) pipeline.get(`${DELIVERY_PREFIX}${key}`)
+  const results = await pipeline.exec()
+  return results
+    .filter((r): r is string | CreDeliveryLedgerRecord => r != null)
+    .map(r => typeof r === 'string' ? JSON.parse(r) as CreDeliveryLedgerRecord : r as CreDeliveryLedgerRecord)
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }

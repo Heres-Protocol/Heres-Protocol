@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const registered = registerCreSecret({
+    const registered = await registerCreSecret({
       owner,
       recipientEmail,
       encryptedPayload,
