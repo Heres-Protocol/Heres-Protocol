@@ -8,9 +8,15 @@ dependencies:
   '@coral-xyz/anchor':
     specifier: 0.32.1
     version: 0.32.1(typescript@5.9.3)
+  '@coral-xyz/borsh':
+    specifier: ^0.32.1
+    version: 0.32.1(@solana/web3.js@1.98.4)
   '@magicblock-labs/ephemeral-rollups-sdk':
-    specifier: 0.8.0
-    version: 0.8.0(fastestsmallesttextencoderdecoder@1.0.22)
+    specifier: ^0.8.5
+    version: 0.8.5(fastestsmallesttextencoderdecoder@1.0.22)
+  '@solana/spl-token':
+    specifier: ^0.4.14
+    version: 0.4.14(@solana/web3.js@1.98.4)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
   '@solana/wallet-adapter-base':
     specifier: ^0.9.23
     version: 0.9.27(@solana/web3.js@1.98.4)
@@ -35,6 +41,9 @@ dependencies:
   gsap:
     specifier: ^3.14.2
     version: 3.14.2
+  loglevel:
+    specifier: ^1.9.2
+    version: 1.9.2
   lucide-react:
     specifier: ^0.303.0
     version: 0.303.0(react@18.3.1)
@@ -53,6 +62,9 @@ dependencies:
   recharts:
     specifier: ^3.7.0
     version: 3.7.0(@types/react@18.3.28)(react-dom@18.3.1)(react-is@19.2.4)(react@18.3.1)(redux@5.0.1)
+  resend:
+    specifier: ^6.9.3
+    version: 6.9.3
 
 devDependencies:
   '@types/node':
@@ -431,6 +443,17 @@ packages:
 
   /@coral-xyz/borsh@0.31.1(@solana/web3.js@1.98.4):
     resolution: {integrity: sha512-9N8AU9F0ubriKfNE3g1WF0/4dtlGXoBN/hd1PvbNBamBNwRgHxH4P+o3Zt7rSEloW1HUs6LfZEchlx9fW7POYw==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      '@solana/web3.js': ^1.69.0
+    dependencies:
+      '@solana/web3.js': 1.98.4(typescript@5.9.3)
+      bn.js: 5.2.3
+      buffer-layout: 1.2.2
+    dev: false
+
+  /@coral-xyz/borsh@0.32.1(@solana/web3.js@1.98.4):
+    resolution: {integrity: sha512-pWsqkkZ+psLlupMkgu5rDok7baDQLWKqyDsb76gUNArbVB783mF3ZOleKMHVXZczl5JuxnVVfO1+XDVvR17C3A==}
     engines: {node: '>=10'}
     peerDependencies:
       '@solana/web3.js': ^1.69.0
@@ -839,8 +862,8 @@ packages:
       '@lit-labs/ssr-dom-shim': 1.5.1
     dev: false
 
-  /@magicblock-labs/ephemeral-rollups-sdk@0.8.0(fastestsmallesttextencoderdecoder@1.0.22):
-    resolution: {integrity: sha512-Eelgua6ub0+8sB+YgwceW5PNLTNCkJVE66QeEUwkxjVl3ulUu8iCbPQk0E4huHLGlSeoG9UxDypAIhdlmimuyQ==}
+  /@magicblock-labs/ephemeral-rollups-sdk@0.8.5(fastestsmallesttextencoderdecoder@1.0.22):
+    resolution: {integrity: sha512-W+k38iQ6XSllc4xV0kehTyWSx+j4juozfTxcA3tmZQD61lWzYm9n0m2iyclSxF/KEi3phUwF73Z0+ZE2aIpy1Q==}
     dependencies:
       '@phala/dcap-qvl-web': 0.2.7
       '@solana/spl-token': 0.4.14(@solana/web3.js@1.98.4)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
@@ -3231,6 +3254,10 @@ packages:
       bs58: 5.0.0
       eventemitter3: 5.0.4
       uuid: 9.0.1
+    dev: false
+
+  /@stablelib/base64@1.0.1:
+    resolution: {integrity: sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==}
     dev: false
 
   /@standard-schema/spec@1.1.0:
@@ -6836,6 +6863,10 @@ packages:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
     dev: false
 
+  /fast-sha256@1.3.0:
+    resolution: {integrity: sha512-n11RGP/lrWEFI/bWdygLxhI+pVeo1ZYIVwvvPkW7azl/rOy+F3HYRZ2K5zeE9mmkhQppyv9sQFx0JM9UabnpPQ==}
+    dev: false
+
   /fast-stable-stringify@1.0.0:
     resolution: {integrity: sha512-wpYMUmFu5f00Sm0cj2pfivpmawLZ0NKdviQ4w9zJeR8JVtOpOxHmLaJuj0vxvGqMJQWyP/COUkF75/57OKyRag==}
     dev: false
@@ -8894,6 +8925,10 @@ packages:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
 
+  /postal-mime@2.7.3:
+    resolution: {integrity: sha512-MjhXadAJaWgYzevi46+3kLak8y6gbg0ku14O1gO/LNOuay8dO+1PtcSGvAdgDR0DoIsSaiIA8y/Ddw6MnrO0Tw==}
+    dev: false
+
   /postcss-import@15.1.0(postcss@8.5.6):
     resolution: {integrity: sha512-hpr+J05B2FVYUAXHeK1YyI267J/dDDhMU6B6civm8hSY1jYJnBXxzKDKDswzJmtLHryrjhnDjqqp/49t8FALew==}
     engines: {node: '>=14.0.0'}
@@ -9442,6 +9477,19 @@ packages:
     resolution: {integrity: sha512-K/BG6eIky/SBpzfHZv/dd+9JBFiS4SWV7FIujVyJRux6e45+73RaUHXLmIR1f7WOMaQ0U1km6qwklRQxpJJY0w==}
     dev: false
 
+  /resend@6.9.3:
+    resolution: {integrity: sha512-GRXjH9XZBJA+daH7bBVDuTShr22iWCxXA8P7t495G4dM/RC+d+3gHBK/6bz9K6Vpcq11zRQKmD+B+jECwQlyGQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@react-email/render': '*'
+    peerDependenciesMeta:
+      '@react-email/render':
+        optional: true
+    dependencies:
+      postal-mime: 2.7.3
+      svix: 1.84.1
+    dev: false
+
   /resolve-from@4.0.0:
     resolution: {integrity: sha512-pb/MYmXstAkysRFx8piNI1tGFNQIFA3vkE3Gq4EuA1dF6gHp/+vgZqsCGJapvy8N3Q+4o7FwvquPJcnZ7RYy4g==}
     engines: {node: '>=4'}
@@ -9916,6 +9964,13 @@ packages:
       type-fest: 0.7.1
     dev: false
 
+  /standardwebhooks@1.0.0:
+    resolution: {integrity: sha512-BbHGOQK9olHPMvQNHWul6MYlrRTAOKn03rOe4A8O3CLWhNf4YHBqq2HJKKC+sfqpxiBY52pNeesD6jIiLDz8jg==}
+    dependencies:
+      '@stablelib/base64': 1.0.1
+      fast-sha256: 1.3.0
+    dev: false
+
   /statuses@1.5.0:
     resolution: {integrity: sha512-OpZ3zP+jT1PI7I8nemJX4AKmAX070ZkYPVWV/AaKTJl+tXCTGyVdC1a4SL8RUQYEwk/f34ZX8UTykN68FwrqAA==}
     engines: {node: '>= 0.6'}
@@ -10126,6 +10181,13 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
     dev: true
+
+  /svix@1.84.1:
+    resolution: {integrity: sha512-K8DPPSZaW/XqXiz1kEyzSHYgmGLnhB43nQCMeKjWGCUpLIpAMMM8kx3rVVOSm6Bo6EHyK1RQLPT4R06skM/MlQ==}
+    dependencies:
+      standardwebhooks: 1.0.0
+      uuid: 10.0.0
+    dev: false
 
   /tailwindcss@3.4.19:
     resolution: {integrity: sha512-3ofp+LL8E+pK/JuPLPggVAIaEuhvIz4qNcf3nA1Xn2o/7fb7s/TYpHhwGDv1ZU3PkBluUVaF8PyCHcm48cKLWQ==}
@@ -10610,6 +10672,11 @@ packages:
   /utils-merge@1.0.1:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
+    dev: false
+
+  /uuid@10.0.0:
+    resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
+    hasBin: true
     dev: false
 
   /uuid@8.3.2:
