@@ -83,7 +83,7 @@ async function sendEmailViaResend(
     }
   }
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Heres Protocol <onboarding@resend.dev>'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Heres Protocol <heres@sentidev.me>'
   const html = buildEmailHtml({ capsuleAddress, owner, executedAt, intentStatement })
 
   const res = await fetch('https://api.resend.com/emails', {
