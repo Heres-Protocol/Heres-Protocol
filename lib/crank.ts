@@ -442,46 +442,31 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
         executedCount += 1
         console.log(`[crank] Executed ${capsule.publicKey.toBase58()} (delegated=${capsule.isDelegated}): ${txSig}`)
 
-        // If delegated, commit+undelegate from ER and wait for propagation to base layer
+        // If delegated, send commit+undelegate but don't wait — distribute on next cycle
         if (capsule.isDelegated) {
           try {
             const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
-            console.log(`[crank] Commit+undelegate sent: ${undelegTx}`)
-
-            const [capsulePDAForWait] = getCapsulePDA(capsule.account.owner)
-            const returned = await waitForUndelegation(connection, capsulePDAForWait, 30000)
-            if (!returned) {
-              errors.push(`${capsule.publicKey.toBase58()}: undelegation timeout (30s) — will retry on next crank cycle`)
-              continue
-            }
-            console.log(`[crank] Undelegation confirmed on base layer`)
+            console.log(`[crank] Commit+undelegate sent (no wait): ${undelegTx}`)
           } catch (undelegErr) {
             const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
-            errors.push(`${capsule.publicKey.toBase58()} undelegate: ${msg}`)
-            continue
+            console.log(`[crank] Commit+undelegate failed (will retry): ${msg}`)
           }
+          // Skip distribute — capsule will appear as needsDistributeOnly on next cycle
+          continue
         }
       } else {
         console.log(`[crank] Skipping execute for already-executed capsule ${capsule.publicKey.toBase58()}, proceeding to distribute`)
 
-        // If still delegated, try undelegation before distributing
+        // If still delegated, send commit+undelegate and skip — wait for next cycle
         if (capsule.isDelegated) {
           try {
             const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
-            console.log(`[crank] Retry commit+undelegate sent: ${undelegTx}`)
-
-            const [capsulePDAForWait] = getCapsulePDA(capsule.account.owner)
-            const returned = await waitForUndelegation(connection, capsulePDAForWait, 30000)
-            if (!returned) {
-              errors.push(`${capsule.publicKey.toBase58()}: undelegation retry timeout (30s)`)
-              continue
-            }
-            console.log(`[crank] Undelegation confirmed on base layer (retry)`)
+            console.log(`[crank] Retry commit+undelegate sent (no wait): ${undelegTx}`)
           } catch (undelegErr) {
             const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
-            errors.push(`${capsule.publicKey.toBase58()} undelegate retry: ${msg}`)
-            continue
+            console.log(`[crank] Retry commit+undelegate failed: ${msg}`)
           }
+          continue
         }
       }
 
