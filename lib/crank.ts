@@ -152,9 +152,12 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
           if (decoded.lastActivity.toNumber() + decoded.inactivityPeriod.toNumber() > now) continue
           eligible.push({ publicKey: capsulePDA, isDelegated, account: decoded as any })
         } else if (!decoded.isActive && decoded.executedAt != null) {
+          console.log(`[crank] Found executed capsule ${capsulePDA.toBase58()} (delegated=${isDelegated}, needsDistributeOnly)`)
           eligible.push({ publicKey: capsulePDA, isDelegated, needsDistributeOnly: true, account: decoded as any })
         }
-      } catch { /* skip */ }
+      } catch (ownerErr) {
+        console.error(`[crank] Error checking owner ${ownerKey}:`, ownerErr instanceof Error ? ownerErr.message : ownerErr)
+      }
     }
   } catch (e) {
     console.error('[crank] Error checking delegated capsules:', e instanceof Error ? e.message : e)
