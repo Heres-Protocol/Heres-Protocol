@@ -71,7 +71,7 @@ export function getProgram(wallet: WalletContextState): Program | null {
   const provider = getProvider(wallet)
   if (!provider) return null
 
-  const programId = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW')
+  const programId = getProgramId()
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
 
@@ -108,7 +108,7 @@ export function getErProgram(wallet: WalletContextState): Program | null {
     commitment: 'confirmed',
   })
 
-  const programId = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW')
+  const programId = getProgramId()
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
 
@@ -132,7 +132,7 @@ export function getTeeProgram(wallet: WalletContextState, token?: string): Progr
     commitment: 'confirmed',
   })
 
-  const programId = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW')
+  const programId = getProgramId()
   const programIdl = JSON.parse(JSON.stringify(idl))
   programIdl.address = programId.toBase58()
 
@@ -195,6 +195,15 @@ export async function createCapsule(
         .createCapsule(new BN(inactivityPeriodSeconds), intentDataBuffer)
         .accounts(accounts)
         .rpc()
+
+      // Register owner in capsule registry so crank can find delegated capsules
+      try {
+        fetch('/api/capsule-registry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ owner: wallet.publicKey!.toBase58() }),
+        })
+      } catch { /* non-critical */ }
 
       return tx
     } catch (error: any) {

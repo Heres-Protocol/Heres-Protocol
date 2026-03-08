@@ -13,6 +13,7 @@ import { getSolanaConnection, getProgramId } from '@/config/solana'
 import { getCapsulePDA, getCapsuleVaultPDA, getFeeConfigPDA } from './program'
 import { SOLANA_CONFIG, MAGICBLOCK_ER } from '@/constants'
 import { buildCcipAccountsForVaultSend } from '@/lib/ccip'
+import { getRegisteredOwners, unregisterCapsuleOwner } from '@/lib/capsule-registry'
 
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
@@ -54,8 +55,17 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
   const program = new Program(idl as any, provider)
   const programId = getProgramId()
 
-  // @ts-ignore
-  const capsules = (await program.account.intentCapsule.all()) as any[]
+  // @ts-ignore — fetch all capsules with 15s timeout to avoid hanging on slow RPC
+  const fetchAll = () => (program.account as any).intentCapsule.all()
+  const capsulesResult = await Promise.race([
+    fetchAll(),
+    new Promise<null>(r => setTimeout(() => r(null), 15000)),
+  ])
+  if (!capsulesResult) {
+    console.log('[crank] intentCapsule.all() timed out (15s)')
+    return []
+  }
+  const capsules = capsulesResult as any[]
   const now = Math.floor(Date.now() / 1000)
   const eligible: DecodedCapsule[] = []
 
@@ -93,69 +103,61 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
     }
   }
 
-  // 2. Delegated capsules (owned by Delegation Program on base layer)
-  // Base layer data is stale (always shows isActive=true), so we check ER state
-  // to avoid re-executing already-executed capsules.
+  // 2. Delegated capsules — check registered owners' PDAs individually
+  //    getProgramAccounts(DELEGATION_PROGRAM_ID) hangs on devnet public RPC,
+  //    so we use a local registry of capsule owners instead.
   const erConnection = new Connection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
-  // Timeout wrapper for ER RPC calls
   const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
     Promise.race([promise, new Promise<null>(r => setTimeout(() => r(null), ms))])
   try {
-    const discriminator = idl.accounts?.find(
-      (a: any) => a.name === 'IntentCapsule' || a.name === 'intentCapsule'
-    )?.discriminator as number[] | undefined
-    if (discriminator) {
-      const bs58Mod = await import('bs58')
-      const encode = bs58Mod.default?.encode || (bs58Mod as any).encode
-      const delegatedAccountsResult = await withTimeout(
-        connection.getProgramAccounts(DELEGATION_PROGRAM_ID, {
-          filters: [{ memcmp: { offset: 0, bytes: encode(Buffer.from(discriminator)) } }],
-        }),
-        10000
-      )
-      if (!delegatedAccountsResult) {
-        console.log('[crank] Delegated account scan timed out (10s), skipping ER checks')
-      }
-      const delegatedAccounts = delegatedAccountsResult || []
-      // @ts-ignore
-      const coder = new (await import('@coral-xyz/anchor')).BorshAccountsCoder(idl)
-      console.log(`[crank] Found ${delegatedAccounts.length} delegated accounts, checking ER state...`)
+    // @ts-ignore
+    const coder = new (await import('@coral-xyz/anchor')).BorshAccountsCoder(idl)
+    const seenPDAs = new Set(capsules.map((c: any) => c.publicKey.toBase58()))
+    const registeredOwners = getRegisteredOwners()
+    console.log(`[crank] Checking ${registeredOwners.length} registered owners for delegated capsules`)
 
-      const erChecks = delegatedAccounts.map(async (acc) => {
-        try {
-          // Read state from ER with 5s timeout per account
-          const erInfo = await withTimeout(erConnection.getAccountInfo(acc.pubkey), 5000)
-          const erData = erInfo ? coder.decode('IntentCapsule', erInfo.data) : null
-          const raw = erData || coder.decode('IntentCapsule', acc.account.data)
-          const decoded = {
-            owner: raw.owner,
-            inactivityPeriod: raw.inactivity_period ?? raw.inactivityPeriod,
-            lastActivity: raw.last_activity ?? raw.lastActivity,
-            intentData: raw.intent_data ?? raw.intentData,
-            isActive: raw.is_active ?? raw.isActive,
-            executedAt: raw.executed_at ?? raw.executedAt,
-            mint: raw.mint,
-          }
-          // Ready to execute on ER
-          if (decoded.isActive && decoded.executedAt == null) {
-            if (decoded.lastActivity.toNumber() + decoded.inactivityPeriod.toNumber() > now) return null
-            return { publicKey: acc.pubkey, isDelegated: true, account: decoded as any } as DecodedCapsule
-          }
-          // Already executed on ER — needs undelegation + distribute
-          if (!decoded.isActive && decoded.executedAt != null) {
-            return { publicKey: acc.pubkey, isDelegated: true, needsDistributeOnly: true, account: decoded as any } as DecodedCapsule
-          }
-        } catch { /* skip */ }
-        return null
-      })
-      // Overall 15s timeout for all ER checks combined
-      const erResults = await withTimeout(Promise.all(erChecks), 15000) || []
-      for (const r of erResults) {
-        if (r) eligible.push(r)
-      }
+    for (const ownerKey of registeredOwners) {
+      const owner = new PublicKey(ownerKey)
+      const [capsulePDA] = getCapsulePDA(owner)
+      // Skip if already found in non-delegated scan
+      if (seenPDAs.has(capsulePDA.toBase58())) continue
+      try {
+        const baseInfo = await connection.getAccountInfo(capsulePDA)
+        if (!baseInfo) continue
+        const isDelegated = baseInfo.owner.equals(DELEGATION_PROGRAM_ID)
+
+        let raw: any
+        if (isDelegated) {
+          // Read state from ER
+          const erInfo = await withTimeout(erConnection.getAccountInfo(capsulePDA), 5000)
+          if (!erInfo) continue
+          raw = coder.decode('IntentCapsule', erInfo.data)
+        } else if (baseInfo.owner.equals(programId)) {
+          // Back on base layer — read directly
+          raw = coder.decode('IntentCapsule', baseInfo.data)
+        } else {
+          continue
+        }
+
+        const decoded = {
+          owner: raw.owner,
+          inactivityPeriod: raw.inactivity_period ?? raw.inactivityPeriod,
+          lastActivity: raw.last_activity ?? raw.lastActivity,
+          intentData: raw.intent_data ?? raw.intentData,
+          isActive: raw.is_active ?? raw.isActive,
+          executedAt: raw.executed_at ?? raw.executedAt,
+          mint: raw.mint,
+        }
+        if (decoded.isActive && decoded.executedAt == null) {
+          if (decoded.lastActivity.toNumber() + decoded.inactivityPeriod.toNumber() > now) continue
+          eligible.push({ publicKey: capsulePDA, isDelegated, account: decoded as any })
+        } else if (!decoded.isActive && decoded.executedAt != null) {
+          eligible.push({ publicKey: capsulePDA, isDelegated, needsDistributeOnly: true, account: decoded as any })
+        }
+      } catch { /* skip */ }
     }
   } catch (e) {
-    console.error('[crank] Error scanning delegated capsules:', e instanceof Error ? e.message : e)
+    console.error('[crank] Error checking delegated capsules:', e instanceof Error ? e.message : e)
   }
 
   return eligible
@@ -481,8 +483,8 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
       try {
         const totalAmountLamportsCheck = parseTotalAmountLamports(capsule.account.intentData)
         const vaultBalanceCheck = await connection.getBalance(vaultPDA)
-        // Need totalAmount + execution fee (30,000) + some margin for rent
-        const minRequired = totalAmountLamportsCheck + 30_000 + 960_000
+        // Need totalAmount + small margin for tx fees (rent stays in vault)
+        const minRequired = totalAmountLamportsCheck + 50_000
         if (vaultBalanceCheck < minRequired) {
           console.log(`[crank] Skipping distribute for ${capsule.publicKey.toBase58()}: vault=${vaultBalanceCheck} < required=${minRequired}`)
           continue

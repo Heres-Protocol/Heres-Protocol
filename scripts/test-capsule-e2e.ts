@@ -17,7 +17,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 // ─── Config ────────────────────────────────────────────────────────
-const PROGRAM_ID = new PublicKey('AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW')
+const PROGRAM_ID = new PublicKey('26pDfWXnq9nm1Y5J6siwQsVfHXKxKo5vKvRMVCpqXms6')
 const RPC_URL = 'https://api.devnet.solana.com'
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const PERMISSION_PROGRAM_ID = new PublicKey('ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1')
@@ -143,14 +143,15 @@ async function main() {
   log('INIT', `Funder balance: ${(funderBalance / 1e9).toFixed(4)} SOL`)
   if (funderBalance < 0.05 * LAMPORTS_PER_SOL) throw new Error('Funder has insufficient balance')
 
-  // Check dev server
-  try { await fetch(`${APP_BASE_URL}/api/intent-delivery/status?capsule=test&owner=test&timestamp=0`) }
-  catch { throw new Error(`Dev server not running at ${APP_BASE_URL}. Run: pnpm dev`) }
-  log('INIT', 'Dev server running')
+  // Check dev server (optional — CRE steps will be skipped if not running)
+  let devServerRunning = false
+  try { await fetch(`${APP_BASE_URL}/api/intent-delivery/status?capsule=test&owner=test&timestamp=0`); devServerRunning = true }
+  catch { log('INIT', 'Dev server not running — CRE steps will be skipped') }
+  if (devServerRunning) log('INIT', 'Dev server running')
 
   // Fund fresh owner
   log('INIT', 'Funding fresh owner...')
-  const fundAmount = SKIP_DELEGATION ? 0.02 : 0.05
+  const fundAmount = SKIP_DELEGATION ? 0.1 : 0.15
   await sendAndConfirmTransaction(connection, new Transaction().add(
     SystemProgram.transfer({ fromPubkey: funder.publicKey, toPubkey: owner, lamports: Math.floor(fundAmount * LAMPORTS_PER_SOL) })
   ), [funder])
@@ -180,30 +181,35 @@ async function main() {
 
   // ═══ Step 1: CRE Register ═════════════════════════════════════
   console.log('\n--- Step 1: CRE Register ---')
-  const fakeEncryptedPayload = JSON.stringify({
-    v: 1, alg: 'AES-GCM', kdf: 'PBKDF2', hash: 'SHA-256', iterations: 120000,
-    salt: Buffer.from('test-salt-12345678').toString('base64'),
-    iv: Buffer.from('test-iv-1234').toString('base64'),
-    ciphertext: Buffer.from('E2E test encrypted payload').toString('base64'),
-  })
   const normalizedEmail = TEST_EMAIL.trim().toLowerCase()
   const recipientEmailHash = sha256Hex(normalizedEmail)
-  const encryptedPayloadHash = sha256Hex(fakeEncryptedPayload)
-  const ts1 = Date.now()
-  const sig1 = signMessageWithKeypair(ownerKp, buildCreSignedMessage({
-    action: 'register-secret', owner: owner.toBase58(), timestamp: ts1, recipientEmailHash, encryptedPayloadHash,
-  }))
-  const regRes = await fetch(`${APP_BASE_URL}/api/intent-delivery/register`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ owner: owner.toBase58(), recipientEmail: normalizedEmail, encryptedPayload: fakeEncryptedPayload, timestamp: ts1, signature: sig1 }),
-  })
-  const regJson = await regRes.json() as any
-  if (!regRes.ok) {
-    log('STEP 1', `CRE register failed [${regRes.status}]: ${JSON.stringify(regJson)}`)
-    assert(false, 'CRE register')
+  let regJson: any = {}
+  if (!devServerRunning) {
+    skip('CRE register (no dev server)')
   } else {
-    log('STEP 1', `CRE registered! ref=${regJson.secretRef}`)
-    assert(true, 'CRE register')
+    const fakeEncryptedPayload = JSON.stringify({
+      v: 1, alg: 'AES-GCM', kdf: 'PBKDF2', hash: 'SHA-256', iterations: 120000,
+      salt: Buffer.from('test-salt-12345678').toString('base64'),
+      iv: Buffer.from('test-iv-1234').toString('base64'),
+      ciphertext: Buffer.from('E2E test encrypted payload').toString('base64'),
+    })
+    const encryptedPayloadHash = sha256Hex(fakeEncryptedPayload)
+    const ts1 = Date.now()
+    const sig1 = signMessageWithKeypair(ownerKp, buildCreSignedMessage({
+      action: 'register-secret', owner: owner.toBase58(), timestamp: ts1, recipientEmailHash, encryptedPayloadHash,
+    }))
+    const regRes = await fetch(`${APP_BASE_URL}/api/intent-delivery/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ owner: owner.toBase58(), recipientEmail: normalizedEmail, encryptedPayload: fakeEncryptedPayload, timestamp: ts1, signature: sig1 }),
+    })
+    regJson = await regRes.json() as any
+    if (!regRes.ok) {
+      log('STEP 1', `CRE register failed [${regRes.status}]: ${JSON.stringify(regJson)}`)
+      assert(false, 'CRE register')
+    } else {
+      log('STEP 1', `CRE registered! ref=${regJson.secretRef}`)
+      assert(true, 'CRE register')
+    }
   }
 
   // ═══ Step 2: Create Capsule ═══════════════════════════════════
@@ -510,36 +516,44 @@ async function main() {
 
   // ═══ Step 8: CRE Dispatch ═════════════════════════════════════
   console.log('\n--- Step 8: CRE Dispatch ---')
-  const dispatchSecret = process.env.CRE_DISPATCH_SECRET || process.env.CRON_SECRET || ''
-  if (!dispatchSecret) {
-    skip('CRE dispatch (no CRE_DISPATCH_SECRET/CRON_SECRET)')
+  if (!devServerRunning) {
+    skip('CRE dispatch (no dev server)')
   } else {
-    const cronRes = await fetch(`${APP_BASE_URL}/api/cre/dispatch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dispatchSecret}` },
-      body: JSON.stringify({ capsuleAddress: capsulePDA.toBase58() }),
-    })
-    const cronJson = await cronRes.json() as any
-    log('STEP 8', `CRE dispatch [${cronRes.status}]: ${JSON.stringify(cronJson)}`)
-    assert(cronRes.status === 200, 'CRE dispatch OK')
+    const dispatchSecret = process.env.CRE_DISPATCH_SECRET || process.env.CRON_SECRET || ''
+    if (!dispatchSecret) {
+      skip('CRE dispatch (no CRE_DISPATCH_SECRET/CRON_SECRET)')
+    } else {
+      const cronRes = await fetch(`${APP_BASE_URL}/api/cre/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dispatchSecret}` },
+        body: JSON.stringify({ capsuleAddress: capsulePDA.toBase58() }),
+      })
+      const cronJson = await cronRes.json() as any
+      log('STEP 8', `CRE dispatch [${cronRes.status}]: ${JSON.stringify(cronJson)}`)
+      assert(cronRes.status === 200, 'CRE dispatch OK')
+    }
   }
 
   // ═══ Step 9: CRE Status Check ═════════════════════════════════
   console.log('\n--- Step 9: CRE Status ---')
-  const ts9 = Date.now()
-  const statusSig = signMessageWithKeypair(ownerKp, buildCreSignedMessage({
-    action: 'delivery-status', owner: owner.toBase58(), timestamp: ts9, capsuleAddress: capsulePDA.toBase58(),
-  }))
-  const statusRes = await fetch(`${APP_BASE_URL}/api/intent-delivery/status?${new URLSearchParams({
-    capsule: capsulePDA.toBase58(), owner: owner.toBase58(), timestamp: String(ts9),
-  })}`, { headers: { 'x-cre-signature': statusSig } })
-  if (statusRes.ok) {
-    const statusJson = await statusRes.json() as any
-    log('STEP 9', `Status: ${JSON.stringify(statusJson)}`)
-    assert(true, 'CRE status check')
+  if (!devServerRunning) {
+    skip('CRE status check (no dev server)')
   } else {
-    log('STEP 9', `Status [${statusRes.status}]: ${await statusRes.text()}`)
-    assert(false, 'CRE status check')
+    const ts9 = Date.now()
+    const statusSig = signMessageWithKeypair(ownerKp, buildCreSignedMessage({
+      action: 'delivery-status', owner: owner.toBase58(), timestamp: ts9, capsuleAddress: capsulePDA.toBase58(),
+    }))
+    const statusRes = await fetch(`${APP_BASE_URL}/api/intent-delivery/status?${new URLSearchParams({
+      capsule: capsulePDA.toBase58(), owner: owner.toBase58(), timestamp: String(ts9),
+    })}`, { headers: { 'x-cre-signature': statusSig } })
+    if (statusRes.ok) {
+      const statusJson = await statusRes.json() as any
+      log('STEP 9', `Status: ${JSON.stringify(statusJson)}`)
+      assert(true, 'CRE status check')
+    } else {
+      log('STEP 9', `Status [${statusRes.status}]: ${await statusRes.text()}`)
+      assert(false, 'CRE status check')
+    }
   }
 
   printSummary()

@@ -4,7 +4,7 @@
 
 // Solana Configuration
 export const SOLANA_CONFIG = {
-  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW',
+  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || '26pDfWXnq9nm1Y5J6siwQsVfHXKxKo5vKvRMVCpqXms6',
   NETWORK: process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet',
   HELIUS_API_KEY: process.env.NEXT_PUBLIC_HELIUS_API_KEY || '',
   /** Platform wallet for creation/execution fees (수수료 수령 지갑) */
@@ -46,7 +46,7 @@ export const MAGICBLOCK_ER = {
   /** Magic program ID for ER CPI (matches ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID) */
   MAGIC_PROGRAM_ID: process.env.NEXT_PUBLIC_MAGIC_PROGRAM_ID || 'Magic11111111111111111111111111111111111111',
   /** Program ID used for buffer PDA seed derivation — #[delegate] macro uses the program's own ID at runtime */
-  BUFFER_SEED_PROGRAM_ID: 'AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW',
+  BUFFER_SEED_PROGRAM_ID: '26pDfWXnq9nm1Y5J6siwQsVfHXKxKo5vKvRMVCpqXms6',
   /** Magic context PDA for commit/undelegate CPI */
   MAGIC_CONTEXT: process.env.NEXT_PUBLIC_MAGIC_CONTEXT || 'MagicContext1111111111111111111111111111111',
   /** Devnet ER RPC — Asia region (closest to KR) */

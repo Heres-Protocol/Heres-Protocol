@@ -56,9 +56,16 @@ async function handleCron(request: NextRequest) {
   }
 
   try {
+    // Overall 50s timeout to avoid serverless function hanging
+    const timeout = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
+      ])
+
     const [crankResult, creResult] = await Promise.allSettled([
-      runCrank(keypair),
-      reconcileCreDeliveries(),
+      timeout(runCrank(keypair), 45000, 'runCrank'),
+      timeout(reconcileCreDeliveries(), 45000, 'reconcileCre'),
     ])
 
     if (crankResult.status === 'rejected') {

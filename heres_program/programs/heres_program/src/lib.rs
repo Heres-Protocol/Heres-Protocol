@@ -14,7 +14,7 @@ use anchor_spl::associated_token::AssociatedToken;
 #[cfg(feature = "oracle")]
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-declare_id!("AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW");
+declare_id!("26pDfWXnq9nm1Y5J6siwQsVfHXKxKo5vKvRMVCpqXms6");
 
 /// TEE validator for Private Ephemeral Rollup (PER). Used as default when no validator account is passed.
 pub const TEE_VALIDATOR: Pubkey = pubkey!("FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA");
