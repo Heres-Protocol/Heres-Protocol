@@ -5,6 +5,12 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
   webpack: (config, { isServer, webpack }) => {
+    // Fix pnpm hoisting: ensure bs58 resolves to the top-level copy
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'bs58': require.resolve('bs58'),
+    }
+
     // Ignore server-only modules in client bundle
     if (!isServer) {
       config.resolve.fallback = {

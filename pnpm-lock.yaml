@@ -5297,6 +5297,7 @@ packages:
 
   /base-x@3.0.11:
     resolution: {integrity: sha512-xz7wQ8xDhdyP7tQxwdteLYeFfS68tSMNCZ/Y37WJ4bhGfKPpqEIlmIyueQHqOyoPhE6xNUqjzRr8ra0eF9VRvA==}
+    requiresBuild: true
     dependencies:
       safe-buffer: 5.2.1
     dev: false
