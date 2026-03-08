@@ -29,6 +29,7 @@ function getPermissionPDA(capsule: PublicKey): [PublicKey, number] {
 export type DecodedCapsule = {
   publicKey: PublicKey
   isDelegated?: boolean
+  needsDistributeOnly?: boolean
   account: {
     owner: PublicKey
     inactivityPeriod: BN
@@ -61,9 +62,24 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
   // 1. Non-delegated capsules (owned by our program)
   for (const capsule of capsules) {
     const data = capsule.account
-    if (!data.isActive || data.executedAt != null) continue
-    if (data.lastActivity.toNumber() + data.inactivityPeriod.toNumber() > now) continue
-    eligible.push({ ...capsule, isDelegated: false })
+    // 1a. Ready to execute (active, inactivity period elapsed)
+    if (data.isActive && data.executedAt == null) {
+      if (data.lastActivity.toNumber() + data.inactivityPeriod.toNumber() > now) continue
+      eligible.push({ ...capsule, isDelegated: false })
+      continue
+    }
+    // 1b. Already executed but not yet distributed — check vault balance
+    if (!data.isActive && data.executedAt != null) {
+      try {
+        const [vaultPDA] = getCapsuleVaultPDA(data.owner)
+        const vaultBalance = await connection.getBalance(vaultPDA)
+        // If vault still has more than rent-exempt minimum (~890880 lamports), needs distribution
+        if (vaultBalance > 900_000) {
+          console.log(`[crank] Found undistributed capsule ${capsule.publicKey.toBase58()} (vault=${vaultBalance} lamports)`)
+          eligible.push({ ...capsule, isDelegated: false, needsDistributeOnly: true })
+        }
+      } catch { /* skip */ }
+    }
   }
 
   // 2. Delegated capsules (owned by Delegation Program, filtered by discriminator)
@@ -92,13 +108,26 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
             executedAt: raw.executed_at ?? raw.executedAt,
             mint: raw.mint,
           }
-          if (!decoded.isActive || decoded.executedAt != null) continue
-          if (decoded.lastActivity.toNumber() + decoded.inactivityPeriod.toNumber() > now) continue
-          eligible.push({
-            publicKey: acc.pubkey,
-            isDelegated: true,
-            account: decoded as any,
-          })
+          // Ready to execute on ER
+          if (decoded.isActive && decoded.executedAt == null) {
+            if (decoded.lastActivity.toNumber() + decoded.inactivityPeriod.toNumber() > now) continue
+            eligible.push({
+              publicKey: acc.pubkey,
+              isDelegated: true,
+              account: decoded as any,
+            })
+          }
+          // Already executed on ER but still delegated — needs undelegation + distribute
+          // (This catches capsules where previous undelegation timed out)
+          if (!decoded.isActive && decoded.executedAt != null) {
+            console.log(`[crank] Found executed-but-still-delegated capsule ${acc.pubkey.toBase58()}`)
+            eligible.push({
+              publicKey: acc.pubkey,
+              isDelegated: true,
+              needsDistributeOnly: true,
+              account: decoded as any,
+            })
+          }
         } catch { /* skip non-matching accounts */ }
       }
     }
@@ -406,27 +435,53 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
     try {
       const [capsulePDA] = getCapsulePDA(capsule.account.owner)
       const [vaultPDA] = getCapsuleVaultPDA(capsule.account.owner)
-      const txSig = await executeCapsuleIntent(connection, crankKeypair, capsule)
-      executedCount += 1
-      console.log(`[crank] Executed ${capsule.publicKey.toBase58()} (delegated=${capsule.isDelegated}): ${txSig}`)
 
-      // If delegated, commit+undelegate from ER and wait for propagation to base layer
-      if (capsule.isDelegated) {
-        try {
-          const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
-          console.log(`[crank] Commit+undelegate sent: ${undelegTx}`)
+      // Skip execute for capsules that only need distribution
+      if (!capsule.needsDistributeOnly) {
+        const txSig = await executeCapsuleIntent(connection, crankKeypair, capsule)
+        executedCount += 1
+        console.log(`[crank] Executed ${capsule.publicKey.toBase58()} (delegated=${capsule.isDelegated}): ${txSig}`)
 
-          const [capsulePDAForWait] = getCapsulePDA(capsule.account.owner)
-          const returned = await waitForUndelegation(connection, capsulePDAForWait, 30000)
-          if (!returned) {
-            errors.push(`${capsule.publicKey.toBase58()}: undelegation timeout (30s) — will retry on next crank cycle`)
+        // If delegated, commit+undelegate from ER and wait for propagation to base layer
+        if (capsule.isDelegated) {
+          try {
+            const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
+            console.log(`[crank] Commit+undelegate sent: ${undelegTx}`)
+
+            const [capsulePDAForWait] = getCapsulePDA(capsule.account.owner)
+            const returned = await waitForUndelegation(connection, capsulePDAForWait, 30000)
+            if (!returned) {
+              errors.push(`${capsule.publicKey.toBase58()}: undelegation timeout (30s) — will retry on next crank cycle`)
+              continue
+            }
+            console.log(`[crank] Undelegation confirmed on base layer`)
+          } catch (undelegErr) {
+            const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
+            errors.push(`${capsule.publicKey.toBase58()} undelegate: ${msg}`)
             continue
           }
-          console.log(`[crank] Undelegation confirmed on base layer`)
-        } catch (undelegErr) {
-          const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
-          errors.push(`${capsule.publicKey.toBase58()} undelegate: ${msg}`)
-          continue
+        }
+      } else {
+        console.log(`[crank] Skipping execute for already-executed capsule ${capsule.publicKey.toBase58()}, proceeding to distribute`)
+
+        // If still delegated, try undelegation before distributing
+        if (capsule.isDelegated) {
+          try {
+            const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
+            console.log(`[crank] Retry commit+undelegate sent: ${undelegTx}`)
+
+            const [capsulePDAForWait] = getCapsulePDA(capsule.account.owner)
+            const returned = await waitForUndelegation(connection, capsulePDAForWait, 30000)
+            if (!returned) {
+              errors.push(`${capsule.publicKey.toBase58()}: undelegation retry timeout (30s)`)
+              continue
+            }
+            console.log(`[crank] Undelegation confirmed on base layer (retry)`)
+          } catch (undelegErr) {
+            const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
+            errors.push(`${capsule.publicKey.toBase58()} undelegate retry: ${msg}`)
+            continue
+          }
         }
       }
 
