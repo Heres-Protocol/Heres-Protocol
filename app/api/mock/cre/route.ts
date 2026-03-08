@@ -44,7 +44,7 @@ function buildEmailHtml(params: {
       <p style="color:#e0e0e0;font-size:14px;margin:0;">${executedDate}</p>
     </div>
     <div style="background:#0f1a2e;border:1px solid #1a3a5a;border-radius:8px;padding:20px;margin:16px 0;">
-      <p style="color:#4a9eff;font-size:12px;font-weight:bold;margin:0 0 12px;">INTENT STATEMENT</p>
+      <p style="color:#4a9eff;font-size:12px;font-weight:bold;margin:0 0 12px;">INTENT STATEMENT (Encrypted)</p>
       <div style="color:#e0e0e0;font-size:15px;line-height:1.6;white-space:pre-wrap;">${params.intentStatement}</div>
     </div>
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #1a1a4a;">
@@ -67,20 +67,24 @@ async function sendEmailViaResend(
   const resendApiKey = process.env.RESEND_API_KEY
   if (!resendApiKey) throw new Error('RESEND_API_KEY not configured')
 
-  // In simulate mode, the "encrypted" payload is just base64 — decode it for display
+  // The encryptedPayload is AES-GCM encrypted JSON: {"v":1,"alg":"AES-GCM","ciphertext":"..."}
+  // In simulate mode we cannot decrypt (no unlock code), so display the metadata
   let intentStatement: string
   try {
-    intentStatement = Buffer.from(encryptedPayload, 'base64').toString('utf-8')
-  } catch {
-    // If it's already a JSON string (from E2E test), parse and show
-    try {
-      const parsed = JSON.parse(encryptedPayload)
-      intentStatement = parsed.ciphertext
-        ? Buffer.from(parsed.ciphertext, 'base64').toString('utf-8')
-        : JSON.stringify(parsed, null, 2)
-    } catch {
-      intentStatement = encryptedPayload
+    const parsed = JSON.parse(encryptedPayload)
+    if (parsed.v === 1 && parsed.alg === 'AES-GCM') {
+      intentStatement = [
+        `Encryption: ${parsed.alg} (v${parsed.v})`,
+        `KDF: ${parsed.kdf || 'N/A'}, ${parsed.iterations ? parsed.iterations.toLocaleString() + ' iterations' : ''}`,
+        ``,
+        `This intent statement is encrypted with the owner's unlock code.`,
+        `In production, decryption happens inside the Chainlink CRE TEE Vault.`,
+      ].join('\n')
+    } else {
+      intentStatement = JSON.stringify(parsed, null, 2)
     }
+  } catch {
+    intentStatement = encryptedPayload
   }
 
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'Heres Protocol <heres@sentidev.me>'
