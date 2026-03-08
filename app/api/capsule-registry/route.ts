@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     }
     // Validate it's a valid pubkey
     new PublicKey(owner)
-    registerCapsuleOwner(owner)
+    await registerCapsuleOwner(owner)
     return NextResponse.json({ ok: true })
   } catch (e) {
     return NextResponse.json({ error: 'invalid owner' }, { status: 400 })

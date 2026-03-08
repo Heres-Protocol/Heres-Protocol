@@ -113,7 +113,7 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
     // @ts-ignore
     const coder = new (await import('@coral-xyz/anchor')).BorshAccountsCoder(idl)
     const seenPDAs = new Set(capsules.map((c: any) => c.publicKey.toBase58()))
-    const registeredOwners = getRegisteredOwners()
+    const registeredOwners = await getRegisteredOwners()
     console.log(`[crank] Checking ${registeredOwners.length} registered owners for delegated capsules`)
 
     for (const ownerKey of registeredOwners) {
