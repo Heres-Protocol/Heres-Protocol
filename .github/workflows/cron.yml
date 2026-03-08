@@ -1,0 +1,45 @@
+name: Cron Jobs
+
+on:
+  schedule:
+    # Execute intent crank - every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+env:
+  SITE_URL: ${{ secrets.SITE_URL }}
+  CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+jobs:
+  execute-intent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute intent crank
+        run: |
+          curl -sf -X GET \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/cron/execute-intent" \
+            --max-time 55
+
+  reconcile-cre:
+    runs-on: ubuntu-latest
+    # Run every other invocation (effectively every 10 min)
+    # GitHub Actions minimum is 5 min, so we skip odd runs
+    steps:
+      - name: Check if should run (every 10 min)
+        id: check
+        run: |
+          MINUTE=$(date +%-M)
+          if (( MINUTE % 10 < 5 )); then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Reconcile CRE deliveries
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          curl -sf -X GET \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/cron/reconcile-cre-delivery" \
+            --max-time 55

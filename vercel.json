@@ -1,12 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/execute-intent",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/reconcile-cre-delivery",
-      "schedule": "*/10 * * * *"
-    }
-  ]
-}
+{}
