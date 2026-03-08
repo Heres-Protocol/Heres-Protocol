@@ -1092,56 +1092,35 @@ export async function undelegateCapsule(
 
   const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
   const magicContextId = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
-  const permissionProgramId = new PublicKey(MAGICBLOCK_ER.PERMISSION_PROGRAM_ID)
-  const [permissionPDA] = getPermissionPDA(capsulePDA, permissionProgramId)
+  const programId = getProgramId()
 
-  console.log('[undelegateCapsule] Committing and undelegating from ER...')
+  console.log('[undelegateCapsule] Committing and undelegating from ER via crank_undelegate...')
   console.log(' - Capsule:', capsulePDA.toBase58())
   console.log(' - Vault:', vaultPDA.toBase58())
 
-  // CommitAndUndelegatePermission: borsh u64 discriminator = 5
-  const discBuf = Buffer.alloc(8)
-  discBuf.writeBigUInt64LE(BigInt(5), 0)
+  // Use our program's crank_undelegate instruction — does CPI to Magic program
+  // so it provides proper parent program ID context.
+  const crankUndelegateDisc = idl.instructions?.find(
+    (i: any) => i.name === 'crank_undelegate' || i.name === 'crankUndelegate'
+  )?.discriminator as number[] | undefined
+  if (!crankUndelegateDisc) throw new Error('crank_undelegate instruction not found in IDL')
 
-  // Undelegate capsule via Permission Program
-  const ixCapsule = new TransactionInstruction({
+  const ix = new TransactionInstruction({
     keys: [
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },  // authority
-      { pubkey: capsulePDA, isSigner: false, isWritable: true },         // permissioned_account
-      { pubkey: permissionPDA, isSigner: false, isWritable: false },     // permission
-      { pubkey: magicProgramId, isSigner: false, isWritable: false },    // magic_program
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },   // payer
+      { pubkey: capsulePDA, isSigner: false, isWritable: true },         // capsule
+      { pubkey: vaultPDA, isSigner: false, isWritable: true },           // vault
       { pubkey: magicContextId, isSigner: false, isWritable: true },     // magic_context
+      { pubkey: magicProgramId, isSigner: false, isWritable: false },    // magic_program
     ],
-    programId: permissionProgramId,
-    data: discBuf,
-  })
-
-  // Undelegate vault via ScheduleBaseIntent(CommitAndUndelegate) — vault has no permission PDA
-  // Variant 6 = ScheduleBaseIntent, Variant 2 = CommitAndUndelegate
-  // CommitTypeArgs::Standalone([0]) + UndelegateTypeArgs::Standalone
-  const scheduleData = Buffer.from([
-    6, 0, 0, 0,  // ScheduleBaseIntent (u32 LE)
-    2, 0, 0, 0,  // CommitAndUndelegate (u32 LE)
-    0,            // CommitTypeArgs::Standalone variant
-    1, 0, 0, 0,  // vec length = 1
-    0,            // account index 0
-    0,            // UndelegateTypeArgs::Standalone variant
-  ])
-  const ixVault = new TransactionInstruction({
-    keys: [
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-      { pubkey: vaultPDA, isSigner: false, isWritable: true },
-      { pubkey: magicContextId, isSigner: false, isWritable: true },
-    ],
-    programId: magicProgramId,
-    data: scheduleData,
+    programId,
+    data: Buffer.from(crankUndelegateDisc),
   })
 
   const erConnection = new Connection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
   const { blockhash, lastValidBlockHeight } = await erConnection.getLatestBlockhash('confirmed')
   const tx = new Transaction({ feePayer: wallet.publicKey, blockhash, lastValidBlockHeight })
-  tx.add(ixCapsule)
-  tx.add(ixVault)
+  tx.add(ix)
 
   const signedTx = await wallet.signTransaction(tx)
   const txSig = await erConnection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })

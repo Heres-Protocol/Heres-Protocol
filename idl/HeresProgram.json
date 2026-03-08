@@ -8,6 +8,50 @@
   },
   "instructions": [
     {
+      "name": "crank_undelegate",
+      "docs": [
+        "Commit state from ER and undelegate capsule + vault back to base layer.",
+        "This is a separate instruction from execute_intent to avoid ExternalAccountDataModified.",
+        "Anyone (crank) can call this — no owner signature required."
+      ],
+      "discriminator": [
+        48,
+        1,
+        72,
+        196,
+        200,
+        1,
+        21,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone can call this (crank wallet)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "capsule",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "magic_context",
+          "writable": true
+        },
+        {
+          "name": "magic_program"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "create_capsule",
       "docs": [
         "Initialize a new Intent Capsule (SOL locked in vault; anyone can execute when conditions are met).",

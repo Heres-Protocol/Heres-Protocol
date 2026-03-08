@@ -60,29 +60,46 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
   const eligible: DecodedCapsule[] = []
 
   // 1. Non-delegated capsules (owned by our program)
+  const readyToExecute: typeof capsules = []
+  const executedCapsules: typeof capsules = []
+
   for (const capsule of capsules) {
     const data = capsule.account
-    // 1a. Ready to execute (active, inactivity period elapsed)
     if (data.isActive && data.executedAt == null) {
       if (data.lastActivity.toNumber() + data.inactivityPeriod.toNumber() > now) continue
       eligible.push({ ...capsule, isDelegated: false })
-      continue
-    }
-    // 1b. Already executed but not yet distributed — check vault balance
-    if (!data.isActive && data.executedAt != null) {
-      try {
-        const [vaultPDA] = getCapsuleVaultPDA(data.owner)
-        const vaultBalance = await connection.getBalance(vaultPDA)
-        // If vault still has more than rent-exempt minimum (~890880 lamports), needs distribution
-        if (vaultBalance > 900_000) {
-          console.log(`[crank] Found undistributed capsule ${capsule.publicKey.toBase58()} (vault=${vaultBalance} lamports)`)
-          eligible.push({ ...capsule, isDelegated: false, needsDistributeOnly: true })
-        }
-      } catch { /* skip */ }
+    } else if (!data.isActive && data.executedAt != null) {
+      executedCapsules.push(capsule)
     }
   }
 
-  // 2. Delegated capsules (owned by Delegation Program, filtered by discriminator)
+  // 1b. Check executed capsules vault balances in parallel
+  if (executedCapsules.length > 0) {
+    const vaultChecks = executedCapsules.map(async (capsule) => {
+      try {
+        const [vaultPDA] = getCapsuleVaultPDA(capsule.account.owner)
+        const vaultBalance = await connection.getBalance(vaultPDA)
+        // rent-exempt minimum is ~953,520 lamports; only flag if vault has more
+        if (vaultBalance > 960_000) {
+          console.log(`[crank] Found undistributed capsule ${capsule.publicKey.toBase58()} (vault=${vaultBalance} lamports)`)
+          return { ...capsule, isDelegated: false, needsDistributeOnly: true } as DecodedCapsule
+        }
+      } catch { /* skip */ }
+      return null
+    })
+    const results = await Promise.all(vaultChecks)
+    for (const r of results) {
+      if (r) eligible.push(r)
+    }
+  }
+
+  // 2. Delegated capsules (owned by Delegation Program on base layer)
+  // Base layer data is stale (always shows isActive=true), so we check ER state
+  // to avoid re-executing already-executed capsules.
+  const erConnection = new Connection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
+  // Timeout wrapper for ER RPC calls
+  const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
+    Promise.race([promise, new Promise<null>(r => setTimeout(() => r(null), ms))])
   try {
     const discriminator = idl.accounts?.find(
       (a: any) => a.name === 'IntentCapsule' || a.name === 'intentCapsule'
@@ -90,15 +107,26 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
     if (discriminator) {
       const bs58Mod = await import('bs58')
       const encode = bs58Mod.default?.encode || (bs58Mod as any).encode
-      const delegatedAccounts = await connection.getProgramAccounts(DELEGATION_PROGRAM_ID, {
-        filters: [{ memcmp: { offset: 0, bytes: encode(Buffer.from(discriminator)) } }],
-      })
+      const delegatedAccountsResult = await withTimeout(
+        connection.getProgramAccounts(DELEGATION_PROGRAM_ID, {
+          filters: [{ memcmp: { offset: 0, bytes: encode(Buffer.from(discriminator)) } }],
+        }),
+        10000
+      )
+      if (!delegatedAccountsResult) {
+        console.log('[crank] Delegated account scan timed out (10s), skipping ER checks')
+      }
+      const delegatedAccounts = delegatedAccountsResult || []
       // @ts-ignore
       const coder = new (await import('@coral-xyz/anchor')).BorshAccountsCoder(idl)
-      for (const acc of delegatedAccounts) {
+      console.log(`[crank] Found ${delegatedAccounts.length} delegated accounts, checking ER state...`)
+
+      const erChecks = delegatedAccounts.map(async (acc) => {
         try {
-          const raw = coder.decode('IntentCapsule', acc.account.data)
-          // BorshAccountsCoder returns snake_case fields; normalise to camelCase
+          // Read state from ER with 5s timeout per account
+          const erInfo = await withTimeout(erConnection.getAccountInfo(acc.pubkey), 5000)
+          const erData = erInfo ? coder.decode('IntentCapsule', erInfo.data) : null
+          const raw = erData || coder.decode('IntentCapsule', acc.account.data)
           const decoded = {
             owner: raw.owner,
             inactivityPeriod: raw.inactivity_period ?? raw.inactivityPeriod,
@@ -110,25 +138,20 @@ export async function getEligibleCapsules(connection: Connection, crankKeypair: 
           }
           // Ready to execute on ER
           if (decoded.isActive && decoded.executedAt == null) {
-            if (decoded.lastActivity.toNumber() + decoded.inactivityPeriod.toNumber() > now) continue
-            eligible.push({
-              publicKey: acc.pubkey,
-              isDelegated: true,
-              account: decoded as any,
-            })
+            if (decoded.lastActivity.toNumber() + decoded.inactivityPeriod.toNumber() > now) return null
+            return { publicKey: acc.pubkey, isDelegated: true, account: decoded as any } as DecodedCapsule
           }
-          // Already executed on ER but still delegated — needs undelegation + distribute
-          // (This catches capsules where previous undelegation timed out)
+          // Already executed on ER — needs undelegation + distribute
           if (!decoded.isActive && decoded.executedAt != null) {
-            console.log(`[crank] Found executed-but-still-delegated capsule ${acc.pubkey.toBase58()}`)
-            eligible.push({
-              publicKey: acc.pubkey,
-              isDelegated: true,
-              needsDistributeOnly: true,
-              account: decoded as any,
-            })
+            return { publicKey: acc.pubkey, isDelegated: true, needsDistributeOnly: true, account: decoded as any } as DecodedCapsule
           }
-        } catch { /* skip non-matching accounts */ }
+        } catch { /* skip */ }
+        return null
+      })
+      // Overall 15s timeout for all ER checks combined
+      const erResults = await withTimeout(Promise.all(erChecks), 15000) || []
+      for (const r of erResults) {
+        if (r) eligible.push(r)
       }
     }
   } catch (e) {
@@ -261,8 +284,9 @@ export async function executeCapsuleIntent(
 
 /**
  * Commit state from ER and undelegate capsule + vault back to base layer.
- * Uses Permission Program CommitAndUndelegatePermission (disc=5) for capsule,
- * and ScheduleBaseIntent(CommitAndUndelegate) for vault (no permission PDA).
+ * Calls our program's crank_undelegate instruction on ER, which does CPI to
+ * Magic program. CPI provides the parent program ID context, solving
+ * "parent program id: None" errors that occur with direct Magic program calls.
  */
 export async function commitAndUndelegateFromER(
   crankKeypair: Keypair,
@@ -271,55 +295,37 @@ export async function commitAndUndelegateFromER(
   const erConnection = new Connection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
   const [capsulePDA] = getCapsulePDA(capsule.account.owner)
   const [vaultPDA] = getCapsuleVaultPDA(capsule.account.owner)
-  const [permissionPDA] = getPermissionPDA(capsulePDA)
+  const programId = getProgramId()
 
   const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
   const magicContextId = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
 
-  // CommitAndUndelegatePermission: borsh u64 discriminator = 5
-  const discBuf = Buffer.alloc(8)
-  discBuf.writeBigUInt64LE(BigInt(5), 0)
+  // crank_undelegate discriminator from IDL
+  const crankUndelegateDisc = idl.instructions?.find(
+    (i: any) => i.name === 'crank_undelegate' || i.name === 'crankUndelegate'
+  )?.discriminator as number[] | undefined
+  if (!crankUndelegateDisc) throw new Error('crank_undelegate instruction not found in IDL')
 
-  const ixCapsule = new TransactionInstruction({
+  const ix = new TransactionInstruction({
     keys: [
-      { pubkey: crankKeypair.publicKey, isSigner: true, isWritable: false },
-      { pubkey: capsulePDA, isSigner: false, isWritable: true },
-      { pubkey: permissionPDA, isSigner: false, isWritable: false },
-      { pubkey: magicProgramId, isSigner: false, isWritable: false },
-      { pubkey: magicContextId, isSigner: false, isWritable: true },
+      { pubkey: crankKeypair.publicKey, isSigner: true, isWritable: true },  // payer
+      { pubkey: capsulePDA, isSigner: false, isWritable: true },              // capsule
+      { pubkey: vaultPDA, isSigner: false, isWritable: true },                // vault
+      { pubkey: magicContextId, isSigner: false, isWritable: true },          // magic_context
+      { pubkey: magicProgramId, isSigner: false, isWritable: false },         // magic_program
     ],
-    programId: PERMISSION_PROGRAM_ID,
-    data: discBuf,
-  })
-
-  // Vault: ScheduleBaseIntent(CommitAndUndelegate) — no permission PDA
-  const scheduleData = Buffer.from([
-    6, 0, 0, 0,  // ScheduleBaseIntent (u32 LE)
-    2, 0, 0, 0,  // CommitAndUndelegate (u32 LE)
-    0,            // CommitTypeArgs::Standalone
-    1, 0, 0, 0,  // vec len = 1
-    0,            // account index 0
-    0,            // UndelegateTypeArgs::Standalone
-  ])
-  const ixVault = new TransactionInstruction({
-    keys: [
-      { pubkey: crankKeypair.publicKey, isSigner: true, isWritable: true },
-      { pubkey: vaultPDA, isSigner: false, isWritable: true },
-      { pubkey: magicContextId, isSigner: false, isWritable: true },
-    ],
-    programId: magicProgramId,
-    data: scheduleData,
+    programId,
+    data: Buffer.from(crankUndelegateDisc),
   })
 
   const { blockhash, lastValidBlockHeight } = await erConnection.getLatestBlockhash('confirmed')
   const tx = new Transaction({ feePayer: crankKeypair.publicKey, blockhash, lastValidBlockHeight })
-  tx.add(ixCapsule)
-  tx.add(ixVault)
+  tx.add(ix)
   tx.sign(crankKeypair)
 
   const txSig = await erConnection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
   await erConnection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
-  console.log(`[crank] Commit+undelegate from ER: ${txSig}`)
+  console.log(`[crank] crank_undelegate from ER: ${txSig}`)
   return txSig
 }
 
@@ -457,20 +463,34 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
       } else {
         console.log(`[crank] Skipping execute for already-executed capsule ${capsule.publicKey.toBase58()}, proceeding to distribute`)
 
-        // If still delegated, send commit+undelegate and skip — wait for next cycle
+        // If still delegated, send commit+undelegate — distribute on next cycle
         if (capsule.isDelegated) {
           try {
             const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
-            console.log(`[crank] Retry commit+undelegate sent (no wait): ${undelegTx}`)
+            console.log(`[crank] Commit+undelegate sent: ${undelegTx} — distribute next cycle`)
           } catch (undelegErr) {
             const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
-            console.log(`[crank] Retry commit+undelegate failed: ${msg}`)
+            console.log(`[crank] Commit+undelegate failed: ${msg}`)
           }
           continue
         }
       }
 
       // Distribute assets on base layer (separate instruction for actual SOL/SPL transfers)
+      // Pre-check: verify vault has enough balance to cover totalAmount + fees
+      try {
+        const totalAmountLamportsCheck = parseTotalAmountLamports(capsule.account.intentData)
+        const vaultBalanceCheck = await connection.getBalance(vaultPDA)
+        // Need totalAmount + execution fee (30,000) + some margin for rent
+        const minRequired = totalAmountLamportsCheck + 30_000 + 960_000
+        if (vaultBalanceCheck < minRequired) {
+          console.log(`[crank] Skipping distribute for ${capsule.publicKey.toBase58()}: vault=${vaultBalanceCheck} < required=${minRequired}`)
+          continue
+        }
+      } catch (balErr) {
+        console.log(`[crank] Vault balance check failed for ${capsule.publicKey.toBase58()}, skipping distribute`)
+        continue
+      }
       try {
         const distTx = await distributeCapsuleAssets(connection, crankKeypair, capsule)
         distributedCount += 1
