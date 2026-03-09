@@ -65,6 +65,35 @@ function DashedLine({
 
 const features: any[] = []
 
+const quickStartCards = [
+  {
+    title: 'Create Capsule',
+    desc: 'Define beneficiary wallets, allocation, and inactivity period in under 2 minutes.',
+    href: '/create',
+    cta: 'Start Creating',
+  },
+  {
+    title: 'Track Activity',
+    desc: 'Watch wallet-level activity signals and capsule status from a single dashboard.',
+    href: '/dashboard',
+    cta: 'Open Dashboard',
+  },
+  {
+    title: 'Mobile Demo',
+    desc: 'Run the Seeker-native flow and sign extension actions directly from Android.',
+    href: 'https://seeker.solanamobile.com',
+    cta: 'Download APK',
+    external: true,
+  },
+]
+
+const proofMetrics = [
+  { label: 'Chains', value: 'Solana-first' },
+  { label: 'Execution', value: 'Permissionless' },
+  { label: 'Privacy', value: 'PER (TEE)' },
+  { label: 'Runtime', value: 'Automatic' },
+]
+
 /* Why Heres benefit-focused cards */
 const whyHeresCards = [
   {
@@ -250,28 +279,62 @@ export default function HomePage() {
           {/* Description + CTAs */}
           <div className="mt-12 sm:mt-14 text-center" data-hero-below-capsule>
             <p className="mx-auto max-w-2xl text-base sm:text-lg text-Heres-muted leading-relaxed">
-              Define once. Delegate to Magicblock PER (TEE). Execution runs on Solana when conditions are met. No bridges, no third party.
+              Create once, then let Heres monitor silently. When inactivity conditions are met, execution finalizes on Solana without manual intervention.
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-4">
               <Link
                 href="/create"
                 className="btn-primary min-w-[180px] shrink-0 rounded-full py-4 text-center text-sm"
               >
-                Get Started
+                Create Capsule
               </Link>
-              <button
-                type="button"
+              <Link
+                href="/dashboard"
                 className="btn-secondary min-w-[180px] shrink-0 rounded-full py-4 text-center text-sm"
-                aria-label="Download APK (coming soon)"
+                aria-label="Open dashboard"
               >
-                Download APK
-              </button>
+                Open Dashboard
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
       <div className="glow-line" />
+
+      {/* Quick start + proof */}
+      <section className="relative py-14 sm:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-4 lg:grid-cols-3">
+            {quickStartCards.map((card) => (
+              <div key={card.title} className="card-bento p-6">
+                <h3 className="font-display text-xl font-bold uppercase tracking-tight text-Heres-white">{card.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-Heres-muted">{card.desc}</p>
+                <Link
+                  href={card.href}
+                  target={card.external ? '_blank' : undefined}
+                  rel={card.external ? 'noopener noreferrer' : undefined}
+                  className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-Heres-accent/90 transition-colors hover:text-Heres-accent"
+                >
+                  {card.cta}
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {proofMetrics.map((m) => (
+              <div key={m.label} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-center">
+                <p className="font-display text-[10px] uppercase tracking-widest text-white/40">{m.label}</p>
+                <p className="mt-1 font-display text-sm uppercase tracking-wide text-Heres-white">{m.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Why Build With Heres */}
       <section ref={whySectionRef} className="why-build-section py-24 sm:py-32">
