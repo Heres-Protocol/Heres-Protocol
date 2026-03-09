@@ -89,6 +89,7 @@ export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput):
   })
 
   const program = getProgramForOwner(owner)
+  const programId = getProgramId()
   const [capsulePDA] = getCapsulePDA(owner)
   const [vaultPDA] = getCapsuleVaultPDA(owner)
   const [feeConfigPDA] = getFeeConfigPDA()
@@ -99,7 +100,7 @@ export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput):
 
   const ix = await program.methods
     .createCapsule(new BN(inactivitySeconds), Buffer.from(intentData))
-    .accounts({
+    .accountsStrict({
       capsule: capsulePDA,
       vault: vaultPDA,
       owner,
@@ -107,9 +108,10 @@ export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput):
       platformFeeRecipient,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
-      mint: null,
-      sourceTokenAccount: null,
-      vaultTokenAccount: null,
+      // Anchor optional-account sentinel for "None".
+      mint: programId,
+      sourceTokenAccount: programId,
+      vaultTokenAccount: programId,
       associatedTokenProgram: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
     } as any)
     .instruction()
