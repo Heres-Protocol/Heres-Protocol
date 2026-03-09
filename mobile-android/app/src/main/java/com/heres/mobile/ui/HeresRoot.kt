@@ -180,6 +180,17 @@ private fun friendlyError(input: String?): String? {
     }
 }
 
+private fun shortUiError(input: String?, fallback: String): String {
+    val raw = input?.trim().orEmpty()
+    if (raw.isBlank()) return fallback
+    return when {
+        raw.contains("iconRelativeUri", ignoreCase = true) -> "지갑 앱 연결 설정을 확인해 주세요."
+        raw.contains("LifecycleOwner", ignoreCase = true) -> "지갑 연결을 다시 시도해 주세요."
+        raw.length > 96 -> raw.take(93) + "..."
+        else -> raw
+    }
+}
+
 @Composable
 private fun TrendBars(txCount: Int, tokenEvents: Int) {
     val max = (maxOf(txCount, tokenEvents, 1)).toFloat()
@@ -232,7 +243,7 @@ private fun HomeContent(
                                     vm.setWallet(it)
                                     "Connected: ${it.take(4)}...${it.takeLast(4)}"
                                 },
-                                onFailure = { "Connect failed: ${it.message}" }
+                                onFailure = { "Connect failed: ${shortUiError(it.message, "지갑 연결 실패")}" }
                             )
                         }
                     }, enabled = !state.loading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9))) { Text("Connect", maxLines = 1) }
@@ -277,7 +288,12 @@ private fun HomeContent(
                     Button(onClick = {
                         scope.launch {
                             val result = onSignAndSendUnsignedTx(state.extendUnsignedTx.transactionBase64)
-                            onExtendSendResult(result.fold({ "update_activity sent: $it" }, { "update_activity failed: ${it.message}" }))
+                            onExtendSendResult(
+                                result.fold(
+                                    { "update_activity sent: $it" },
+                                    { "update_activity failed: ${shortUiError(it.message, "서명 또는 전송 실패")}" }
+                                )
+                            )
                         }
                     }, colors = ButtonDefaults.buttonColors(containerColor = Mint)) {
                         Text("Sign & Send Extension")
@@ -317,14 +333,14 @@ private fun CreateContent(
                             scope.launch {
                                 val result = onConnectWallet()
                                 connectResult = result.fold(
-                                    onSuccess = {
-                                        vm.setWallet(it)
-                                        "Connected: ${it.take(4)}...${it.takeLast(4)}"
-                                    },
-                                    onFailure = { "Connect failed: ${it.message}" }
-                                )
-                            }
-                        },
+                                onSuccess = {
+                                    vm.setWallet(it)
+                                    "Connected: ${it.take(4)}...${it.takeLast(4)}"
+                                },
+                                onFailure = { "Connect failed: ${shortUiError(it.message, "지갑 연결 실패")}" }
+                            )
+                        }
+                    },
                         enabled = !state.loading,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9))
                     ) {
@@ -358,7 +374,12 @@ private fun CreateContent(
                     Button(onClick = {
                         scope.launch {
                             val result = onSignAndSendUnsignedTx(state.createForm.unsignedTx.transactionBase64)
-                            onCreateSendResult(result.fold({ "Create sent: $it" }, { "Create failed: ${it.message}" }))
+                            onCreateSendResult(
+                                result.fold(
+                                    { "Create sent: $it" },
+                                    { "Create failed: ${shortUiError(it.message, "서명 또는 전송 실패")}" }
+                                )
+                            )
                         }
                     }, colors = ButtonDefaults.buttonColors(containerColor = Coral)) {
                         Text("Sign & Send Create")
