@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class BeneficiaryDraft(
-    val address: String = "",
+    val address: String = "22qQrq3A4fVN5D8PZDAzUjyrByTYnqTTNKFKXrFWh99J",
     val amountSol: String = ""
 )
 

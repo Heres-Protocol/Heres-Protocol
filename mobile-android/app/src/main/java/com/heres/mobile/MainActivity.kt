@@ -7,10 +7,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
-import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import com.heres.mobile.ui.HeresRoot
 import com.heres.mobile.ui.HeresTheme
 import com.heres.mobile.wallet.WalletSigner
+import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 
 class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher =
@@ -30,12 +30,8 @@ class MainActivity : ComponentActivity() {
             HeresTheme {
                 Surface {
                     HeresRoot(
-                        onConnectWallet = {
-                            walletSigner.connectWallet()
-                        },
-                        onSignAndSendUnsignedTx = { unsigned ->
-                            walletSigner.signAndSendUnsignedTx(unsigned)
-                        }
+                        onConnectWallet = { walletSigner.connectWallet() },
+                        onSignAndSendUnsignedTx = { unsigned -> walletSigner.signAndSendUnsignedTx(unsigned) }
                     )
                 }
             }
