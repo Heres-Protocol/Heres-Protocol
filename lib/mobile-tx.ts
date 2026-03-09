@@ -107,6 +107,9 @@ export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput):
       platformFeeRecipient,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
+      mint: null,
+      sourceTokenAccount: null,
+      vaultTokenAccount: null,
       associatedTokenProgram: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
     } as any)
     .instruction()
