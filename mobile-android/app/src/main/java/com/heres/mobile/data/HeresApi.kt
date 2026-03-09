@@ -7,6 +7,9 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface HeresApi {
+    @GET("api/mobile/dashboard")
+    suspend fun getDashboardCapsules(@Query("wallet") wallet: String? = null): DashboardCapsulesResponse
+
     @GET("api/mobile/activity-score")
     suspend fun getActivityScore(@Query("wallet") wallet: String): ActivityScoreResponse
 
@@ -24,4 +27,7 @@ interface HeresApi {
 
     @POST("api/mobile/tx/update-activity")
     suspend fun buildUpdateActivityUnsignedTx(@Body request: UpdateActivityUnsignedRequest): UnsignedTxResponse
+
+    @POST("api/capsule-registry")
+    suspend fun registerCapsuleOwner(@Body request: RegisterCapsuleOwnerRequest)
 }

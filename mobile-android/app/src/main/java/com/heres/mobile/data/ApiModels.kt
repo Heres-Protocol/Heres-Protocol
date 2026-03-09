@@ -20,6 +20,21 @@ data class CapsulesResponse(
 )
 
 @Serializable
+data class DashboardSummaryResponse(
+    val total: Int = 0,
+    val active: Int = 0,
+    val executed: Int = 0,
+    val expired: Int = 0,
+)
+
+@Serializable
+data class DashboardCapsulesResponse(
+    val wallet: String? = null,
+    val summary: DashboardSummaryResponse = DashboardSummaryResponse(),
+    val items: List<CapsuleListItem> = emptyList()
+)
+
+@Serializable
 data class CapsuleListItem(
     val capsuleAddress: String,
     val owner: String,
@@ -78,5 +93,10 @@ data class UnsignedTxResponse(
 
 @Serializable
 data class UpdateActivityUnsignedRequest(
+    val owner: String
+)
+
+@Serializable
+data class RegisterCapsuleOwnerRequest(
     val owner: String
 )

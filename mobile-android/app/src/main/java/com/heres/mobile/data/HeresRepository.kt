@@ -43,6 +43,10 @@ class HeresRepository {
         api.getActivityScore(wallet)
     }
 
+    suspend fun getDashboardCapsules(wallet: String? = null): DashboardCapsulesResponse = callApi {
+        api.getDashboardCapsules(wallet?.takeIf { it.isNotBlank() })
+    }
+
     suspend fun getMyCapsules(wallet: String): List<CapsuleListItem> = callApi {
         api.getMyCapsules(wallet).items
     }
@@ -79,13 +83,42 @@ class HeresRepository {
         api.buildUpdateActivityUnsignedTx(UpdateActivityUnsignedRequest(owner))
     }
 
+    suspend fun registerCapsuleOwner(owner: String) {
+        callApi {
+            api.registerCapsuleOwner(RegisterCapsuleOwnerRequest(owner))
+        }
+    }
+
+    suspend fun getDashboardCapsulesSafe(wallet: String? = null): DashboardCapsulesResponse {
+        return try {
+            getDashboardCapsules(wallet)
+        } catch (error: IllegalStateException) {
+            val walletValue = wallet?.trim().orEmpty()
+            if (!error.message.orEmpty().contains("HTTP 404") || walletValue.isBlank()) {
+                throw error
+            }
+
+            val myCapsules = getMyCapsules(walletValue)
+            DashboardCapsulesResponse(
+                wallet = walletValue,
+                summary = DashboardSummaryResponse(
+                    total = myCapsules.size,
+                    active = myCapsules.count { it.status == "active" },
+                    executed = myCapsules.count { it.status == "executed" },
+                    expired = myCapsules.count { it.status == "expired" },
+                ),
+                items = myCapsules
+            )
+        }
+    }
+
     private suspend fun <T> callApi(block: suspend () -> T): T {
         return try {
             block()
         } catch (error: HttpException) {
             throw IllegalStateException(mapHttpError(error), error)
         } catch (error: IOException) {
-            throw IllegalStateException("네트워크 연결을 확인해 주세요.", error)
+            throw IllegalStateException("Check your network connection and try again.", error)
         }
     }
 
@@ -99,20 +132,20 @@ class HeresRepository {
             ?.trim()
 
         if (code == 400 && serverMessage == "Invalid wallet address") {
-            return "지갑 주소 형식이 올바르지 않습니다."
+            return "The wallet address format is invalid."
         }
         if (code == 404 && serverMessage == "Capsule not found") {
-            return "해당 캡슐을 찾을 수 없습니다."
+            return "The requested capsule could not be found."
         }
         if (serverMessage?.contains("Reached maximum depth for account resolution") == true) {
-            return "캡슐 생성 API가 현재 서버에서 실패하고 있습니다. 잠시 후 다시 시도해 주세요."
+            return "The capsule creation API is failing on the server right now. Please try again shortly."
         }
         if (code >= 500) {
-            return "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+            return "A server error occurred. Please try again shortly."
         }
         if (!serverMessage.isNullOrBlank()) {
             return serverMessage
         }
-        return "요청에 실패했습니다. (HTTP $code)"
+        return "Request failed. (HTTP $code)"
     }
 }

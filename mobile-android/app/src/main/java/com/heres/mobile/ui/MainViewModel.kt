@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.heres.mobile.data.ActivityScoreResponse
 import com.heres.mobile.data.CapsuleDetailResponse
 import com.heres.mobile.data.CapsuleListItem
+import com.heres.mobile.data.DashboardSummaryResponse
 import com.heres.mobile.data.ExtendPreviewResponse
 import com.heres.mobile.data.HeresRepository
 import com.heres.mobile.data.UnsignedTxResponse
@@ -32,6 +33,8 @@ data class MainUiState(
     val wallet: String = "",
     val loading: Boolean = false,
     val error: String? = null,
+    val dashboardSummary: DashboardSummaryResponse = DashboardSummaryResponse(),
+    val dashboardCapsules: List<CapsuleListItem> = emptyList(),
     val activity: ActivityScoreResponse? = null,
     val capsules: List<CapsuleListItem> = emptyList(),
     val selectedCapsule: CapsuleDetailResponse? = null,
@@ -48,6 +51,20 @@ class MainViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(MainUiState())
     val state: StateFlow<MainUiState> = _state.asStateFlow()
+    private var restoredWallet = false
+
+    init {
+        refresh()
+    }
+
+    fun restoreWallet(wallet: String) {
+        val normalized = wallet.trim()
+        if (normalized.isBlank()) return
+        if (restoredWallet && _state.value.wallet == normalized) return
+        restoredWallet = true
+        _state.value = _state.value.copy(wallet = normalized, error = null)
+        refresh()
+    }
 
     fun setWallet(wallet: String) {
         _state.value = _state.value.copy(wallet = wallet.trim(), error = null)
@@ -158,26 +175,30 @@ class MainViewModel(
     }
 
     fun refresh() {
-        val wallet = _state.value.wallet
-        if (wallet.isBlank()) {
-            _state.value = _state.value.copy(error = "Enter wallet address")
-            return
-        }
+        val wallet = _state.value.wallet.trim()
 
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             runCatching {
-                val activity = repository.getActivityScore(wallet)
-                val capsules = repository.getMyCapsules(wallet)
-                val extend = repository.getExtendPreview(wallet)
-                Triple(activity, capsules, extend)
-            }.onSuccess { (activity, capsules, extend) ->
+                val dashboard = repository.getDashboardCapsulesSafe(wallet.ifBlank { null })
+                val activity = if (wallet.isBlank()) null else repository.getActivityScore(wallet)
+                val capsules = if (wallet.isBlank()) emptyList() else repository.getMyCapsules(wallet)
+                val extend = if (wallet.isBlank()) null else repository.getExtendPreview(wallet)
+                Quadruple(dashboard.summary, dashboard.items, activity, Triple(capsules, extend, wallet))
+            }.onSuccess { (dashboardSummary, dashboardCapsules, activity, walletData) ->
+                val (capsules, extend, activeWallet) = walletData
                 _state.value = _state.value.copy(
                     loading = false,
+                    dashboardSummary = dashboardSummary,
+                    dashboardCapsules = dashboardCapsules,
                     activity = activity,
                     capsules = capsules,
                     extendPreview = extend,
-                    selectedCapsule = null,
+                    selectedCapsule = _state.value.selectedCapsule?.takeIf { detail ->
+                        dashboardCapsules.any { it.capsuleAddress == detail.capsuleAddress } ||
+                            capsules.any { it.capsuleAddress == detail.capsuleAddress }
+                    },
+                    wallet = activeWallet,
                     error = null
                 )
             }.onFailure { error ->
@@ -224,4 +245,21 @@ class MainViewModel(
             }
         }
     }
+
+    fun registerCreatedCapsuleOwner() {
+        val wallet = _state.value.wallet.trim()
+        if (wallet.isBlank()) return
+
+        viewModelScope.launch {
+            runCatching { repository.registerCapsuleOwner(wallet) }
+            refresh()
+        }
+    }
 }
+
+private data class Quadruple<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D,
+)
