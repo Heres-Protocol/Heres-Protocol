@@ -910,7 +910,7 @@ export default function CapsuleDetailPage() {
                     <Tooltip
                       contentStyle={{ backgroundColor: 'var(--Heres-card)', border: '1px solid var(--Heres-border)' }}
                       labelStyle={{ color: 'var(--Heres-white)' }}
-                      formatter={(value: number | undefined) => [value != null ? `$${Number(value).toFixed(2)}` : '$0.00', 'USD']}
+                      formatter={(value) => [value != null && !Array.isArray(value) ? '$' + Number(value).toFixed(2) : '$0.00', 'USD']}
                     />
                     <Area
                       type="monotone"

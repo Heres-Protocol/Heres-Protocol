@@ -1,5 +1,6 @@
 import { Pool, type QueryResult, type QueryResultRow } from 'pg'
 import { debugWarn } from '@/lib/log'
+import { POSTGRES_SCHEMA_SQL } from '@/lib/postgres-schema'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -34,21 +35,13 @@ export function getPgPool(): Pool | null {
   return globalThis.__heresPgPool
 }
 
-async function readSchemaSql(): Promise<string> {
-  const fs = await import('fs/promises')
-  const path = await import('path')
-  const schemaPath = path.join(process.cwd(), 'db', 'schema.sql')
-  return await fs.readFile(schemaPath, 'utf8')
-}
-
 export async function ensurePostgresSchema(): Promise<void> {
   const pool = getPgPool()
   if (!pool) return
 
   if (!globalThis.__heresPgSchemaReady) {
     globalThis.__heresPgSchemaReady = (async () => {
-      const schemaSql = await readSchemaSql()
-      await pool.query(schemaSql)
+      await pool.query(POSTGRES_SCHEMA_SQL)
     })().catch((error) => {
       globalThis.__heresPgSchemaReady = undefined
       throw error
