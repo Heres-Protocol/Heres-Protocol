@@ -29,6 +29,22 @@ const nextConfig = {
         resourceRegExp: /^pino-pretty$/,
       })
     )
+
+    // Windows dev environments can surface Watchpack lstat errors for system files
+    // like C:\pagefile.sys when the watcher walks too broadly. Ignore those paths
+    // so local development stays stable without affecting runtime behavior.
+    config.watchOptions = {
+      ...(config.watchOptions || {}),
+      ignored: [
+        '**/.git/**',
+        '**/node_modules/**',
+        'C:/pagefile.sys',
+        'C:/hiberfil.sys',
+        'C:/swapfile.sys',
+        'C:/$Recycle.Bin/**',
+        'C:/System Volume Information/**',
+      ],
+    }
     
     return config
   },

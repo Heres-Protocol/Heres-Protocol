@@ -8,7 +8,7 @@ import type { Wallet } from '@coral-xyz/anchor'
 const WalletClass = (require('@coral-xyz/anchor').Wallet || (AnchorProvider.prototype as any).wallet)
 import { WalletContextState } from '@solana/wallet-adapter-react'
 import idl from '../idl/heres_program.json'
-import { getSolanaConnection, getTeeConnection, getProgramId } from '@/config/solana'
+import { getSolanaConnection, getSolanaFallbackConnection, getTeeConnection, getProgramId } from '@/config/solana'
 import {
   getCapsulePDA,
   getFeeConfigPDA,
@@ -20,6 +20,7 @@ import {
 } from './program'
 import { SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { TEE_AUTH } from './tee'
+import { debugLog } from '@/lib/log'
 import type { IntentCapsule } from '@/types'
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
@@ -189,7 +190,7 @@ export async function createCapsule(
         associatedTokenProgram: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
       }
 
-      console.log('[createCapsule] Accounts:', Object.keys(accounts).map(k => `${k}: ${accounts[k]?.toString()}`))
+      debugLog('[createCapsule] Accounts:', Object.keys(accounts).map(k => `${k}: ${accounts[k]?.toString()}`))
 
       const tx = await program.methods
         .createCapsule(new BN(inactivityPeriodSeconds), intentDataBuffer)
@@ -222,7 +223,7 @@ export async function createCapsule(
       if (isRetryableError && attempt < maxRetries - 1) {
         // Wait before retry (exponential backoff: 2s, 4s, 8s, 16s)
         const delay = Math.min(2000 * Math.pow(2, attempt), 16000)
-        console.log(`RPC error (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`)
+        debugLog(`RPC error (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`)
         await new Promise(resolve => setTimeout(resolve, delay))
         continue
       }
@@ -323,7 +324,7 @@ export async function executeIntent(
   const isDelegated = accountInfo && accountInfo.owner.equals(delegationProgramId)
 
   if (isDelegated) {
-    console.log('[executeIntent] Capsule is delegated, routing through ER RPC')
+    debugLog('[executeIntent] Capsule is delegated, routing through ER RPC')
     // Use raw instruction with 4 required accounts (deployed binary accepts 4-7 accounts;
     // optional accounts default to None when not provided)
     const programId = getProgramId()
@@ -385,7 +386,7 @@ export async function delegateCapsule(
 
   const [capsulePDA] = getCapsulePDA(wallet.publicKey)
   const activeValidator = validatorPubkey ?? new PublicKey(MAGICBLOCK_ER.ACTIVE_VALIDATOR)
-  console.log('[delegateCapsule] Using validator:', activeValidator.toBase58())
+  debugLog('[delegateCapsule] Using validator:', activeValidator.toBase58())
 
   // Verify capsule account exists and is owned by our program
   const connection = getSolanaConnection()
@@ -399,7 +400,7 @@ export async function delegateCapsule(
 
   // Check if already delegated
   if (accountInfo.owner.equals(delegationProgramId)) {
-    console.log('Capsule is already delegated to MagicBlock (Ephemereality). Proceeding...')
+    debugLog('Capsule is already delegated to MagicBlock (Ephemereality). Proceeding...')
     return 'ALREADY_DELEGATED'
   }
 
@@ -474,9 +475,9 @@ export async function scheduleExecuteIntent(
   const executionIntervalMillis = args?.executionIntervalMillis ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_INTERVAL_MS || 60000);
   const iterations = args?.iterations ?? new BN(MAGICBLOCK_ER.CRANK_DEFAULT_ITERATIONS || 0);
 
-  console.log('[scheduleExecuteIntent] Scheduling on ER RPC (Asia devnet)')
-  console.log('[scheduleExecuteIntent] Capsule:', capsulePDA.toBase58())
-  console.log('[scheduleExecuteIntent] Payer:', wallet.publicKey.toBase58())
+  debugLog('[scheduleExecuteIntent] Scheduling on ER RPC (Asia devnet)')
+  debugLog('[scheduleExecuteIntent] Capsule:', capsulePDA.toBase58())
+  debugLog('[scheduleExecuteIntent] Payer:', wallet.publicKey.toBase58())
 
   // Build manual TransactionInstruction matching deployed binary (7 accounts).
   // magic_program, payer, capsule, vault, permission_program, permission, magic_context.
@@ -515,15 +516,15 @@ export async function scheduleExecuteIntent(
 
     // Sign via wallet adapter
     const signedTx = await wallet.signTransaction!(tx);
-    console.log('[scheduleExecuteIntent] Sending signed tx to ER RPC...');
+    debugLog('[scheduleExecuteIntent] Sending signed tx to ER RPC...');
 
     const txSignature = await erConnection.sendRawTransaction(signedTx.serialize(), {
       skipPreflight: true,
     });
-    console.log('[scheduleExecuteIntent] Tx sent, confirming...', txSignature);
+    debugLog('[scheduleExecuteIntent] Tx sent, confirming...', txSignature);
     await erConnection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed');
 
-    console.log('[scheduleExecuteIntent] Success! TX:', txSignature);
+    debugLog('[scheduleExecuteIntent] Success! TX:', txSignature);
     return txSignature;
   } catch (err: any) {
     console.error('[scheduleExecuteIntent] ✗ Error:', err);
@@ -619,7 +620,7 @@ export async function distributeAssets(
     }
   }) || []
 
-  console.log('[distributeAssets] Calling with beneficiaries:', beneficiaries?.length || 0)
+  debugLog('[distributeAssets] Calling with beneficiaries:', beneficiaries?.length || 0)
 
   // Check if capsule is delegated — if so, route through ER RPC
   const baseConnection = getSolanaConnection()
@@ -859,11 +860,12 @@ export async function recreateCapsule(
  */
 export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null> {
   const connection = getSolanaConnection()
+  const fallbackConnection = getSolanaFallbackConnection()
   const [capsulePDA] = getCapsulePDA(owner)
 
   try {
-    console.log('Fetching capsule for owner:', owner.toString())
-    console.log('Capsule PDA:', capsulePDA.toString())
+    debugLog('Fetching capsule for owner:', owner.toString())
+    debugLog('Capsule PDA:', capsulePDA.toString())
 
     // Retry logic for RPC errors
     const maxRetries = 3
@@ -875,7 +877,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
         // Use Anchor's account decoder to parse the account
         // We need a provider to use Program.account, but we can decode manually
         accountInfo = await connection.getAccountInfo(capsulePDA)
-        console.log(`Account info (attempt ${attempt + 1}):`, accountInfo ? 'Found' : 'Not found')
+        debugLog(`Account info (attempt ${attempt + 1}):`, accountInfo ? 'Found' : 'Not found')
         break // Success, exit retry loop
       } catch (error: any) {
         lastError = error
@@ -892,7 +894,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
 
         if (isRetryableError && attempt < maxRetries - 1) {
           const delay = Math.min(2000 * Math.pow(2, attempt), 10000)
-          console.log(`RPC error (attempt ${attempt + 1}/${maxRetries}): ${errorMessage}, retrying in ${delay}ms...`)
+          debugLog(`RPC error (attempt ${attempt + 1}/${maxRetries}): ${errorMessage}, retrying in ${delay}ms...`)
           await new Promise(resolve => setTimeout(resolve, delay))
           continue
         }
@@ -900,20 +902,29 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       }
     }
 
+    if (!accountInfo && lastError) {
+      try {
+        debugLog('Primary capsule fetch failed, retrying with fallback RPC...')
+        accountInfo = await fallbackConnection.getAccountInfo(capsulePDA)
+      } catch (fallbackError: any) {
+        debugLog('Fallback capsule fetch also failed:', fallbackError?.message || fallbackError)
+      }
+    }
+
     if (!accountInfo || !accountInfo.data) {
-      console.log('No account info or data found for PDA:', capsulePDA.toString())
+      debugLog('No account info or data found for PDA:', capsulePDA.toString())
       return null
     }
 
     // Check if the account is delegated to MagicBlock ER
     const delegationProgramId = new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)
     if (accountInfo.owner.equals(delegationProgramId)) {
-      console.log('Account is delegated. Re-fetching from ER RPC...')
+      debugLog('Account is delegated. Re-fetching from ER RPC...')
       const { Connection: SolConnection } = require('@solana/web3.js')
       const erConn = new SolConnection(MAGICBLOCK_ER.ER_RPC_URL, { commitment: 'confirmed' })
       const erAccountInfo = await erConn.getAccountInfo(capsulePDA)
       if (erAccountInfo && erAccountInfo.data) {
-        console.log('Successfully fetched delegated state from ER RPC')
+        debugLog('Successfully fetched delegated state from ER RPC')
         accountInfo.data = erAccountInfo.data
       }
     }
@@ -988,7 +999,7 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
       capsule.mint = new PublicKey(dataToParse.slice(offset, offset + 32))
     }
 
-    console.log('Successfully fetched capsule:', {
+    debugLog('Successfully fetched capsule:', {
       owner: capsule.owner.toString(),
       isActive: capsule.isActive,
       executedAt: capsule.executedAt,
@@ -1103,9 +1114,9 @@ export async function undelegateCapsule(
   const magicContextId = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
   const programId = getProgramId()
 
-  console.log('[undelegateCapsule] Committing and undelegating from ER via crank_undelegate...')
-  console.log(' - Capsule:', capsulePDA.toBase58())
-  console.log(' - Vault:', vaultPDA.toBase58())
+  debugLog('[undelegateCapsule] Committing and undelegating from ER via crank_undelegate...')
+  debugLog(' - Capsule:', capsulePDA.toBase58())
+  debugLog(' - Vault:', vaultPDA.toBase58())
 
   // Use our program's crank_undelegate instruction — does CPI to Magic program
   // so it provides proper parent program ID context.
@@ -1135,7 +1146,7 @@ export async function undelegateCapsule(
   const txSig = await erConnection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
   await erConnection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
 
-  console.log('[undelegateCapsule] Success. Tx:', txSig)
+  debugLog('[undelegateCapsule] Success. Tx:', txSig)
   return txSig
 }
 
@@ -1170,7 +1181,7 @@ export async function processUndelegation(
     .accounts(accounts)
     .rpc()
 
-  console.log('[processUndelegation] Success. Tx:', tx)
+  debugLog('[processUndelegation] Success. Tx:', tx)
   return tx
 }
 
@@ -1195,7 +1206,7 @@ export async function cancelCapsule(
     systemProgram: SystemProgram.programId,
   }
 
-  console.log('[cancelCapsule] Cancelling capsule and reclaiming SOL...')
+  debugLog('[cancelCapsule] Cancelling capsule and reclaiming SOL...')
 
   const tx = await program.methods
     .cancelCapsule()
@@ -1203,7 +1214,7 @@ export async function cancelCapsule(
     .accounts(accounts)
     .rpc()
 
-  console.log('[cancelCapsule] Success. Tx:', tx)
+  debugLog('[cancelCapsule] Success. Tx:', tx)
   return tx
 }
 
@@ -1225,7 +1236,7 @@ export async function deactivateCapsule(
     owner: wallet.publicKey,
   }
 
-  console.log('[deactivateCapsule] Deactivating capsule...')
+  debugLog('[deactivateCapsule] Deactivating capsule...')
 
   const tx = await program.methods
     .deactivateCapsule()
@@ -1233,9 +1244,10 @@ export async function deactivateCapsule(
     .accounts(accounts)
     .rpc()
 
-  console.log('[deactivateCapsule] Success. Tx:', tx)
+  debugLog('[deactivateCapsule] Success. Tx:', tx)
   return tx
 }
 
 // Re-export types
 export type { IntentCapsule } from '@/types'
+

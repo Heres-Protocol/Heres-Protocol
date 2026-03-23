@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { useRef, useEffect, useState } from 'react'
+import { getAppHref } from '@/lib/app-url'
 
 const AsciiCapsule = dynamic(() => import('@/components/AsciiCapsule').then((m) => ({ default: m.AsciiCapsule })), {
   ssr: false,
@@ -69,13 +70,13 @@ const quickStartCards = [
   {
     title: 'Create Capsule',
     desc: 'Define beneficiary wallets, allocation, and inactivity period in under 2 minutes.',
-    href: '/create',
+    href: getAppHref('/create'),
     cta: 'Start Creating',
   },
   {
     title: 'Track Activity',
     desc: 'Watch wallet-level activity signals and capsule status from a single dashboard.',
-    href: '/dashboard',
+    href: getAppHref('/dashboard'),
     cta: 'Open Dashboard',
   },
   {
@@ -100,19 +101,19 @@ const whyHeresCards = [
     title: 'Your intent, executed when it matters',
     description: 'Leave instructions that run only when the time is right. No one can execute early. Your conditions stay yours until the moment you chose.',
     image: '/why-Heres-1.png',
-    href: '/create',
+    href: getAppHref('/create'),
   },
   {
     title: 'Privacy by design',
     description: 'Your conditions stay private. Only the outcome is visible on-chain. No third party sees your rules. Just the result when silence becomes truth.',
     image: '/why-Heres-2.png',
-    href: '/dashboard',
+    href: getAppHref('/dashboard'),
   },
   {
     title: "Set it once. It runs when you're silent.",
     description: 'Define your intent once. No bridges, no middlemen. When your conditions are met, execution happens automatically, the way you wanted.',
     image: '/why-Heres-3.png',
-    href: '/create',
+    href: getAppHref('/create'),
   },
 ]
 
@@ -283,13 +284,13 @@ export default function HomePage() {
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-4">
               <Link
-                href="/create"
+                href={getAppHref('/create')}
                 className="btn-primary min-w-[180px] shrink-0 rounded-full py-4 text-center text-sm"
               >
                 Create Capsule
               </Link>
               <Link
-                href="/dashboard"
+                href={getAppHref('/dashboard')}
                 className="btn-secondary min-w-[180px] shrink-0 rounded-full py-4 text-center text-sm"
                 aria-label="Open dashboard"
               >
@@ -410,7 +411,7 @@ export default function HomePage() {
                   >
                     <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm p-3 text-center md:p-4 w-[164px]">
                       <div className="flex items-center justify-center gap-2 font-display text-sm md:text-base text-white whitespace-nowrap uppercase tracking-wide">
-                        <Image src="/logos/solana.svg" alt="Solana" width={24} height={24} className="shrink-0" unoptimized />
+                        <Image src="/logos/solana.svg" alt="Solana" width={24} height={24} className="h-6 w-auto shrink-0" unoptimized />
                         <span>Solana Devnet</span>
                       </div>
                     </div>
@@ -473,7 +474,7 @@ export default function HomePage() {
                   >
                     <div className="flex flex-col items-center gap-1 rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm px-3 py-2 leading-none md:px-4 md:py-2.5 min-w-[220px] w-[220px]">
                       <div className="flex items-center gap-2 justify-center whitespace-nowrap">
-                        <Image src="/logos/magicblock.svg" alt="Magicblock" width={20} height={20} className="shrink-0" unoptimized />
+                        <Image src="/logos/magicblock.svg" alt="Magicblock" width={20} height={20} className="h-5 w-auto shrink-0" unoptimized />
                         <span className="font-display text-[11px] uppercase tracking-wider text-white/60">Magicblock PER (TEE)</span>
                       </div>
                       <span className="font-display text-[9px] uppercase tracking-widest text-white/30">Privacy</span>
@@ -559,7 +560,7 @@ export default function HomePage() {
                   />
                 </div>
               </div>
-              <Link href="/create" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-Heres-accent/80 transition-colors hover:text-Heres-accent">
+              <Link href={getAppHref('/create')} className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-Heres-accent/80 transition-colors hover:text-Heres-accent">
                 View the create page
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
               </Link>
@@ -591,7 +592,7 @@ export default function HomePage() {
                   </code>
                 </pre>
               </div>
-              <Link href="/create" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-Heres-accent/80 transition-colors hover:text-Heres-accent">
+              <Link href={getAppHref('/create')} className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-Heres-accent/80 transition-colors hover:text-Heres-accent">
                 View the code
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
               </Link>
@@ -618,7 +619,7 @@ export default function HomePage() {
                   />
                 </div>
               </div>
-              <Link href="/dashboard" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-Heres-accent/80 transition-colors hover:text-Heres-accent">
+              <Link href={getAppHref('/dashboard')} className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-Heres-accent/80 transition-colors hover:text-Heres-accent">
                 View the dashboard
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
               </Link>
@@ -697,7 +698,7 @@ export default function HomePage() {
               <p className="mt-8 text-lg leading-relaxed text-Heres-muted">
                 Define your intent once: beneficiaries, amounts, inactivity period. Your capsule lives on Solana; Magicblock PER (TEE) monitors privately. When silence becomes truth, execution runs on Devnet. No third party, no bridges.
               </p>
-              <Link href="/create" className="mt-10 inline-block btn-primary rounded-full px-10 py-4 text-sm">
+              <Link href={getAppHref('/create')} className="mt-10 inline-block btn-primary rounded-full px-10 py-4 text-sm">
                 Create Your Capsule
               </Link>
             </div>

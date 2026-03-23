@@ -16,7 +16,6 @@ import { createCapsule, getCapsule, delegateCapsule, scheduleExecuteIntent } fro
 import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
 import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, MAX_CAPSULE_MODIFICATIONS } from '@/constants'
-import { getNftsByOwner } from '@/lib/helius'
 import { encodeIntentData, daysToSeconds } from '@/utils/intent'
 import { buildCreSignedMessage } from '@/utils/creAuth'
 import { bytesToBase64, encryptPrivateMessage, sha256Hex } from '@/utils/creCrypto'
@@ -86,7 +85,14 @@ export default function CreatePage() {
     const run = async () => {
       if (SOLANA_CONFIG.HELIUS_API_KEY) {
         try {
-          const items = await getNftsByOwner(publicKey.toBase58())
+          const res = await fetch(`/api/helius/nfts?wallet=${encodeURIComponent(publicKey.toBase58())}`, {
+            cache: 'no-store',
+          })
+          const payload = await res.json().catch(() => null)
+          if (!res.ok || !payload) {
+            throw new Error(payload?.error || `NFT request failed (${res.status})`)
+          }
+          const items = Array.isArray(payload.items) ? payload.items as Array<{ mint: string; name?: string; symbol?: string; imageUri?: string }> : []
           if (cancelled) return
           const nfts: NftItem[] = items.map((item) => ({
             mint: item.mint,

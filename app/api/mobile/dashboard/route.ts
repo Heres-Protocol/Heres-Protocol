@@ -3,23 +3,32 @@ import { PublicKey } from '@solana/web3.js'
 import { getRegisteredOwners } from '@/lib/capsule-registry'
 import { getCapsule } from '@/lib/solana'
 import { getCapsulePDA } from '@/lib/program'
-import { computeCapsuleStatus } from '@/lib/mobile'
+import { computeCapsuleStatus, validateWalletQuery } from '@/lib/mobile'
 
 export async function GET(request: NextRequest) {
   try {
-    const wallet = request.nextUrl.searchParams.get('wallet')?.trim() || null
-    if (wallet) {
-      try {
-        new PublicKey(wallet)
-      } catch {
-        return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400 })
-      }
+    const wallet = request.nextUrl.searchParams.get('wallet')
+    const validation = validateWalletQuery(wallet)
+    if (!validation.ok) {
+      return NextResponse.json({
+        wallet: null,
+        summary: { total: 0, active: 0, executed: 0, expired: 0 },
+        items: [],
+      })
     }
 
-    const owners = await getRegisteredOwners()
-    const ownerSet = new Set(owners)
-    if (wallet) {
-      ownerSet.add(wallet)
+    try {
+      new PublicKey(wallet!)
+    } catch {
+      return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400 })
+    }
+
+    const ownerSet = new Set<string>()
+    ownerSet.add(wallet!)
+
+    if (process.env.NODE_ENV !== 'production' && request.nextUrl.searchParams.get('includeRegistered') === '1') {
+      const owners = await getRegisteredOwners()
+      owners.forEach((owner) => ownerSet.add(owner))
     }
 
     const settled = await Promise.allSettled(

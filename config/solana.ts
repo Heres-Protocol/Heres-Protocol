@@ -5,27 +5,37 @@
 import { Connection, PublicKey } from '@solana/web3.js'
 import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE, MAGICBLOCK_ER } from '@/constants'
 
-let cachedConnection: Connection | null = null
+let cachedPrimaryConnection: Connection | null = null
+let cachedFallbackConnection: Connection | null = null
 
-/**
- * Get Solana connection with Helius RPC (Base Layer).
- * Use Helius when API key is set; otherwise fallback to public RPC.
- */
-export function getSolanaConnection(): Connection {
-  if (cachedConnection) return cachedConnection
-
-  const rpcUrl = HELIUS_CONFIG.RPC_URL
-  cachedConnection = new Connection(rpcUrl, {
+function createConnection(rpcUrl: string): Connection {
+  const wsEndpoint = rpcUrl.startsWith('https://') ? rpcUrl.replace('https://', 'wss://') : undefined
+  return new Connection(rpcUrl, {
     commitment: 'confirmed',
-    wsEndpoint: HELIUS_CONFIG.RPC_URL.replace('https', 'wss'),
+    ...(wsEndpoint ? { wsEndpoint } : {}),
     disableRetryOnRateLimit: true,
   })
-  return cachedConnection
 }
 
-/**
- * Get ER RPC connection (Asia devnet) for delegated state queries and scheduling.
- */
+export function getSolanaConnection(): Connection {
+  if (cachedPrimaryConnection) return cachedPrimaryConnection
+  cachedPrimaryConnection = createConnection(HELIUS_CONFIG.RPC_URL)
+  return cachedPrimaryConnection
+}
+
+export function getSolanaFallbackConnection(): Connection {
+  if (cachedFallbackConnection) return cachedFallbackConnection
+  cachedFallbackConnection = createConnection(HELIUS_CONFIG.RPC_URL_ALT)
+  return cachedFallbackConnection
+}
+
+export function getSolanaRpcUrls() {
+  return {
+    primary: HELIUS_CONFIG.RPC_URL,
+    fallback: HELIUS_CONFIG.RPC_URL_ALT,
+  }
+}
+
 export function getErConnection(): Connection {
   return new Connection(MAGICBLOCK_ER.ER_RPC_URL, {
     commitment: 'confirmed',
@@ -33,9 +43,6 @@ export function getErConnection(): Connection {
   })
 }
 
-/**
- * Get direct TEE RPC connection for PER (private) flows.
- */
 export function getTeeConnection(token?: string): Connection {
   const url = token ? `${PER_TEE.TEE_RPC_URL}?token=${token}` : PER_TEE.TEE_RPC_URL
   return new Connection(url, {
@@ -43,16 +50,10 @@ export function getTeeConnection(token?: string): Connection {
   })
 }
 
-/**
- * Get program ID as PublicKey
- */
 export function getProgramId(): PublicKey {
   return new PublicKey(SOLANA_CONFIG.PROGRAM_ID)
 }
 
-/**
- * Validate Solana address
- */
 export function isValidSolanaAddress(address: string): boolean {
   try {
     new PublicKey(address)

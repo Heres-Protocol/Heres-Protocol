@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto'
 import { Redis } from '@upstash/redis'
 import { CreDeliveryLedgerRecord, CreSecretRecord } from '@/lib/cre/types'
 
@@ -33,12 +34,67 @@ type LocalState = {
   deliveries: CreDeliveryLedgerRecord[]
 }
 
+type LocalStateEnvelope = {
+  v: 1
+  alg: 'aes-256-gcm'
+  iv: string
+  tag: string
+  ciphertext: string
+}
+
+function getLocalEncryptionKey(): Buffer {
+  const os = require('os')
+  const fallbackMaterial = [
+    os.hostname?.() || 'unknown-host',
+    os.userInfo?.().username || process.env.USERNAME || 'unknown-user',
+    process.cwd(),
+  ].join('|')
+  const secretMaterial = process.env.CRE_LOCAL_STORE_SECRET?.trim() || fallbackMaterial
+  return createHash('sha256').update(secretMaterial).digest()
+}
+
+function encryptLocalState(state: LocalState): LocalStateEnvelope {
+  const iv = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', getLocalEncryptionKey(), iv)
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(state), 'utf8'), cipher.final()])
+
+  return {
+    v: 1,
+    alg: 'aes-256-gcm',
+    iv: iv.toString('base64'),
+    tag: cipher.getAuthTag().toString('base64'),
+    ciphertext: ciphertext.toString('base64'),
+  }
+}
+
+function decryptLocalState(state: LocalStateEnvelope): LocalState {
+  const decipher = createDecipheriv('aes-256-gcm', getLocalEncryptionKey(), Buffer.from(state.iv, 'base64'))
+  decipher.setAuthTag(Buffer.from(state.tag, 'base64'))
+  const plaintext = Buffer.concat([
+    decipher.update(Buffer.from(state.ciphertext, 'base64')),
+    decipher.final(),
+  ])
+  return JSON.parse(plaintext.toString('utf8')) as LocalState
+}
+
 function loadLocal(): LocalState {
   try {
     const fs = require('fs')
     const p = getLocalPath()
     if (!fs.existsSync(p)) return { secrets: [], deliveries: [] }
-    return JSON.parse(fs.readFileSync(p, 'utf8')) as LocalState
+    const parsed = JSON.parse(fs.readFileSync(p, 'utf8')) as LocalState | LocalStateEnvelope
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'v' in parsed &&
+      'alg' in parsed &&
+      'iv' in parsed &&
+      'tag' in parsed &&
+      'ciphertext' in parsed
+    ) {
+      return decryptLocalState(parsed as LocalStateEnvelope)
+    }
+    return parsed as LocalState
   } catch {
     return { secrets: [], deliveries: [] }
   }
@@ -52,7 +108,7 @@ function saveLocal(state: LocalState) {
     const dir = path.dirname(p)
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
     const tmp = `${p}.tmp`
-    fs.writeFileSync(tmp, JSON.stringify(state, null, 2))
+    fs.writeFileSync(tmp, JSON.stringify(encryptLocalState(state), null, 2))
     fs.renameSync(tmp, p)
   } catch (err) {
     console.warn('[CRE store] local save failed:', err)

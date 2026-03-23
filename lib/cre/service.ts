@@ -56,6 +56,26 @@ function createIdempotencyKey(capsuleAddress: string, executedAt: number): strin
   return `${capsuleAddress}:${executedAt}`
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let index = 0
+
+  const runners = Array.from({ length: Math.max(1, Math.min(concurrency, items.length || 1)) }, async () => {
+    while (index < items.length) {
+      const currentIndex = index
+      index += 1
+      results[currentIndex] = await worker(items[currentIndex])
+    }
+  })
+
+  await Promise.all(runners)
+  return results
+}
+
 async function notifyOps(message: string): Promise<void> {
   const webhook = getRequiredEnv('OPS_ALERT_WEBHOOK_URL')
   if (!webhook) return
@@ -331,20 +351,18 @@ export async function reconcileCreDeliveries(): Promise<{
   failed: number
 }> {
   const secrets = await listCreSecrets()
-  let executedCreCapsules = 0
-  let dispatched = 0
-  let failed = 0
-
-  for (const secret of secrets) {
+  const results = await mapWithConcurrency(secrets, 5, async (secret) => {
     let owner: PublicKey
     try {
       owner = new PublicKey(secret.owner)
     } catch {
-      continue
+      return { executed: false, dispatched: false, failed: false }
     }
 
     const capsule = await fetchCapsuleStateByOwner(owner)
-    if (!capsule?.executedAt) continue
+    if (!capsule?.executedAt) {
+      return { executed: false, dispatched: false, failed: false }
+    }
 
     const parsed = parseIntentPayload(capsule.intentData)
     const cre =
@@ -353,13 +371,21 @@ export async function reconcileCreDeliveries(): Promise<{
         : undefined
     const creSecretRef = typeof cre === 'object' && cre ? (cre as { secretRef?: unknown }).secretRef : undefined
     const creEnabled = typeof cre === 'object' && cre ? Boolean((cre as { enabled?: boolean }).enabled) : false
-    if (!creEnabled || typeof creSecretRef !== 'string' || creSecretRef !== secret.secretRef) continue
+    if (!creEnabled || typeof creSecretRef !== 'string' || creSecretRef !== secret.secretRef) {
+      return { executed: false, dispatched: false, failed: false }
+    }
 
-    executedCreCapsules += 1
-    const result = await dispatchCreDeliveryForCapsule(capsule.capsuleAddress)
-    if (result.ok && !result.skipped) dispatched += 1
-    if (!result.ok) failed += 1
-  }
+    const dispatchResult = await dispatchCreDeliveryForCapsule(capsule.capsuleAddress)
+    return {
+      executed: true,
+      dispatched: Boolean(dispatchResult.ok && !dispatchResult.skipped),
+      failed: !dispatchResult.ok,
+    }
+  })
+
+  const executedCreCapsules = results.filter((result) => result.executed).length
+  const dispatched = results.filter((result) => result.dispatched).length
+  const failed = results.filter((result) => result.failed).length
 
   return {
     scanned: secrets.length,

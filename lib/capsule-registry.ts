@@ -7,6 +7,7 @@
  * Falls back to file-based storage in local dev if env vars are missing.
  */
 import { Redis } from '@upstash/redis'
+import { debugLog } from '@/lib/log'
 
 const REDIS_KEY = 'capsule-owners'
 
@@ -59,12 +60,12 @@ export async function registerCapsuleOwner(ownerPubkey: string): Promise<void> {
     if (!owners.includes(ownerPubkey)) {
       owners.push(ownerPubkey)
       saveLocal(owners)
-      console.log(`[capsule-registry] Registered owner (local): ${ownerPubkey}`)
+      debugLog(`[capsule-registry] Registered owner (local): ${ownerPubkey}`)
     }
     return
   }
   const added = await redis.sadd(REDIS_KEY, ownerPubkey)
-  if (added) console.log(`[capsule-registry] Registered owner: ${ownerPubkey}`)
+  if (added) debugLog(`[capsule-registry] Registered owner: ${ownerPubkey}`)
 }
 
 /** Get all registered capsule owners */

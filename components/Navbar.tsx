@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Menu, User, X, ChevronDown } from 'lucide-react'
 import '@solana/wallet-adapter-react-ui/styles.css'
+import { getAppHref } from '@/lib/app-url'
 
 const WalletMultiButton = dynamic(
   () =>
@@ -16,8 +17,8 @@ const WalletMultiButton = dynamic(
 
 const navLinks = [
   { href: '/', label: 'Home' },
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/create', label: 'Create' },
+  { href: getAppHref('/dashboard'), label: 'Dashboard', activePath: '/dashboard' },
+  { href: getAppHref('/create'), label: 'Create', activePath: '/create' },
 ]
 
 const NETWORKS = [
@@ -62,7 +63,7 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm font-medium transition-colors ${pathname === link.href
+              className={`text-sm font-medium transition-colors ${pathname === ('activePath' in link ? link.activePath : link.href)
                 ? 'text-Heres-accent'
                 : 'text-Heres-muted hover:text-Heres-white'
                 }`}
@@ -142,7 +143,7 @@ export function Navbar() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className={`block rounded-lg px-4 py-2 text-sm font-medium transition-colors ${pathname === link.href
+                    className={`block rounded-lg px-4 py-2 text-sm font-medium transition-colors ${pathname === ('activePath' in link ? link.activePath : link.href)
                       ? 'bg-Heres-accent/30 text-white'
                       : 'text-white hover:bg-white/15'
                       }`}
