@@ -10,6 +10,7 @@ import {
   getCapsuleByAddress,
   executeIntent,
   distributeAssets,
+  undelegateCapsule,
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
@@ -208,6 +209,23 @@ export default function CapsuleDetailPage() {
     } catch (err: any) {
       console.error('[Distribute Assets] Error:', err)
       setActionResult({ type: 'error', message: err.message || 'Distribution failed' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleUndelegate = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    setActionLoading('undelegate')
+    setActionResult(null)
+    try {
+      const tx = await undelegateCapsule(wallet as any, capsule.owner)
+      const refreshed = await getCapsuleByAddress(new PublicKey(capsule.capsuleAddress))
+      setCapsule(refreshed)
+      setActionResult({ type: 'success', message: `Undelegate TX: ${tx}` })
+    } catch (err: any) {
+      console.error('[Undelegate] Error:', err)
+      setActionResult({ type: 'error', message: err.message || 'Undelegation failed' })
     } finally {
       setActionLoading(null)
     }
@@ -722,7 +740,8 @@ export default function CapsuleDetailPage() {
             const isExpired = status === 'Expired'
             const isActive = status === 'Active'
             const canExecute = isExpired && !isExecuted
-            const canDistribute = Boolean(isExecuted)
+            const canUndelegate = Boolean(isDelegated)
+            const canDistribute = Boolean(isExecuted && !isDelegated)
             const canDispatchCre = Boolean(isExecuted && isCreEnabled)
             const allDone = Boolean(isExecuted && creDeliveryStatus?.status === 'delivered')
 
@@ -751,7 +770,12 @@ export default function CapsuleDetailPage() {
                       Inactivity period has elapsed. You can now <strong>Execute Intent</strong> to deactivate the capsule, then distribute assets.
                     </p>
                   )}
-                  {isExecuted && !allDone && (
+                  {isExecuted && isDelegated && (
+                    <p className="text-sm text-blue-400">
+                      Capsule executed on ER. <strong>Undelegate from ER</strong> first, then distribute assets on the base layer.
+                    </p>
+                  )}
+                  {isExecuted && !allDone && !isDelegated && (
                     <p className="text-sm text-Heres-accent">
                       Capsule executed. Proceed to <strong>Distribute Assets</strong>{isCreEnabled ? ' and then dispatch Intent Statement delivery via CRE.' : '.'}
                     </p>
@@ -811,10 +835,25 @@ export default function CapsuleDetailPage() {
                     type="button"
                     onClick={handleDistributeAssets}
                     disabled={!canDistribute || !!actionLoading}
-                    title={!canDistribute ? 'Execute intent first' : 'Distribute SOL/tokens to beneficiaries'}
+                    title={
+                      !canDistribute
+                        ? isDelegated
+                          ? 'Undelegate from ER first'
+                          : 'Execute intent first'
+                        : 'Distribute SOL/tokens to beneficiaries'
+                    }
                     className="rounded-lg border border-Heres-purple px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-Heres-purple/10 text-Heres-purple hover:bg-Heres-purple/20"
                   >
                     {actionLoading === 'distribute' ? 'Distributing...' : 'Distribute Assets'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUndelegate}
+                    disabled={!canUndelegate || !!actionLoading}
+                    title={!canUndelegate ? 'Capsule is already on base layer' : 'Commit ER state and undelegate back to Solana base layer'}
+                    className="rounded-lg border border-blue-500 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                  >
+                    {actionLoading === 'undelegate' ? 'Undelegating...' : 'Undelegate from ER'}
                   </button>
                   {isCreEnabled && (
                     <button

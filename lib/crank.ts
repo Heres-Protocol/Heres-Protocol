@@ -353,6 +353,32 @@ async function waitForUndelegation(
   return false
 }
 
+async function commitUndelegateAndWait(
+  connection: Connection,
+  crankKeypair: Keypair,
+  capsule: DecodedCapsule,
+  capsulePDA: PublicKey,
+  vaultPDA: PublicKey
+): Promise<string> {
+  const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
+  console.log(`[crank] Commit+undelegate sent: ${undelegTx}`)
+
+  const [capsuleReady, vaultReady] = await Promise.all([
+    waitForUndelegation(connection, capsulePDA, 20_000),
+    waitForUndelegation(connection, vaultPDA, 20_000),
+  ])
+
+  if (!capsuleReady || !vaultReady) {
+    throw new Error(
+      `Undelegation not visible on base layer yet (capsule=${capsuleReady}, vault=${vaultReady})`
+    )
+  }
+
+  capsule.isDelegated = false
+  console.log(`[crank] Undelegation confirmed on base layer for ${capsulePDA.toBase58()}`)
+  return undelegTx
+}
+
 /**
  * Distribute assets from vault to beneficiaries (call on base layer after execute_intent).
  * This is a separate on-chain instruction that handles actual SOL/SPL transfers.
@@ -453,29 +479,32 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
         executedCount += 1
         console.log(`[crank] Executed ${capsule.publicKey.toBase58()} (delegated=${capsule.isDelegated}): ${txSig}`)
 
-        // If delegated, send commit+undelegate but don't wait — distribute on next cycle
+        // If delegated, commit state back to base layer and verify undelegation before continuing.
         if (capsule.isDelegated) {
           try {
-            const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
-            console.log(`[crank] Commit+undelegate sent (no wait): ${undelegTx}`)
+            await commitUndelegateAndWait(connection, crankKeypair, capsule, capsulePDA, vaultPDA)
           } catch (undelegErr) {
             const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
-            console.log(`[crank] Commit+undelegate failed (will retry): ${msg}`)
+            errors.push(`${capsule.publicKey.toBase58()} undelegate: ${msg}`)
+            console.log(`[crank] Commit+undelegate failed: ${msg}`)
+            continue
           }
-          // Skip distribute — capsule will appear as needsDistributeOnly on next cycle
+          // Undelegation is confirmed; defer distribution to the next cycle for safety.
           continue
         }
       } else {
         console.log(`[crank] Skipping execute for already-executed capsule ${capsule.publicKey.toBase58()}, proceeding to distribute`)
 
-        // If still delegated, send commit+undelegate — distribute on next cycle
+        // If still delegated, commit state back to base layer and verify undelegation before continuing.
         if (capsule.isDelegated) {
           try {
-            const undelegTx = await commitAndUndelegateFromER(crankKeypair, capsule)
-            console.log(`[crank] Commit+undelegate sent: ${undelegTx} — distribute next cycle`)
+            await commitUndelegateAndWait(connection, crankKeypair, capsule, capsulePDA, vaultPDA)
+            console.log('[crank] Undelegation confirmed; capsule will distribute on the next cycle')
           } catch (undelegErr) {
             const msg = undelegErr instanceof Error ? undelegErr.message : String(undelegErr)
+            errors.push(`${capsule.publicKey.toBase58()} undelegate: ${msg}`)
             console.log(`[crank] Commit+undelegate failed: ${msg}`)
+            continue
           }
           continue
         }

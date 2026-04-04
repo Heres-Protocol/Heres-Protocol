@@ -1109,12 +1109,14 @@ export async function getCapsuleByAddress(capsulePda: PublicKey): Promise<(Inten
  * (discriminator = 5 as borsh u64 LE) which commits ER state and undelegates the account.
  */
 export async function undelegateCapsule(
-  wallet: WalletContextState
+  wallet: WalletContextState,
+  ownerPublicKey?: PublicKey
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet not connected')
 
-  const [capsulePDA] = getCapsulePDA(wallet.publicKey)
-  const [vaultPDA] = getCapsuleVaultPDA(wallet.publicKey)
+  const ownerKey = ownerPublicKey ?? wallet.publicKey
+  const [capsulePDA] = getCapsulePDA(ownerKey)
+  const [vaultPDA] = getCapsuleVaultPDA(ownerKey)
 
   const magicProgramId = new PublicKey(MAGICBLOCK_ER.MAGIC_PROGRAM_ID)
   const magicContextId = new PublicKey(MAGICBLOCK_ER.MAGIC_CONTEXT)
@@ -1151,6 +1153,26 @@ export async function undelegateCapsule(
   const signedTx = await wallet.signTransaction(tx)
   const txSig = await erConnection.sendRawTransaction(signedTx.serialize(), { skipPreflight: true })
   await erConnection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed')
+
+  const baseConnection = getSolanaConnection()
+  const waitForBaseProgramOwner = async (account: PublicKey, timeoutMs = 20_000): Promise<boolean> => {
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      const info = await baseConnection.getAccountInfo(account)
+      if (info?.owner.equals(programId)) return true
+      await new Promise((resolve) => setTimeout(resolve, 2_000))
+    }
+    return false
+  }
+
+  const [capsuleReady, vaultReady] = await Promise.all([
+    waitForBaseProgramOwner(capsulePDA),
+    waitForBaseProgramOwner(vaultPDA),
+  ])
+
+  if (!capsuleReady || !vaultReady) {
+    throw new Error(`Undelegation submitted but not yet visible on base layer (capsule=${capsuleReady}, vault=${vaultReady})`)
+  }
 
   debugLog('[undelegateCapsule] Success. Tx:', txSig)
   return txSig
