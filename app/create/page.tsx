@@ -12,7 +12,7 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 )
 import Link from 'next/link'
-import { createCapsule, getCapsule, delegateCapsule, scheduleExecuteIntent } from '@/lib/solana'
+import { createCapsule, getCapsule, delegateCapsule, scheduleExecuteIntent, registerCapsuleOwnerForAutomation } from '@/lib/solana'
 import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
 import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, MAX_CAPSULE_MODIFICATIONS } from '@/constants'
@@ -488,6 +488,10 @@ export default function CreatePage() {
       setTxHash(hash)
       console.log('[Step 1/3] Capsule created. Tx:', hash)
 
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+      const automationIssues: string[] = []
+      const ownerBase58 = publicKey?.toBase58()
+
       // Increment modification count
       if (publicKey) {
         const newCount = currentCount + 1
@@ -509,32 +513,94 @@ export default function CreatePage() {
         localStorage.setItem(txKey, hash)
       }
 
+      if (ownerBase58) {
+        setCurrentStep('Registering automation...')
+        console.log('[Automation] Registering capsule owner for crank discovery...')
+        let ownerRegistered = false
+        for (let attempt = 0; attempt < 3 && !ownerRegistered; attempt++) {
+          try {
+            await registerCapsuleOwnerForAutomation(ownerBase58)
+            ownerRegistered = true
+            console.log('[Automation] Owner registration successful.')
+          } catch (registryErr: any) {
+            console.warn(`[Automation] Owner registration failed (attempt ${attempt + 1}/3):`, registryErr?.message)
+            if (attempt < 2) await sleep(1500 * (attempt + 1))
+          }
+        }
+        if (!ownerRegistered) {
+          automationIssues.push('owner registration for crank discovery')
+        }
+      }
+
+      let delegatedToEr = false
+
       // ===== Step 2: Delegate to ER (Asia devnet) =====
       setCurrentStep('Delegating to ER...')
       console.log('[Step 2/3] Delegating capsule to Asia ER validator...')
-      try {
-        const delegateTx = await delegateCapsule(wallet as any, new PublicKey(MAGICBLOCK_ER.ACTIVE_VALIDATOR))
-        console.log('[Step 2/3] Delegation successful. Tx:', delegateTx)
-      } catch (delegateErr: any) {
-        console.warn('[Step 2/3] Delegation failed:', delegateErr?.message)
-        // Continue — capsule is created, delegation can be retried
+      for (let attempt = 0; attempt < 2 && !delegatedToEr; attempt++) {
+        try {
+          const delegateTx = await delegateCapsule(wallet as any, new PublicKey(MAGICBLOCK_ER.ACTIVE_VALIDATOR))
+          delegatedToEr = true
+          console.log('[Step 2/3] Delegation successful. Tx:', delegateTx)
+        } catch (delegateErr: any) {
+          console.warn(`[Step 2/3] Delegation failed (attempt ${attempt + 1}/2):`, delegateErr?.message)
+          if (attempt < 1) await sleep(2000)
+        }
+      }
+      if (!delegatedToEr) {
+        automationIssues.push('ER delegation')
       }
 
-      // Wait for ER to sync the delegated account
-      setCurrentStep('Waiting for ER sync...')
-      await new Promise(resolve => setTimeout(resolve, 5000))
+      let erSynced = false
+      if (delegatedToEr && publicKey) {
+        setCurrentStep('Waiting for ER sync...')
+        for (let attempt = 0; attempt < 8 && !erSynced; attempt++) {
+          try {
+            const syncedCapsule = await getCapsule(publicKey)
+            const accountOwner = (syncedCapsule as any)?.accountOwner as PublicKey | undefined
+            if (accountOwner?.equals?.(new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID))) {
+              erSynced = true
+              break
+            }
+          } catch {
+            // Retry until timeout.
+          }
+          await sleep(2000)
+        }
+
+        if (!erSynced) {
+          automationIssues.push('ER sync before crank scheduling')
+        }
+      }
 
       // ===== Step 3: Schedule Crank on ER =====
-      setCurrentStep('Scheduling crank...')
-      console.log('[Step 3/3] Scheduling crank on ER (Asia devnet)...')
-      try {
-        const scheduleTx = await scheduleExecuteIntent(wallet as any, publicKey)
-        console.log('[Step 3/3] Crank scheduled. Tx:', scheduleTx)
-      } catch (scheduleErr: any) {
-        console.warn('[Step 3/3] Crank scheduling failed:', scheduleErr?.message)
+      if (delegatedToEr && erSynced && publicKey) {
+        setCurrentStep('Scheduling crank...')
+        console.log('[Step 3/3] Scheduling crank on ER (Asia devnet)...')
+        let scheduled = false
+        for (let attempt = 0; attempt < 3 && !scheduled; attempt++) {
+          try {
+            const scheduleTx = await scheduleExecuteIntent(wallet as any, publicKey)
+            scheduled = true
+            console.log('[Step 3/3] Crank scheduled. Tx:', scheduleTx)
+          } catch (scheduleErr: any) {
+            console.warn(`[Step 3/3] Crank scheduling failed (attempt ${attempt + 1}/3):`, scheduleErr?.message)
+            if (attempt < 2) await sleep(2500 * (attempt + 1))
+          }
+        }
+
+        if (!scheduled) {
+          automationIssues.push('ER crank scheduling')
+        }
       }
 
       setCurrentStep(null)
+
+      if (automationIssues.length) {
+        alert(
+          `Capsule created, but automatic execution setup is incomplete.\n\nMissing or failed: ${automationIssues.join(', ')}.\n\nExternal cron may still pick it up if registry is configured, but please confirm automation before relying on it.`
+        )
+      }
 
       // Redirect to capsules page after successful creation
       window.location.href = '/capsules'

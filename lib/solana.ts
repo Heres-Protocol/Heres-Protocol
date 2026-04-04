@@ -197,15 +197,6 @@ export async function createCapsule(
         .accounts(accounts)
         .rpc()
 
-      // Register owner in capsule registry so crank can find delegated capsules
-      try {
-        fetch('/api/capsule-registry', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ owner: wallet.publicKey!.toBase58() }),
-        })
-      } catch { /* non-critical */ }
-
       return tx
     } catch (error: any) {
       lastError = error
@@ -239,6 +230,29 @@ export async function createCapsule(
   }
 
   throw lastError
+}
+
+export async function registerCapsuleOwnerForAutomation(ownerPubkey: string): Promise<void> {
+  const response = await fetch('/api/capsule-registry', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ owner: ownerPubkey }),
+  })
+
+  if (response.ok) return
+
+  const raw = await response.text()
+  let message = 'Failed to register capsule owner for automation'
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as { error?: string }
+      message = parsed.error || raw
+    } catch {
+      message = raw
+    }
+  }
+
+  throw new Error(`Automation registration failed: ${message}`)
 }
 
 /**
