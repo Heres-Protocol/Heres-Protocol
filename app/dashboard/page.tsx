@@ -3,9 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  ChevronDown,
-  ChevronUp,
-  Copy,
   Database,
   RefreshCw,
   Settings,
@@ -117,26 +114,6 @@ const timeAgo = (timestampMs: number | null) => {
 const maskAddress = (address: string) =>
   address.length > 10 ? `${address.slice(0, 4)}...${address.slice(-4)}` : address
 
-const copyToClipboard = (text: string) => {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text)
-  }
-}
-
-function CopyButton({ value, className }: { value: string; className?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={() => copyToClipboard(value)}
-      className={`inline-flex shrink-0 items-center justify-center rounded p-1 text-Heres-muted transition-colors hover:bg-Heres-surface/80 hover:text-Heres-accent ${className || ''}`}
-      title="Copy"
-      aria-label="Copy to clipboard"
-    >
-      <Copy className="h-4 w-4" />
-    </button>
-  )
-}
-
 const statusTone = (status: string, kind: CapsuleRow['kind']) => {
   const normalized = status.toLowerCase()
   if (kind === 'event') {
@@ -155,8 +132,6 @@ const statusTone = (status: string, kind: CapsuleRow['kind']) => {
 export default function DashboardPage() {
   const wallet = useWallet()
   const [capsules, setCapsules] = useState<CapsuleListItem[]>([])
-  const [capsuleDetails, setCapsuleDetails] = useState<Record<string, CapsuleRow>>({})
-  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [filterMode, setFilterMode] = useState<'all' | 'live' | 'created' | 'executed' | 'active' | 'expired'>('all')
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
@@ -174,7 +149,6 @@ export default function DashboardPage() {
   const [initFeeError, setInitFeeError] = useState<string | null>(null)
   const [listTotal, setListTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
-  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const loadTokenRef = useRef(0)
   const [summary, setSummary] = useState({
@@ -330,43 +304,8 @@ export default function DashboardPage() {
     return () => controller.abort()
   }, [currentPage, debouncedQuery, filterMode, refreshKey, sortOrder])
 
-  useEffect(() => {
-    const visibleIds = new Set(capsules.map((capsule) => capsule.id))
-    setCapsuleDetails((current) => {
-      const nextEntries = Object.entries(current).filter(([id]) => visibleIds.has(id))
-      if (nextEntries.length === Object.keys(current).length) {
-        return current
-      }
-      return Object.fromEntries(nextEntries)
-    })
-
-    if (expandedId && !visibleIds.has(expandedId)) {
-      setExpandedId(null)
-    }
-  }, [capsules, expandedId])
-
   const pageSize = 10
   const pagedCapsules = capsules
-
-  const loadCapsuleDetail = useCallback(async (id: string) => {
-    if (capsuleDetails[id]) return
-    setDetailLoadingId(id)
-    try {
-      const res = await fetch(`/api/capsules/${encodeURIComponent(id)}`, { cache: 'no-store' })
-      const payload = (await res.json().catch(() => null)) as CapsuleRow | null
-      if (!res.ok || !payload) {
-        throw new Error((payload as any)?.error || `Detail request failed (${res.status})`)
-      }
-      setCapsuleDetails((current) => ({
-        ...current,
-        [id]: payload,
-      }))
-    } catch {
-      setError('Unable to load capsule detail. Please try again.')
-    } finally {
-      setDetailLoadingId((current) => (current === id ? null : current))
-    }
-  }, [capsuleDetails])
 
   const statCards = [
     { label: 'Active Capsules', value: formatNumber(summary.active), tone: 'text-Heres-accent' },
@@ -488,7 +427,6 @@ export default function DashboardPage() {
                 <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={programIdStr}>
                   {maskAddress(programIdStr)}
                 </p>
-                <CopyButton value={programIdStr} />
               </div>
             </div>
             <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
@@ -513,7 +451,6 @@ export default function DashboardPage() {
                   <Sparkles className="w-4 h-4 text-Heres-accent" />
                 </div>
                 <div className={`mt-3 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
-                <p className="mt-1 text-xs text-Heres-muted">Protocol health</p>
               </div>
             ))}
           </section>
@@ -592,9 +529,6 @@ export default function DashboardPage() {
                 )}
 
                 {pagedCapsules.map((capsule) => {
-                  const detail = capsuleDetails[capsule.id]
-                  const displayCapsule = detail || ({ ...capsule, events: [] } as CapsuleRow)
-
                   return (
                   <div
                     key={capsule.id}
@@ -625,7 +559,6 @@ export default function DashboardPage() {
                           <span className="font-mono text-Heres-muted break-all max-w-full min-w-0">
                             {capsule.signature ? maskAddress(capsule.signature) : '...'}
                           </span>
-                          {capsule.signature && <CopyButton value={capsule.signature} />}
                         </div>
                         <div className="grid gap-2 text-xs text-Heres-muted md:grid-cols-3">
                           <div>
@@ -634,7 +567,6 @@ export default function DashboardPage() {
                               <p className="font-mono text-Heres-white break-all truncate">
                                 {maskAddress(capsule.capsuleAddress)}
                               </p>
-                              <CopyButton value={capsule.capsuleAddress} />
                             </div>
                           </div>
                           <div>
@@ -643,7 +575,6 @@ export default function DashboardPage() {
                               <p className="font-mono text-Heres-white break-all truncate">
                                 {capsule.owner ? maskAddress(capsule.owner) : '...'}
                               </p>
-                              {capsule.owner && <CopyButton value={capsule.owner} />}
                             </div>
                           </div>
                           <div>
@@ -671,155 +602,7 @@ export default function DashboardPage() {
                           </div>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextExpanded = expandedId === capsule.id ? null : capsule.id
-                          setExpandedId(nextExpanded)
-                          if (nextExpanded) {
-                            loadCapsuleDetail(capsule.id)
-                          }
-                        }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-surface/80 px-4 py-2 text-xs text-Heres-muted transition hover:border-Heres-accent/50 hover:text-Heres-accent"
-                      >
-                        Details
-                        {expandedId === capsule.id ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </button>
                     </div>
-
-                    {expandedId === capsule.id && (
-                      <div className="mt-4 w-full min-w-0 rounded-xl border border-Heres-border bg-Heres-surface/80 px-4 py-4 text-xs text-Heres-muted space-y-4 overflow-hidden">
-                        {detailLoadingId === capsule.id && !detail && (
-                          <div className="rounded-lg border border-Heres-border bg-Heres-card/60 px-3 py-3 text-sm text-Heres-muted">
-                            Loading on-chain detail...
-                          </div>
-                        )}
-                        <div className="grid gap-3 md:grid-cols-2 max-w-full">
-                          <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Capsule</p>
-                            <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-Heres-white break-all truncate">{displayCapsule.capsuleAddress}</p>
-                              <CopyButton value={displayCapsule.capsuleAddress} />
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Owner</p>
-                            <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-Heres-white break-all truncate">{displayCapsule.owner || '...'}</p>
-                              {displayCapsule.owner && <CopyButton value={displayCapsule.owner} />}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Last Activity</p>
-                            <p className="text-Heres-white">{formatDateTime(displayCapsule.lastActivityMs)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Executed At</p>
-                            <p className="text-Heres-white">{formatDateTime(displayCapsule.executedAtMs)}</p>
-                          </div>
-                          {displayCapsule.kind === 'capsule' ? (
-                            <>
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Inactivity Seconds</p>
-                                <p className="text-Heres-white">{displayCapsule.inactivitySeconds || '...'}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Payload Size</p>
-                                <p className="text-Heres-white">{displayCapsule.payloadSize ? `${displayCapsule.payloadSize} bytes` : '...'}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Is Active</p>
-                                <p className="text-Heres-white">{displayCapsule.isActive == null ? '...' : displayCapsule.isActive ? 'Yes' : 'No'}</p>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Token Delta</p>
-                                <p className="text-Heres-white">{displayCapsule.tokenDelta || '...'}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">SOL Delta</p>
-                                <p className="text-Heres-white">{displayCapsule.solDelta == null ? '...' : `${displayCapsule.solDelta.toFixed(4)} SOL`}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">PER (TEE) Tx Bytes</p>
-                                <p className="text-Heres-white">{displayCapsule.proofBytes ? `${displayCapsule.proofBytes} bytes` : '...'}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">PER (TEE) Context</p>
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <p className="font-mono text-Heres-white break-all truncate">{zkProofHash || '...'}</p>
-                                  {zkProofHash && <CopyButton value={zkProofHash} />}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">PER (TEE) Commit Hash</p>
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <p className="font-mono text-Heres-white break-all truncate">{zkPublicInputsHash || '...'}</p>
-                                  {zkPublicInputsHash && <CopyButton value={zkPublicInputsHash} />}
-                                </div>
-                              </div>
-                            </>
-                          )}
-                          <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">Latest Signature</p>
-                            <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-Heres-white break-all truncate">{displayCapsule.signature || '...'}</p>
-                              {displayCapsule.signature && <CopyButton value={displayCapsule.signature} />}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <p className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted mb-2">
-                            Capsule Events
-                          </p>
-                          {displayCapsule.events.length === 0 ? (
-                            <p className="text-Heres-muted">No transaction events found for this capsule.</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {displayCapsule.events.map((event) => (
-                                <div
-                                  key={`${displayCapsule.id}-${event.signature}`}
-                                  className="rounded-lg border border-Heres-border bg-Heres-card/80 px-3 py-3"
-                                >
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="text-Heres-white">{event.label}</span>
-                                    <span className="text-[10px] text-Heres-muted">
-                                      {event.blockTime ? timeAgo(event.blockTime * 1000) : '...'}
-                                    </span>
-                                  </div>
-                                  <div className="mt-2 flex items-start justify-between gap-2 text-[11px] text-Heres-muted">
-                                    <div className="flex min-w-0 items-center gap-1">
-                                      <span className="font-mono break-all truncate">{event.signature}</span>
-                                      <CopyButton value={event.signature} className="shrink-0" />
-                                    </div>
-                                    <span className={`shrink-0 ${event.status === 'success' ? 'text-Heres-accent' : 'text-red-400'}`}>
-                                      {event.status}
-                                    </span>
-                                  </div>
-                                  {event.logs.length > 0 && (
-                                    <div className="mt-2 max-h-48 overflow-y-auto space-y-1 text-[11px] text-Heres-muted font-mono break-all whitespace-pre-wrap overflow-x-hidden">
-                                      {event.logs.map((log, index) => (
-                                        <div key={`${event.signature}-${index}`}>{log}</div>
-                                      ))}
-                                      <p className="text-[10px] text-Heres-muted pt-1">
-                                        {event.logs.length} log{event.logs.length !== 1 ? 's' : ''} total
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )})}
               </div>

@@ -61,18 +61,19 @@ export type RestoreOnActionJSON =
 
 export {
   RemoteAddress,
-  RemoteAddressFields,
-  RemoteAddressJSON,
 } from "./RemoteAddress";
+export type { RemoteAddressFields, RemoteAddressJSON } from "./RemoteAddress";
 export {
-  RemoteConfigFields,
-  RemoteConfigJSON,
   RemoteConfig,
 } from "./RemoteConfig";
+export type { RemoteConfigFields, RemoteConfigJSON } from "./RemoteConfig";
 export {
-  RateLimitTokenBucketFields,
-  RateLimitTokenBucketJSON,
   RateLimitTokenBucket,
 } from "./RateLimitTokenBucket";
+export type {
+  RateLimitTokenBucketFields,
+  RateLimitTokenBucketJSON,
+} from "./RateLimitTokenBucket";
 
-export { RateLimitConfig, RateLimitConfigFields, RateLimitConfigJSON } from "./RateLimitConfig";
+export { RateLimitConfig } from "./RateLimitConfig";
+export type { RateLimitConfigFields, RateLimitConfigJSON } from "./RateLimitConfig";

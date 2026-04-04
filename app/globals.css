@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 :root {
+  --font-sans: system-ui;
+  --font-display: system-ui;
   --Heres-bg: #050816;
   --Heres-surface: #0c1024;
   --Heres-card: #111832;

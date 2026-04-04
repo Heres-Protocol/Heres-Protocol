@@ -467,11 +467,11 @@ export default function CapsuleDetailPage() {
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-red-400 mb-6">{error || 'Capsule not found'}</p>
           <Link
-            href="/dashboard"
+            href="/capsules"
             className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-card/80 px-4 py-2 text-Heres-white hover:border-Heres-accent/40"
           >
             <ArrowLeft className="h-4 w-4" />
-            Dashboard
+            My Capsules
           </Link>
         </div>
       </div>
@@ -493,11 +493,11 @@ export default function CapsuleDetailPage() {
       <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <Link
-            href="/dashboard"
+            href="/capsules"
             className="inline-flex items-center gap-2 text-sm text-Heres-muted hover:text-Heres-accent mb-6"
           >
             <ArrowLeft className="h-4 w-4" />
-            Dashboard
+            My Capsules
           </Link>
 
           {/* Graph Explorer style: header card */}

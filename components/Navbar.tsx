@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Menu, User, X, ChevronDown } from 'lucide-react'
 import '@solana/wallet-adapter-react-ui/styles.css'
-import { getAppHref } from '@/lib/app-url'
+import { getAppHref, getMarketingHref } from '@/lib/app-url'
 
 const WalletMultiButton = dynamic(
   () =>
@@ -15,8 +15,10 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 )
 
+const homeHref = getMarketingHref('/')
+
 const navLinks = [
-  { href: '/', label: 'Home' },
+  { href: homeHref, label: 'Home' },
   { href: getAppHref('/dashboard'), label: 'Dashboard', activePath: '/dashboard' },
   { href: getAppHref('/create'), label: 'Create', activePath: '/create' },
 ]
@@ -52,7 +54,7 @@ export function Navbar() {
     <header className="nav-glass">
       <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-2 px-3 pr-4 sm:px-6 sm:pr-6 lg:px-8">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
-          <Link href="/" className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <Link href={homeHref} className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <Image src="/logo-white.png?v=3" alt="Heres" width={52} height={52} className="h-9 w-auto sm:h-[52px]" priority unoptimized />
             <span className="truncate text-lg font-bold tracking-tight text-Heres-white sm:text-xl">Heres</span>
           </Link>
