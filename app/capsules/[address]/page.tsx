@@ -163,6 +163,7 @@ export default function CapsuleDetailPage() {
   const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [creDispatchLoading, setCreDispatchLoading] = useState(false)
   const [creDispatchResult, setCreDispatchResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [distributionComplete, setDistributionComplete] = useState(false)
 
   const isOwner = Boolean(wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey))
 
@@ -205,6 +206,7 @@ export default function CapsuleDetailPage() {
         : undefined
       const mint = capsule.mint && !capsule.mint.equals(PublicKey.default) ? capsule.mint : undefined
       const tx = await distributeAssets(wallet as any, capsule.owner, beneficiaries, mint)
+      setDistributionComplete(true)
       setActionResult({ type: 'success', message: `Distribute Assets TX: ${tx}` })
     } catch (err: any) {
       console.error('[Distribute Assets] Error:', err)
@@ -303,6 +305,44 @@ export default function CapsuleDetailPage() {
     }
     return () => { cancelled = true }
   }, [address])
+
+  useEffect(() => {
+    if (!capsule?.owner || !capsule.executedAt) {
+      setDistributionComplete(false)
+      return
+    }
+
+    const isDelegated = capsule.accountOwner?.equals?.(new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)) ?? false
+    const isNativeSol = !capsule.mint || capsule.mint.equals(PublicKey.default)
+
+    if (isDelegated || !isNativeSol) {
+      setDistributionComplete(false)
+      return
+    }
+
+    let cancelled = false
+
+    ; (async () => {
+      try {
+        const connection = getSolanaConnection()
+        const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
+        const [vaultInfo, rentExemptLamports] = await Promise.all([
+          connection.getAccountInfo(vaultPDA),
+          connection.getMinimumBalanceForRentExemption(9),
+        ])
+        const spendableLamports = Math.max(0, (vaultInfo?.lamports || 0) - rentExemptLamports)
+        if (!cancelled) {
+          setDistributionComplete(spendableLamports === 0)
+        }
+      } catch {
+        if (!cancelled) {
+          setDistributionComplete(false)
+        }
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [capsule?.owner, capsule?.executedAt, capsule?.mint, capsule?.accountOwner])
 
   useEffect(() => {
     if (
@@ -739,20 +779,22 @@ export default function CapsuleDetailPage() {
             const isExecuted = status === 'Executed' || (!capsule.isActive && capsule.executedAt)
             const isExpired = status === 'Expired'
             const isActive = status === 'Active'
+            const isCreDelivered = creDeliveryStatus?.status === 'delivered'
+            const isDistributed = Boolean(isExecuted && distributionComplete)
             const canExecute = isExpired && !isExecuted
             const canUndelegate = Boolean(isDelegated)
-            const canDistribute = Boolean(isExecuted && !isDelegated)
-            const canDispatchCre = Boolean(isExecuted && isCreEnabled)
-            const allDone = Boolean(isExecuted && creDeliveryStatus?.status === 'delivered')
-
-            // Determine current step (1-based)
-            const currentStep = allDone ? 4 : isExecuted ? 2 : canExecute ? 1 : 0
+            const canDistribute = Boolean(isExecuted && !isDelegated && !isDistributed)
+            const canDispatchCre = Boolean(isExecuted && isDistributed && isCreEnabled && !isCreDelivered)
 
             const steps = [
               { num: 1, label: 'Execute Intent', desc: 'Deactivate capsule when inactivity condition met' },
               { num: 2, label: 'Distribute Assets', desc: 'Transfer SOL/tokens to beneficiaries' },
               ...(isCreEnabled ? [{ num: 3, label: 'Deliver Intent Statement', desc: 'Dispatch encrypted intent via CRE' }] : []),
             ]
+            const allDone = Boolean(isExecuted && isDistributed && (!isCreEnabled || isCreDelivered))
+
+            // Determine current step (1-based)
+            const currentStep = allDone ? steps.length + 1 : canDispatchCre ? 3 : isExecuted ? 2 : canExecute ? 1 : 0
 
             return (
               <section className="card-Heres p-6 mb-6 border-amber-500/30">
@@ -775,14 +817,21 @@ export default function CapsuleDetailPage() {
                       Capsule executed on ER. <strong>Undelegate from ER</strong> first, then distribute assets on the base layer.
                     </p>
                   )}
-                  {isExecuted && !allDone && !isDelegated && (
+                  {isDistributed && isCreEnabled && !isCreDelivered && (
+                    <p className="text-sm text-Heres-accent">
+                      Assets already reached the beneficiary. Proceed to <strong>Deliver Intent Statement</strong> via CRE.
+                    </p>
+                  )}
+                  {isExecuted && !isDistributed && !allDone && !isDelegated && (
                     <p className="text-sm text-Heres-accent">
                       Capsule executed. Proceed to <strong>Distribute Assets</strong>{isCreEnabled ? ' and then dispatch Intent Statement delivery via CRE.' : '.'}
                     </p>
                   )}
                   {allDone && (
                     <p className="text-sm text-green-400">
-                      All steps complete. Assets distributed and intent statement delivered.
+                      {isCreEnabled
+                        ? 'All steps complete. Assets distributed and intent statement delivered.'
+                        : 'All steps complete. Assets distributed to the beneficiary.'}
                     </p>
                   )}
                   {status === 'Waiting' && (
