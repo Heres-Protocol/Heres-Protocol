@@ -883,6 +883,12 @@ export async function getCapsule(owner: PublicKey): Promise<IntentCapsule | null
         lastError = error
         const errorMessage = error?.message || ''
         const isRetryableError =
+          errorMessage.includes('429') ||
+          errorMessage.includes('Too Many Requests') ||
+          errorMessage.includes('too many requests') ||
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('Rate limit') ||
+          errorMessage.includes('Connection rate limits exceeded') ||
           errorMessage.includes('503') ||
           errorMessage.includes('401') ||
           errorMessage.includes('32401') ||

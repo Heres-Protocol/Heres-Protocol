@@ -32,6 +32,7 @@ import { PublicKey } from '@solana/web3.js'
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 
 export type CapsuleAssetType = 'token' | 'nft' | null
+type InactivityUnit = 'days' | 'minutes'
 
 export type NftItem = { mint: string; name?: string; symbol?: string; imageUri?: string }
 
@@ -47,6 +48,7 @@ export default function CreatePage() {
   const [totalAmount, setTotalAmount] = useState('')
   const [targetDate, setTargetDate] = useState('')
   const [inactivityDays, setInactivityDays] = useState('')
+  const [inactivityUnit, setInactivityUnit] = useState<InactivityUnit>('days')
   const [delayDays, setDelayDays] = useState<string>(DEFAULT_VALUES.DELAY_DAYS)
   const [showSimulation, setShowSimulation] = useState(false)
   const [isPending, setIsPending] = useState(false)
@@ -174,6 +176,28 @@ export default function CreatePage() {
 
   const addBeneficiary = () => {
     setBeneficiaries([...beneficiaries, { chain: 'solana', address: '', amount: '', amountType: 'fixed', destinationChainSelector: '' }])
+  }
+
+  const supportsMinuteMode = SOLANA_CONFIG.NETWORK === 'devnet'
+
+  const formatInactivityLabel = (value: string | number, unit: InactivityUnit) => {
+    const numeric = typeof value === 'number' ? value : parseInt(value, 10)
+    if (!Number.isFinite(numeric) || numeric <= 0) return ''
+    const label = unit === 'minutes'
+      ? (numeric === 1 ? 'minute' : 'minutes')
+      : (numeric === 1 ? 'day' : 'days')
+    return `${numeric} ${label}`
+  }
+
+  const syncTargetDateFromDays = (rawValue: string) => {
+    const days = parseInt(rawValue, 10)
+    if (Number.isFinite(days) && days > 0) {
+      const d = new Date()
+      d.setDate(d.getDate() + days)
+      setTargetDate(d.toISOString().split('T')[0])
+    } else {
+      setTargetDate('')
+    }
   }
 
   const removeBeneficiary = (index: number) => {
@@ -345,7 +369,7 @@ export default function CreatePage() {
 
     try {
 
-      const inactivityDaysNum = parseInt(inactivityDays)
+      const inactivityValueNum = parseInt(inactivityDays, 10)
       let intentData: Uint8Array
       let creMeta: {
         enabled: true
@@ -406,7 +430,9 @@ export default function CreatePage() {
           nftMints: selectedNftMints,
           nftRecipients: validRecipients,
           nftAssignments,
-          inactivityDays: inactivityDaysNum,
+          inactivityDays: inactivityUnit === 'days' ? inactivityValueNum : 0,
+          inactivityValue: inactivityValueNum,
+          inactivityUnit,
           delayDays: parseInt(delayDays),
           cre: creMeta,
         }
@@ -416,16 +442,17 @@ export default function CreatePage() {
           intent,
           beneficiaries,
           totalAmount,
-          inactivityDays: inactivityDaysNum,
+          inactivityDays: inactivityUnit === 'days' ? inactivityValueNum : 0,
+          inactivityValue: inactivityValueNum,
+          inactivityUnit,
           delayDays: parseInt(delayDays),
           cre: creMeta,
         })
       }
 
-      // On devnet, allow small values for testing (treat values <= 30 as minutes, not days)
-      const inactivityPeriodSeconds = SOLANA_CONFIG.NETWORK === 'devnet' && inactivityDaysNum <= 30
-        ? inactivityDaysNum * 60  // treat as minutes on devnet for small values
-        : daysToSeconds(inactivityDaysNum)
+      const inactivityPeriodSeconds = inactivityUnit === 'minutes'
+        ? inactivityValueNum * 60
+        : daysToSeconds(inactivityValueNum)
 
       // Check if there's an existing capsule - if so, recreate it instead of creating new
       let hash: string
@@ -1064,6 +1091,7 @@ export default function CreatePage() {
                         onChange={(e) => {
                           setTargetDate(e.target.value)
                           if (e.target.value) {
+                            setInactivityUnit('days')
                             const selectedDate = new Date(e.target.value)
                             const today = new Date()
                             today.setHours(0, 0, 0, 0)
@@ -1076,7 +1104,7 @@ export default function CreatePage() {
                         min={new Date().toISOString().split('T')[0]}
                         className="w-full rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white focus:outline-none focus:border-Heres-accent/50"
                       />
-                      {targetDate && inactivityDays && <p className="text-xs text-Heres-accent mt-2">{inactivityDays} days until execution</p>}
+                      {targetDate && inactivityDays && <p className="text-xs text-Heres-accent mt-2">{formatInactivityLabel(inactivityDays, 'days')} until execution</p>}
                     </div>
                     <div>
                       <label className="block text-sm text-Heres-muted mb-2">Delay Window (days)</label>
@@ -1090,23 +1118,52 @@ export default function CreatePage() {
                   </div>
                   <div className="mt-4">
                     <label className="block text-sm text-Heres-muted mb-2">
-                      {SOLANA_CONFIG.NETWORK === 'devnet' ? 'Inactivity period (≤30 = minutes, >30 = days)' : 'Or inactivity period (days)'}
+                      {supportsMinuteMode ? 'Inactivity period' : 'Or inactivity period (days)'}
                     </label>
+                    {supportsMinuteMode && (
+                      <div className="mb-3 inline-flex rounded-xl border border-Heres-border bg-Heres-surface/70 p-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInactivityUnit('days')
+                            syncTargetDateFromDays(inactivityDays)
+                          }}
+                          className={`rounded-lg px-4 py-2 text-sm transition ${
+                            inactivityUnit === 'days'
+                              ? 'bg-Heres-accent/15 text-Heres-accent'
+                              : 'text-Heres-muted hover:text-Heres-white'
+                          }`}
+                        >
+                          Days
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInactivityUnit('minutes')
+                            setTargetDate('')
+                          }}
+                          className={`rounded-lg px-4 py-2 text-sm transition ${
+                            inactivityUnit === 'minutes'
+                              ? 'bg-Heres-accent/15 text-Heres-accent'
+                              : 'text-Heres-muted hover:text-Heres-white'
+                          }`}
+                        >
+                          Minutes
+                        </button>
+                      </div>
+                    )}
                     <input
                       type="number"
                       value={inactivityDays}
                       onChange={(e) => {
                         setInactivityDays(e.target.value)
-                        if (e.target.value) {
-                          const days = parseInt(e.target.value)
-                          if (days > 0) {
-                            const d = new Date()
-                            d.setDate(d.getDate() + days)
-                            setTargetDate(d.toISOString().split('T')[0])
-                          }
+                        if (inactivityUnit === 'days') {
+                          syncTargetDateFromDays(e.target.value)
+                        } else {
+                          setTargetDate('')
                         }
                       }}
-                      placeholder="Enter days"
+                      placeholder={inactivityUnit === 'minutes' ? 'Enter minutes' : 'Enter days'}
                       className="w-full rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50"
                     />
                     {SOLANA_CONFIG.NETWORK === 'devnet' && (
@@ -1116,6 +1173,7 @@ export default function CreatePage() {
                             key={m}
                             type="button"
                             onClick={() => {
+                              setInactivityUnit('minutes')
                               setInactivityDays(String(m))
                               setTargetDate('')
                             }}
@@ -1131,9 +1189,7 @@ export default function CreatePage() {
                     {targetDate
                       ? `Triggers on ${new Date(targetDate).toLocaleDateString()}, ${delayDays}-day delay.`
                       : inactivityDays
-                        ? SOLANA_CONFIG.NETWORK === 'devnet' && parseInt(inactivityDays) <= 30
-                          ? `After ${inactivityDays} minutes of inactivity (devnet test mode).`
-                          : `After ${inactivityDays} days of inactivity, ${delayDays}-day delay.`
+                        ? `After ${formatInactivityLabel(inactivityDays, inactivityUnit)} of inactivity, ${delayDays}-day delay.`
                         : 'Set target date or inactivity period.'}
                   </p>
                 </div>
@@ -1310,7 +1366,9 @@ export default function CreatePage() {
                       )}
                       <div className="rounded-xl p-4 border border-Heres-border bg-Heres-surface/50">
                         <p className="text-xs text-Heres-accent mb-1">Trigger</p>
-                        <p className="text-Heres-white">After {inactivityDays} days of inactivity, {delayDays}-day delay.</p>
+                        <p className="text-Heres-white">
+                          After {formatInactivityLabel(inactivityDays, inactivityUnit) || '0 days'} of inactivity, {delayDays}-day delay.
+                        </p>
                       </div>
                       <div className="rounded-xl p-4 border border-Heres-border bg-Heres-surface/50">
                         <p className="text-xs text-Heres-accent mb-1">Intent Statement Delivery</p>
@@ -1337,3 +1395,4 @@ export default function CreatePage() {
     </div>
   )
 }
+
