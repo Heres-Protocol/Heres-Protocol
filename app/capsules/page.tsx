@@ -20,6 +20,7 @@ const WalletMultiButton = dynamic(
 
 type DashboardFilter = 'all' | 'active' | 'waiting' | 'expired' | 'executed'
 type CapsuleStatus = 'Active' | 'Waiting' | 'Expired' | 'Executed'
+type TriggerUnit = 'Minute' | 'Minutes' | 'Hour' | 'Hours' | 'Day' | 'Days'
 
 type BeneficiaryTableRow = {
   id: string
@@ -64,6 +65,39 @@ function formatDateLabel(timestampMs: number | null) {
     month: 'short',
     year: 'numeric',
   })
+}
+
+function getTriggerUnit(seconds: number) {
+  if (seconds < 3600) return 'minute' as const
+  if (seconds < 86400) return 'hour' as const
+  return 'day' as const
+}
+
+function formatTriggerDisplay(remainingSeconds: number, fallbackSeconds: number) {
+  const unitSourceSeconds = remainingSeconds > 0 ? remainingSeconds : fallbackSeconds
+  const triggerUnit = getTriggerUnit(Math.max(0, unitSourceSeconds))
+
+  if (triggerUnit === 'minute') {
+    const value = Math.max(0, Math.ceil(remainingSeconds / 60))
+    return {
+      value,
+      unit: value === 1 ? ('Minute' as TriggerUnit) : ('Minutes' as TriggerUnit),
+    }
+  }
+
+  if (triggerUnit === 'hour') {
+    const value = Math.max(0, Math.ceil(remainingSeconds / 3600))
+    return {
+      value,
+      unit: value === 1 ? ('Hour' as TriggerUnit) : ('Hours' as TriggerUnit),
+    }
+  }
+
+  const value = Math.max(0, Math.ceil(remainingSeconds / 86400))
+  return {
+    value,
+    unit: value === 1 ? ('Day' as TriggerUnit) : ('Days' as TriggerUnit),
+  }
 }
 
 function computeStatus(capsule: Awaited<ReturnType<typeof getCapsule>>) {
@@ -143,7 +177,8 @@ export default function CapsulesEntryPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<DashboardFilter>('all')
   const [rows, setRows] = useState<BeneficiaryTableRow[]>([])
-  const [triggerDays, setTriggerDays] = useState(0)
+  const [triggerValue, setTriggerValue] = useState(0)
+  const [triggerUnit, setTriggerUnit] = useState<TriggerUnit>('Minutes')
   const [triggerProgress, setTriggerProgress] = useState(0)
   const [assetUnit, setAssetUnit] = useState('units')
   const [capsuleStatus, setCapsuleStatus] = useState<CapsuleStatus | null>(null)
@@ -154,7 +189,8 @@ export default function CapsulesEntryPage() {
 
     if (!connected || !publicKey) {
       setRows([])
-      setTriggerDays(0)
+      setTriggerValue(0)
+      setTriggerUnit('Minutes')
       setTriggerProgress(0)
       setAssetUnit('units')
       setCapsuleStatus(null)
@@ -171,7 +207,8 @@ export default function CapsulesEntryPage() {
         if (cancelled) return
         if (!capsule) {
           setRows([])
-          setTriggerDays(0)
+          setTriggerValue(0)
+          setTriggerUnit('Minutes')
           setTriggerProgress(0)
           setAssetUnit('units')
           setCapsuleStatus(null)
@@ -187,17 +224,19 @@ export default function CapsulesEntryPage() {
         const releaseAtMs = capsule.lastActivity
           ? (capsule.lastActivity + capsule.inactivityPeriod) * 1000
           : null
-        const totalDays = Math.max(1, Math.round(capsule.inactivityPeriod / 86400))
-        const remainingDays = capsule.executedAt || !releaseAtMs
+        const totalSeconds = Math.max(60, capsule.inactivityPeriod)
+        const remainingSeconds = capsule.executedAt || !releaseAtMs
           ? 0
-          : Math.max(0, Math.ceil((releaseAtMs - Date.now()) / 86_400_000))
+          : Math.max(0, Math.ceil((releaseAtMs - Date.now()) / 1000))
+        const triggerDisplay = formatTriggerDisplay(remainingSeconds, totalSeconds)
 
         setCapsuleStatus(status)
-        setTriggerDays(remainingDays)
+        setTriggerValue(triggerDisplay.value)
+        setTriggerUnit(triggerDisplay.unit)
         setTriggerProgress(
           status === 'Executed'
             ? 100
-            : Math.min(100, Math.max(0, ((totalDays - remainingDays) / totalDays) * 100))
+            : Math.min(100, Math.max(0, ((totalSeconds - remainingSeconds) / totalSeconds) * 100))
         )
 
         const nextRows: BeneficiaryTableRow[] = []
@@ -265,7 +304,8 @@ export default function CapsulesEntryPage() {
         if (!cancelled) {
           setError(fetchError instanceof Error ? fetchError.message : 'Failed to load your capsule dashboard')
           setRows([])
-          setTriggerDays(0)
+          setTriggerValue(0)
+          setTriggerUnit('Minutes')
           setTriggerProgress(0)
           setAssetUnit('units')
           setCapsuleStatus(null)
@@ -382,10 +422,10 @@ export default function CapsulesEntryPage() {
             <div className="rounded-[16px] border border-cyan-400/45 bg-[#10162f] px-5 py-3.5 shadow-[0_0_0_1px_rgba(34,211,238,0.08)]">
               <div className="flex items-start justify-between gap-4">
                 <div className="w-full">
-                  <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">Trigger Days</p>
+                  <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">Trigger Time</p>
                   <p className="mt-2 flex items-end gap-2 text-white">
-                    <span className="text-[34px] font-semibold leading-none">{triggerDays}</span>
-                    <span className="pb-0.5 text-[16px] font-medium text-slate-200">Days</span>
+                    <span className="text-[34px] font-semibold leading-none">{triggerValue}</span>
+                    <span className="pb-0.5 text-[16px] font-medium text-slate-200">{triggerUnit}</span>
                   </p>
                   <p className="mt-1 text-[16px] leading-none text-slate-200">
                     {capsuleStatus === 'Executed' ? 'Execution Complete' : 'To Inactivity'}
