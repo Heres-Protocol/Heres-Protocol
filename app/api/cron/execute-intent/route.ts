@@ -77,13 +77,19 @@ async function handleCron(request: NextRequest) {
       return NextResponse.json({ error: message, cre }, { status: 500 })
     }
 
-    return NextResponse.json({
+    const response = {
       ...crankResult.value,
       cre:
         creResult.status === 'fulfilled'
           ? creResult.value
           : { error: creResult.reason instanceof Error ? creResult.reason.message : String(creResult.reason) },
-    })
+    }
+
+    if (!crankResult.value.ok) {
+      return NextResponse.json(response, { status: 500 })
+    }
+
+    return NextResponse.json(response)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: message }, { status: 500 })
