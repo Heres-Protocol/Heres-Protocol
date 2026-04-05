@@ -36,8 +36,8 @@ function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey
   )[0]
 }
 
-/** Default crank: run execute_intent check every 15 min, up to 100k iterations (MagicBlock Crank). */
-export const CRANK_DEFAULT_INTERVAL_MS = 15 * 60 * 1000
+/** Default crank cadence mirrors the configured MagicBlock ER schedule interval. */
+export const CRANK_DEFAULT_INTERVAL_MS = MAGICBLOCK_ER.CRANK_DEFAULT_INTERVAL_MS
 export const CRANK_DEFAULT_ITERATIONS = 100_000
 
 // Re-export connection function

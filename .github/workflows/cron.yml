@@ -7,23 +7,37 @@ env:
   SITE_URL: ${{ secrets.SITE_URL }}
   CRON_SECRET: ${{ secrets.CRON_SECRET }}
 
+concurrency:
+  group: heres-cron-jobs
+  cancel-in-progress: false
+
 jobs:
   execute-intent:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
+      - name: Validate required secrets
+        run: |
+          test -n "$SITE_URL" || (echo "SITE_URL secret is required" && exit 1)
+          test -n "$CRON_SECRET" || (echo "CRON_SECRET secret is required" && exit 1)
       - name: Execute intent crank
         run: |
-          curl -sf -X GET \
+          curl -sf --retry 2 --retry-delay 2 -X GET \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$SITE_URL/api/cron/execute-intent" \
             --max-time 55
 
   reconcile-cre:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
+      - name: Validate required secrets
+        run: |
+          test -n "$SITE_URL" || (echo "SITE_URL secret is required" && exit 1)
+          test -n "$CRON_SECRET" || (echo "CRON_SECRET secret is required" && exit 1)
       - name: Reconcile CRE deliveries
         run: |
-          curl -sf -X GET \
+          curl -sf --retry 2 --retry-delay 2 -X GET \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$SITE_URL/api/cron/reconcile-cre-delivery" \
             --max-time 55

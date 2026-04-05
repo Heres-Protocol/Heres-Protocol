@@ -11,6 +11,7 @@ import {
   executeIntent,
   distributeAssets,
   undelegateCapsule,
+  registerCapsuleOwnerForAutomation,
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
@@ -228,6 +229,27 @@ export default function CapsuleDetailPage() {
     } catch (err: any) {
       console.error('[Undelegate] Error:', err)
       setActionResult({ type: 'error', message: err.message || 'Undelegation failed' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleRefreshAutomation = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    setActionLoading('automation')
+    setActionResult(null)
+    try {
+      await registerCapsuleOwnerForAutomation(capsule.owner.toBase58())
+      setActionResult({
+        type: 'success',
+        message: 'Automation registry refreshed. The next external cron run should be able to discover this capsule.',
+      })
+    } catch (err: any) {
+      console.error('[Automation Refresh] Error:', err)
+      setActionResult({
+        type: 'error',
+        message: err.message || 'Failed to refresh automation registry',
+      })
     } finally {
       setActionLoading(null)
     }
@@ -785,6 +807,7 @@ export default function CapsuleDetailPage() {
             const canUndelegate = Boolean(isDelegated)
             const canDistribute = Boolean(isExecuted && !isDelegated && !isDistributed)
             const canDispatchCre = Boolean(isExecuted && isDistributed && isCreEnabled && !isCreDelivered)
+            const canRefreshAutomation = Boolean((isExpired || isActive) && !isExecuted)
 
             const steps = [
               { num: 1, label: 'Execute Intent', desc: 'Deactivate capsule when inactivity condition met' },
@@ -810,6 +833,11 @@ export default function CapsuleDetailPage() {
                   {canExecute && (
                     <p className="text-sm text-amber-400">
                       Inactivity period has elapsed. You can now <strong>Execute Intent</strong> to deactivate the capsule, then distribute assets.
+                    </p>
+                  )}
+                  {isExpired && !isExecuted && (
+                    <p className="mt-2 text-sm text-blue-400">
+                      If external automation missed this capsule, use <strong>Refresh Automation</strong> to re-register it for the crank without creating a new capsule.
                     </p>
                   )}
                   {isExecuted && isDelegated && (
@@ -894,6 +922,15 @@ export default function CapsuleDetailPage() {
                     className="rounded-lg border border-Heres-purple px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-Heres-purple/10 text-Heres-purple hover:bg-Heres-purple/20"
                   >
                     {actionLoading === 'distribute' ? 'Distributing...' : 'Distribute Assets'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRefreshAutomation}
+                    disabled={!canRefreshAutomation || !!actionLoading}
+                    title={!canRefreshAutomation ? 'Only pending capsules can be re-registered for automation' : 'Re-register this capsule for external crank discovery'}
+                    className="rounded-lg border border-cyan-500 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
+                  >
+                    {actionLoading === 'automation' ? 'Refreshing...' : 'Refresh Automation'}
                   </button>
                   <button
                     type="button"
