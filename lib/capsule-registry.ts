@@ -8,6 +8,7 @@
  */
 import { Redis } from '@upstash/redis'
 import { debugLog } from '@/lib/log'
+import { isPostgresConfigured, pgQuery } from '@/lib/postgres'
 
 const REDIS_KEY = 'capsule-owners'
 
@@ -48,6 +49,10 @@ function saveLocal(owners: string[]) {
   }
 }
 
+function shouldUseLocalFallback(): boolean {
+  return !getRedis() && !isPostgresConfigured()
+}
+
 // ---------------------------------------------------------------------------
 // Public API (async — callers must await)
 // ---------------------------------------------------------------------------
@@ -55,7 +60,24 @@ function saveLocal(owners: string[]) {
 /** Register a capsule owner (idempotent) */
 export async function registerCapsuleOwner(ownerPubkey: string): Promise<void> {
   const redis = getRedis()
-  if (!redis) {
+  if (redis) {
+    const added = await redis.sadd(REDIS_KEY, ownerPubkey)
+    if (added) debugLog(`[capsule-registry] Registered owner: ${ownerPubkey}`)
+    return
+  }
+
+  if (isPostgresConfigured()) {
+    await pgQuery(
+      `INSERT INTO capsule_owner_registry (owner_address, registered_at)
+       VALUES ($1, NOW())
+       ON CONFLICT (owner_address) DO NOTHING`,
+      [ownerPubkey]
+    )
+    debugLog(`[capsule-registry] Registered owner (postgres): ${ownerPubkey}`)
+    return
+  }
+
+  if (shouldUseLocalFallback()) {
     const owners = loadLocal()
     if (!owners.includes(ownerPubkey)) {
       owners.push(ownerPubkey)
@@ -64,24 +86,44 @@ export async function registerCapsuleOwner(ownerPubkey: string): Promise<void> {
     }
     return
   }
-  const added = await redis.sadd(REDIS_KEY, ownerPubkey)
-  if (added) debugLog(`[capsule-registry] Registered owner: ${ownerPubkey}`)
 }
 
 /** Get all registered capsule owners */
 export async function getRegisteredOwners(): Promise<string[]> {
   const redis = getRedis()
-  if (!redis) return loadLocal()
-  return await redis.smembers(REDIS_KEY)
+  if (redis) return await redis.smembers(REDIS_KEY)
+
+  if (isPostgresConfigured()) {
+    const result = await pgQuery<{ owner_address: string }>(
+      `SELECT owner_address
+       FROM capsule_owner_registry
+       ORDER BY registered_at DESC`
+    )
+    return result.rows.map((row) => row.owner_address)
+  }
+
+  return loadLocal()
 }
 
 /** Remove a capsule owner (after capsule is fully distributed) */
 export async function unregisterCapsuleOwner(ownerPubkey: string): Promise<void> {
   const redis = getRedis()
-  if (!redis) {
+  if (redis) {
+    await redis.srem(REDIS_KEY, ownerPubkey)
+    return
+  }
+
+  if (isPostgresConfigured()) {
+    await pgQuery(
+      'DELETE FROM capsule_owner_registry WHERE owner_address = $1',
+      [ownerPubkey]
+    )
+    return
+  }
+
+  if (shouldUseLocalFallback()) {
     const owners = loadLocal().filter(o => o !== ownerPubkey)
     saveLocal(owners)
     return
   }
-  await redis.srem(REDIS_KEY, ownerPubkey)
 }

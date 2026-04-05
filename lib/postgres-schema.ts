@@ -54,6 +54,11 @@ CREATE TABLE IF NOT EXISTS dashboard_sync_state (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS capsule_owner_registry (
+  owner_address TEXT PRIMARY KEY,
+  registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS helius_webhook_logs (
   id BIGSERIAL PRIMARY KEY,
   event_hash TEXT NOT NULL UNIQUE,

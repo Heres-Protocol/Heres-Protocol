@@ -26,6 +26,12 @@ function getRedis(): Redis | null {
 // ---------------------------------------------------------------------------
 function getLocalPath(): string {
   const path = require('path')
+  const configured = process.env.CRE_STORE_PATH?.trim()
+  if (configured) {
+    return path.isAbsolute(configured)
+      ? configured
+      : path.join(process.cwd(), configured)
+  }
   return path.join(process.cwd(), '.data', 'cre-store.json')
 }
 

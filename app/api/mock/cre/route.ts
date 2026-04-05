@@ -18,7 +18,27 @@ function sign(secret: string, payload: string): string {
 }
 
 function getBaseUrl(request: NextRequest): string {
-  return process.env.MOCK_CRE_CALLBACK_BASE_URL || `${request.nextUrl.protocol}//${request.nextUrl.host}`
+  const configured = process.env.MOCK_CRE_CALLBACK_BASE_URL?.trim()
+  const requestOrigin = `${request.nextUrl.protocol}//${request.nextUrl.host}`
+  if (!configured) return requestOrigin
+
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const configuredUrl = new URL(configured)
+      const requestUrl = new URL(requestOrigin)
+      const isLocalConfigured =
+        configuredUrl.hostname === '127.0.0.1' || configuredUrl.hostname === 'localhost'
+      const isLocalRequest =
+        requestUrl.hostname === '127.0.0.1' || requestUrl.hostname === 'localhost'
+      if (isLocalConfigured && isLocalRequest && configuredUrl.port !== requestUrl.port) {
+        return requestOrigin
+      }
+    } catch {
+      return requestOrigin
+    }
+  }
+
+  return configured
 }
 
 function buildEmailHtml(params: {

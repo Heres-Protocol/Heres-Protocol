@@ -44,6 +44,44 @@ function getRequiredEnv(name: string): string | null {
   return value.trim()
 }
 
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+function normalizeLocalMockUrl(urlValue: string): string {
+  if (process.env.NODE_ENV === 'production') return urlValue
+
+  const port = getRequiredEnv('PORT')
+  if (!port) return urlValue
+
+  try {
+    const parsed = new URL(urlValue)
+    const isLocalHost = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost'
+    if (!isLocalHost || parsed.pathname !== '/api/mock/cre' || parsed.port === port) {
+      return urlValue
+    }
+    parsed.port = port
+    return parsed.toString()
+  } catch {
+    return urlValue
+  }
+}
+
+function getCreWebhookUrl(): string | null {
+  const configured = getRequiredEnv('CHAINLINK_CRE_WEBHOOK_URL')
+  if (configured) return normalizeLocalMockUrl(configured)
+
+  if (process.env.NODE_ENV === 'production') return null
+
+  const baseUrl = getRequiredEnv('APP_BASE_URL') || getRequiredEnv('INDEXER_BASE_URL')
+  if (baseUrl) return `${trimTrailingSlash(baseUrl)}/api/mock/cre`
+
+  const port = getRequiredEnv('PORT')
+  if (port) return `http://127.0.0.1:${port}/api/mock/cre`
+
+  return 'http://127.0.0.1:3000/api/mock/cre'
+}
+
 function computeSecretHash(payload: string): string {
   return sha256Hex(payload)
 }
@@ -100,8 +138,10 @@ async function callChainlinkWorkflow(payload: {
   secretHash: string
   encryptedPayload: string
 }): Promise<void> {
-  const webhook = getRequiredEnv('CHAINLINK_CRE_WEBHOOK_URL')
-  if (!webhook) throw new Error('CHAINLINK_CRE_WEBHOOK_URL is not configured')
+  const webhook = getCreWebhookUrl()
+  if (!webhook) {
+    throw new Error('CHAINLINK_CRE_WEBHOOK_URL is not configured and no local mock CRE fallback could be resolved')
+  }
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const apiKey = getRequiredEnv('CHAINLINK_CRE_API_KEY')
@@ -113,15 +153,21 @@ async function callChainlinkWorkflow(payload: {
     headers['x-cre-signature'] = signature
   }
 
-  const response = await fetch(webhook, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  })
+  let response: Response
+  try {
+    response = await fetch(webhook, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`CRE webhook request to ${webhook} failed: ${message}`)
+  }
 
   if (!response.ok) {
     const body = await response.text()
-    throw new Error(`CRE webhook error ${response.status}: ${body}`)
+    throw new Error(`CRE webhook ${webhook} returned ${response.status}: ${body}`)
   }
 }
 
@@ -203,6 +249,8 @@ export async function dispatchCreDeliveryForCapsule(
 
   const secret = await getCreSecret(creConfig.secretRef)
   const nextAttempts = (existing?.attempts ?? 0) + 1
+  const missingSecretMessage =
+    'Secret ref not found in registry. Restore the local CRE store or recreate the capsule so the encrypted payload can be registered again.'
 
   if (!secret) {
     await upsertDeliveryLedger(idempotencyKey, {
@@ -212,9 +260,9 @@ export async function dispatchCreDeliveryForCapsule(
       secretRef: creConfig.secretRef,
       status: 'failed',
       attempts: nextAttempts,
-      lastError: 'Secret ref not found in registry',
+      lastError: missingSecretMessage,
     })
-    return { ok: false, error: 'Secret ref not found in registry', idempotencyKey, status: 'failed' }
+    return { ok: false, error: missingSecretMessage, idempotencyKey, status: 'failed' }
   }
 
   if (secret.owner !== capsule.owner.toBase58()) {
