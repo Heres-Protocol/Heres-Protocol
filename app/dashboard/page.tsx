@@ -308,11 +308,8 @@ export default function DashboardPage() {
   const pagedCapsules = capsules
 
   const statCards = [
-    { label: 'Active Capsules', value: formatNumber(summary.active), tone: 'text-Heres-accent' },
-    { label: 'Executed Capsules', value: formatNumber(summary.executed), tone: 'text-Heres-purple' },
-    { label: 'PER (TEE) Verified', value: formatNumber(summary.proofs), tone: 'text-Heres-accent' },
-    { label: 'Total Value Secured', value: formatSol(summary.totalValueSecuredLamports), tone: 'text-Heres-accent' },
-    { label: 'Total Value Executed', value: formatSol(summary.totalValueExecutedLamports), tone: 'text-Heres-purple' },
+    { label: 'Total Value Allocated', value: formatSol(summary.totalValueSecuredLamports), tone: 'text-Heres-accent' },
+    { label: 'Total Capsules Executed', value: formatNumber(summary.executed), tone: 'text-Heres-accent' },
     { label: 'Active Value Locked', value: formatSol(summary.activeValueLockedLamports), tone: 'text-Heres-accent' },
   ]
 
@@ -321,7 +318,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-hero text-Heres-white">
-      <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+      <main className="px-4 pb-16 pt-28 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {error && (
             <div className="mb-6 rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-400">
@@ -330,44 +327,75 @@ export default function DashboardPage() {
           )}
 
           {/* Explorer-style: single header card (name + version + stats + Updated) */}
-          <section className="card-Heres p-6 sm:p-8 mb-6">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-baseline gap-4">
-                <h1 className="text-2xl font-bold text-Heres-white sm:text-3xl">
-                  Heres Capsules
+          <section className="proto-panel relative mb-6 overflow-hidden p-6 sm:p-8">
+            <div className="proto-hero-blob right-[-16%] top-[-26%] opacity-60" aria-hidden />
+            <div className="relative grid gap-4 lg:grid-cols-[1.45fr_0.55fr]">
+              <div>
+                <p className="proto-label">Public Explorer</p>
+                <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white sm:text-6xl">
+                  Heres Protocol
+                  <br />
+                  Explorer
                 </h1>
-                <span className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-2.5 py-1 text-xs font-medium text-Heres-muted">
-                  v1.0
-                </span>
-                <span className="text-Heres-accent font-semibold">
-                  {formatNumber(summary.total)} Capsules
-                </span>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+                  Track capsule status, PER (TEE) execution, network indexing, and on-chain beneficiary activity from a single surface.
+                </p>
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <div className="proto-input flex items-center gap-3 px-5 py-3 text-sm">
+                    <Database className="h-4 w-4 text-cyan-300" />
+                    <input
+                      value={query}
+                      onChange={(event) => {
+                        setCurrentPage(1)
+                        setQuery(event.target.value)
+                      }}
+                      placeholder="Search capsule, owner, or signature"
+                      className="w-full bg-transparent outline-none"
+                    />
+                  </div>
+                  <Link
+                    href="/capsules"
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-cyan-400/35 bg-cyan-400/10 px-5 py-3 text-sm font-medium text-cyan-200 transition hover:bg-cyan-400/16"
+                  >
+                    <User className="h-4 w-4" />
+                    My Capsule
+                  </Link>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/capsules"
-                  className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-card/80 px-4 py-2 text-sm font-medium text-Heres-muted transition-colors hover:border-Heres-accent/40 hover:text-Heres-accent"
-                >
-                  <User className="h-4 w-4" />
-                  My Capsule
-                </Link>
+              <div className="proto-grid-card p-5">
+                <p className="proto-label">Network Status</p>
+                <div className="mt-4 space-y-3 text-sm text-slate-300">
+                  <div className="flex items-center justify-between">
+                    <span>Cluster</span>
+                    <span className="font-medium text-white">{SOLANA_CONFIG.NETWORK ? `Solana ${SOLANA_CONFIG.NETWORK}` : 'Solana Devnet'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>RPC</span>
+                    <span className="font-medium text-cyan-300">{rpcLabel}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Capsules Indexed</span>
+                    <span className="font-medium text-white">{formatNumber(summary.total)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Last Sync</span>
+                    <span className="font-medium text-white">{isRefreshing ? 'Syncing...' : lastUpdated ? timeAgo(lastUpdated) : 'Pending'}</span>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => setRefreshKey((k) => k + 1)}
                   disabled={isRefreshing}
-                  className="flex items-center gap-3 rounded-lg border border-Heres-border bg-Heres-card/80 px-4 py-2 text-sm text-Heres-muted transition-colors hover:border-Heres-accent/40 hover:text-Heres-accent disabled:opacity-70"
+                  className="mt-6 flex w-full items-center justify-center gap-3 rounded-full border border-cyan-400/30 bg-white/5 px-4 py-3 text-sm text-slate-200 transition hover:border-cyan-300/50 hover:text-white disabled:opacity-70"
                 >
                   <RefreshCw
                     className={`h-4 w-4 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`}
                     style={isRefreshing ? { animation: 'spin 1s linear infinite' } : undefined}
                   />
-                  {isRefreshing ? 'Syncing...' : lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : 'Syncing'}
+                  {isRefreshing ? 'Syncing Explorer' : 'Refresh Explorer'}
                 </button>
               </div>
             </div>
-            <p className="mt-3 text-sm text-Heres-muted max-w-xl">
-              Track capsule status, PER (TEE) execution, and verification on Solana Devnet.
-            </p>
           </section>
 
           {/* ?섏닔猷...ㅼ젙 珥덇린... Fee config媛 ?놁쓣 ?뚮쭔 ?쒖떆 (諛고룷 ...1?뚮쭔 ?꾩슂) */}
@@ -414,7 +442,7 @@ export default function DashboardPage() {
           )}
 
           {/* Explorer-style: metadata grid (Network, Program ID, Query URL) */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Network</p>
               <p className="text-sm font-medium text-Heres-white truncate">
@@ -440,12 +468,9 @@ export default function DashboardPage() {
           </section>
 
           {/* Stats row (Explorer "Signal" style) */}
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-6">
+          <section className="mb-6 grid gap-4 lg:grid-cols-[1fr_1fr_0.9fr]">
             {statCards.map((card) => (
-              <div
-                key={card.label}
-                className="card-Heres p-5 transition-all hover:border-Heres-accent/30"
-              >
+              <div key={card.label} className="proto-grid-card proto-stat-chart p-5 transition-all hover:border-Heres-accent/30">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-medium uppercase tracking-wider text-Heres-muted">{card.label}</p>
                   <Sparkles className="w-4 h-4 text-Heres-accent" />
@@ -453,10 +478,20 @@ export default function DashboardPage() {
                 <div className={`mt-3 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
               </div>
             ))}
+            <div className="proto-grid-card p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wider text-Heres-muted">Network Status</p>
+                <span className="text-green-500">●</span>
+              </div>
+              <div className="mt-4 space-y-4 text-sm text-slate-300">
+                <div className="flex justify-between"><span>Total Transactions</span><span className="text-white">{formatNumber(summary.total)}</span></div>
+                <div className="flex justify-between"><span>Total Delegations</span><span className="text-white">{formatNumber(summary.proofs)}</span></div>
+                <div className="flex justify-between"><span>Active Validators</span><span className="text-white">10</span></div>
+              </div>
+            </div>
           </section>
 
-          {/* Explorer-style: tab bar + content */}
-          <section className="card-Heres overflow-hidden">
+          <section className="proto-outline-panel overflow-hidden">
             {/* Tab bar - Explorer "Query | Curators" style */}
             <div className="border-b border-Heres-border">
               <div className="flex flex-wrap gap-0 overflow-x-auto">
@@ -493,15 +528,6 @@ export default function DashboardPage() {
                   {formatNumber(listTotal)} records
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    value={query}
-                    onChange={(event) => {
-                      setCurrentPage(1)
-                      setQuery(event.target.value)
-                    }}
-                    placeholder="Search by address, owner, or signature"
-                    className="w-full sm:w-72 rounded-lg border border-Heres-border bg-Heres-surface/80 px-3 py-2 text-sm text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50 transition"
-                  />
                   <button
                     type="button"
                     onClick={() => {
@@ -515,15 +541,23 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-6 space-y-3">
+              <div className="mt-6 overflow-hidden rounded-[20px] border border-cyan-400/14">
+                <div className="hidden grid-cols-[1.2fr_1.1fr_0.8fr_1fr_0.9fr] gap-4 bg-[#121b39] px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 lg:grid">
+                  <span>Capsule</span>
+                  <span>Event</span>
+                  <span>Time</span>
+                  <span>Participants</span>
+                  <span>Stats</span>
+                </div>
+                <div className="space-y-0">
                 {isListLoading && listTotal === 0 && (
-                  <div className="rounded-xl border border-Heres-border bg-Heres-surface/50 px-4 py-8 text-center text-sm text-Heres-muted">
+                  <div className="border-t border-cyan-400/10 bg-Heres-surface/50 px-4 py-8 text-center text-sm text-Heres-muted lg:border-t-0">
                     Loading on-chain capsule data...
                   </div>
                 )}
 
                 {!isListLoading && listTotal === 0 && (
-                  <div className="rounded-xl border border-Heres-border bg-Heres-surface/50 px-4 py-8 text-center text-sm text-Heres-muted">
+                  <div className="border-t border-cyan-400/10 bg-Heres-surface/50 px-4 py-8 text-center text-sm text-Heres-muted lg:border-t-0">
                     No capsules found. Try syncing again or adjust the search query.
                   </div>
                 )}
@@ -532,13 +566,14 @@ export default function DashboardPage() {
                   return (
                   <div
                     key={capsule.id}
-                    className={`rounded-xl border px-4 py-4 transition-colors ${capsule.kind === 'event'
-                      ? 'border-Heres-accent/30 bg-Heres-accent/5'
-                      : 'border-Heres-border bg-Heres-card/50'
+                    className={`px-4 py-4 transition-colors lg:px-5 ${capsule.kind === 'event'
+                      ? 'border-t border-cyan-400/16 bg-cyan-400/5'
+                      : 'border-t border-cyan-400/10 bg-Heres-card/50'
                       }`}
                   >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="grid gap-4 lg:grid-cols-[1.2fr_1.1fr_0.8fr_1fr_0.9fr] lg:items-center">
                       <div className="space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Capsule</p>
                         <div className="flex items-center gap-3 text-sm text-Heres-muted">
                           <span className="rounded-lg border border-Heres-border bg-Heres-surface/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-Heres-muted">
                             {capsule.kind === 'event' ? 'Event' : 'Capsule'}
@@ -560,51 +595,45 @@ export default function DashboardPage() {
                             {capsule.signature ? maskAddress(capsule.signature) : '...'}
                           </span>
                         </div>
-                        <div className="grid gap-2 text-xs text-Heres-muted md:grid-cols-3">
-                          <div>
-                            <p className="uppercase tracking-wider text-Heres-muted text-[10px] font-medium">Capsule</p>
-                            <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-Heres-white break-all truncate">
-                                {maskAddress(capsule.capsuleAddress)}
-                              </p>
-                            </div>
+                        <p className="font-mono text-sm text-white">{maskAddress(capsule.capsuleAddress)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Event</p>
+                        <p className="text-sm font-medium text-white">{capsule.status}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {capsule.kind === 'event' ? 'Indexed activity event' : 'Capsule lifecycle state'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Time</p>
+                        <p className="text-sm text-white">
+                          {capsule.kind === 'event'
+                            ? timeAgo(capsule.lastActivityMs)
+                            : formatDuration(capsule.inactivitySeconds)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">{formatDateTime(capsule.lastActivityMs)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Participants</p>
+                        <p className="font-mono text-sm text-white">{capsule.owner ? maskAddress(capsule.owner) : '...'}</p>
+                        <p className="mt-1 text-xs text-slate-400">Owner</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Stats</p>
+                        {capsule.kind === 'event' && (capsule.tokenDelta != null || capsule.solDelta != null || capsule.proofBytes != null) ? (
+                          <div className="space-y-1 text-[11px] text-slate-300">
+                            {capsule.tokenDelta != null && <p className="font-mono">Token: {capsule.tokenDelta}</p>}
+                            {capsule.solDelta != null && <p className="font-mono">SOL: {capsule.solDelta.toFixed(4)}</p>}
+                            {capsule.proofBytes != null && <p>TEE proof: {capsule.proofBytes} bytes</p>}
                           </div>
-                          <div>
-                            <p className="uppercase tracking-wider text-Heres-muted text-[10px] font-medium">Owner</p>
-                            <div className="flex items-center gap-1 min-w-0">
-                              <p className="font-mono text-Heres-white break-all truncate">
-                                {capsule.owner ? maskAddress(capsule.owner) : '...'}
-                              </p>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="uppercase tracking-wider text-Heres-muted text-[10px] font-medium">
-                              {capsule.kind === 'event' ? 'Created' : 'Inactivity'}
-                            </p>
-                            <p className="text-Heres-white">
-                              {capsule.kind === 'event'
-                                ? timeAgo(capsule.lastActivityMs)
-                                : formatDuration(capsule.inactivitySeconds)}
-                            </p>
-                          </div>
-                        </div>
-                        {capsule.kind === 'event' && (capsule.tokenDelta != null || capsule.solDelta != null || capsule.proofBytes != null) && (
-                          <div className="flex flex-wrap gap-3 text-[11px] text-Heres-muted">
-                            {capsule.tokenDelta != null && (
-                              <span className="font-mono">Token ?: {capsule.tokenDelta}</span>
-                            )}
-                            {capsule.solDelta != null && (
-                              <span className="font-mono">SOL ?: {capsule.solDelta.toFixed(4)}</span>
-                            )}
-                            {capsule.proofBytes != null && (
-                              <span>PER (TEE) tx: {capsule.proofBytes} bytes</span>
-                            )}
-                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-300">{capsule.isDelegated ? 'Delegated to PER' : 'Base layer'}</p>
                         )}
                       </div>
                     </div>
                   </div>
                 )})}
+                </div>
               </div>
 
               {listTotal > pageSize && (

@@ -251,71 +251,65 @@ export default function HomePage() {
 
   return (
     <div className="bg-hero grain-overlay">
-      {/* Hero */}
       <section
         ref={heroRef}
-        className="relative overflow-hidden px-4 pt-36 pb-32 sm:px-6 sm:pt-44 sm:pb-40 lg:px-8"
+        className="relative overflow-hidden px-4 pb-20 pt-36 sm:px-6 sm:pb-28 sm:pt-44 lg:px-8"
       >
-        {/* Decorative hero glow orbs */}
-        <div className="pointer-events-none absolute top-0 left-1/4 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-Heres-cyan/[0.04] blur-[120px]" aria-hidden />
-        <div className="pointer-events-none absolute top-20 right-1/4 translate-x-1/2 w-[500px] h-[500px] rounded-full bg-Heres-purple/[0.04] blur-[100px]" aria-hidden />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1120px] overflow-hidden" aria-hidden>
+          <div className="absolute left-1/2 top-8 h-[980px] w-[980px] -translate-x-1/2 rounded-[48%] border border-cyan-400/25 bg-[radial-gradient(circle_at_40%_40%,rgba(30,196,255,0.38),rgba(5,10,24,0.08)_45%,transparent_72%)] blur-[2px]" />
+          <div className="absolute left-1/2 top-20 h-[920px] w-[920px] -translate-x-1/2 rounded-[46%] border border-cyan-400/15 shadow-[0_0_80px_rgba(34,211,238,0.2),0_0_180px_rgba(37,99,235,0.18)]" />
+          <div className="absolute -left-20 bottom-0 h-[520px] w-[520px] rounded-full bg-blue-700/40 blur-[120px]" />
+        </div>
 
-        <div className="mx-auto max-w-5xl text-center">
-          <div data-hero-tag className="mb-6 inline-flex items-center gap-2">
-            <span className="tag-pill">
-              <span className="accent-dot" />
-              Privacy-Preserving Capsule Protocol
-            </span>
-          </div>
-          <h1 className="font-display text-5xl font-bold uppercase tracking-tight text-Heres-white sm:text-6xl lg:text-7xl xl:text-8xl leading-[0.95]">
-            Your intent. Your rules.{' '}
-            <span className="text-shimmer">
-              Executed when you&apos;re silent.
-            </span>
+        <div className="relative mx-auto max-w-6xl text-center">
+          <h1 className="mx-auto max-w-5xl text-[clamp(3.4rem,8vw,6.6rem)] font-semibold uppercase leading-[0.94] tracking-[-0.06em] text-white">
+            <span className="text-cyan-400">Your intent.</span> Executed when
+            <br />
+            you&apos;re silent
           </h1>
-          {/* ASCII capsule animation */}
-          <div className="mt-12 sm:mt-14" data-hero-ascii>
-            <AsciiCapsule />
+          <div className="mt-10">
+            <Link
+              href={getAppHref('/create')}
+              className="inline-flex min-w-[390px] max-w-full items-center justify-center rounded-[22px] bg-[#30b6d1] px-10 py-5 text-[22px] font-semibold uppercase tracking-[-0.03em] text-white shadow-[0_0_30px_rgba(34,211,238,0.4)] transition hover:opacity-90"
+            >
+              Create Capsules
+            </Link>
           </div>
-          {/* Description + CTAs */}
-          <div className="mt-12 sm:mt-14 text-center" data-hero-below-capsule>
-            <p className="mx-auto max-w-2xl text-base sm:text-lg text-Heres-muted leading-relaxed">
-              Create once, then let Heres monitor silently. When inactivity conditions are met, execution finalizes on Solana without manual intervention.
-            </p>
-            <div className="mt-10 flex flex-wrap justify-center gap-4">
-              <Link
-                href={getAppHref('/create')}
-                className="btn-primary min-w-[180px] shrink-0 rounded-full py-4 text-center text-sm"
-              >
-                Create Capsule
-              </Link>
-              <Link
-                href={getAppHref('/dashboard')}
-                className="btn-secondary min-w-[180px] shrink-0 rounded-full py-4 text-center text-sm"
-                aria-label="Open dashboard"
-              >
-                Open Dashboard
-              </Link>
+          <p className="mx-auto mt-14 max-w-5xl text-[clamp(1.35rem,2.2vw,2rem)] font-semibold leading-[1.35] text-white/45">
+            Create once, then let Heres monitor silently. When inactivity conditions are met, execution
+            finalizes on Solana without manual intervention.
+          </p>
+          <div className="mt-16">
+            <p className="text-[22px] uppercase tracking-[-0.03em] text-white">Built On</p>
+            <div className="mx-auto mt-6 inline-flex rounded-[2px] bg-black px-12 py-6">
+              <Image src="/logos/solana.svg" alt="Solana" width={250} height={60} className="h-10 w-auto" unoptimized />
+            </div>
+          </div>
+          <div className="mt-24">
+            <p className="text-[22px] uppercase tracking-[-0.03em] text-white">Backed By</p>
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
+              {['COLOSSEUM', 'MagicBlock', 'COLOSSEUM', 'MagicBlock', 'COLOSSEUM'].map((name, index) => (
+                <div key={`${name}-${index}`} className="flex h-[64px] items-center justify-center bg-black/80 px-6 text-2xl font-semibold text-white/90">
+                  {name}
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      <div className="glow-line" />
-
-      {/* Quick start + proof */}
-      <section className="relative py-14 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-4 lg:grid-cols-3">
+      <section className="relative bg-[radial-gradient(circle_at_40%_0%,rgba(29,78,216,0.55),transparent_38%),linear-gradient(180deg,#11205f_0%,#0e1a55_100%)] py-14 sm:py-16">
+        <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-8 lg:grid-cols-2">
             {quickStartCards.map((card) => (
-              <div key={card.title} className="card-bento p-6">
-                <h3 className="font-display text-xl font-bold uppercase tracking-tight text-Heres-white">{card.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-Heres-muted">{card.desc}</p>
+              <div key={card.title} className="mx-auto w-full max-w-[460px] rounded-[28px] border border-cyan-400/45 bg-[#12183a] px-6 py-10 text-center shadow-[0_0_0_1px_rgba(34,211,238,0.05)]">
+                <h3 className="font-display text-[42px] font-semibold uppercase tracking-[-0.05em] text-Heres-white">{card.title}</h3>
+                <p className="mt-4 text-[18px] leading-[1.45] text-white/45">{card.desc}</p>
                 <Link
                   href={card.href}
                   target={card.external ? '_blank' : undefined}
                   rel={card.external ? 'noopener noreferrer' : undefined}
-                  className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-Heres-accent/90 transition-colors hover:text-Heres-accent"
+                  className="mt-7 inline-flex items-center gap-3 text-[20px] font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
                 >
                   {card.cta}
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -325,14 +319,14 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {proofMetrics.map((m) => (
-              <div key={m.label} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-center">
-                <p className="font-display text-[10px] uppercase tracking-widest text-white/40">{m.label}</p>
-                <p className="mt-1 font-display text-sm uppercase tracking-wide text-Heres-white">{m.value}</p>
-              </div>
-            ))}
+          <div className="mx-auto mt-8 max-w-[460px] rounded-[28px] border border-cyan-400/45 bg-[#12183a] px-6 py-10 text-center shadow-[0_0_0_1px_rgba(34,211,238,0.05)]">
+            <h3 className="font-display text-[42px] font-semibold uppercase tracking-[-0.05em] text-Heres-white">Mobile Demo</h3>
+            <p className="mt-4 text-[18px] leading-[1.45] text-white/45">
+              Run the seeker-native flow and sign extension actions directly from your Mobile.
+            </p>
+            <Link href="https://seeker.solanamobile.com" target="_blank" rel="noopener noreferrer" className="mt-7 inline-flex items-center gap-3 text-[20px] font-semibold text-cyan-400 transition-colors hover:text-cyan-300">
+              Download APK
+            </Link>
           </div>
         </div>
       </section>
@@ -340,16 +334,10 @@ export default function HomePage() {
       {/* Why Build With Heres */}
       <section ref={whySectionRef} className="why-build-section py-24 sm:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
+          <div className="mx-auto max-w-4xl rounded-[28px] bg-[#12183a] px-8 py-9 text-center">
             <h2 ref={whyTitleRef} className="font-display text-3xl font-bold uppercase tracking-tight text-white sm:text-4xl lg:text-5xl">
               Why Build With Heres?
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-center text-Heres-muted hidden">
-              Capsules on Solana, private logic in Magicblock PER (TEE), execution when you&apos;re silent.
-            </p>
-          </div>
-
-          <div data-why-heading className="mx-auto mt-4 max-w-2xl text-center">
             <p className="why-build-subtitle text-lg font-medium font-display uppercase tracking-wide">Your development environment</p>
             <p className="why-build-desc mt-2">Everything you need to build privacy-preserving capsules on Solana.</p>
           </div>
@@ -630,7 +618,6 @@ export default function HomePage() {
 
       <div className="glow-line" />
 
-      {/* Heres on Solana Mobile */}
       <section className="relative py-24 sm:py-32 overflow-hidden">
         {/* Background accent */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-Heres-purple/[0.02] to-transparent" aria-hidden />
@@ -680,126 +667,30 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="glow-line" />
-
-      {/* Unleash the Power of Heres */}
-      <section ref={unleashRef} className="relative overflow-hidden py-28 sm:py-36">
-        {/* Background orbs */}
-        <div className="pointer-events-none absolute top-1/2 left-1/4 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-Heres-cyan/[0.03] blur-[120px]" aria-hidden />
-        <div className="pointer-events-none absolute top-1/2 right-1/4 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-Heres-purple/[0.03] blur-[100px]" aria-hidden />
-
-        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-16 lg:grid-cols-2">
-            <div data-gsap-unleash-text className="max-w-xl">
-              <h2 className="font-display text-4xl font-bold uppercase tracking-tight leading-[1.1] text-Heres-white sm:text-5xl lg:text-6xl">
-                Unleash the Power of{' '}
-                <span className="text-shimmer">Heres</span>
-              </h2>
-              <p className="mt-8 text-lg leading-relaxed text-Heres-muted">
-                Define your intent once: beneficiaries, amounts, inactivity period. Your capsule lives on Solana; Magicblock PER (TEE) monitors privately. When silence becomes truth, execution runs on Devnet. No third party, no bridges.
-              </p>
-              <Link href={getAppHref('/create')} className="mt-10 inline-block btn-primary rounded-full px-10 py-4 text-sm">
-                Create Your Capsule
-              </Link>
+      <section className="relative overflow-hidden border-t border-cyan-400/20 bg-[linear-gradient(180deg,#111d61_0%,#101a52_100%)] py-24 sm:py-28">
+        <div className="mx-auto max-w-6xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="text-[clamp(3rem,6vw,5rem)] font-semibold uppercase tracking-[-0.06em] text-white">The possibilities are limitless</h2>
+          <p className="mt-4 text-3xl font-semibold uppercase tracking-[-0.04em] text-cyan-400">All on Solana</p>
+          <div className="mt-14 grid gap-8 sm:grid-cols-3">
+            <div>
+              <p className="text-7xl font-semibold text-white/80">100 +</p>
+              <p className="mt-4 text-2xl text-white/60">Capsules Created</p>
             </div>
-            <div
-              data-gsap-unleash-3d
-              className="relative aspect-video max-w-lg overflow-hidden"
-            >
-              <AsciiCapsule bgColor="transparent" />
+            <div>
+              <p className="text-7xl font-semibold text-white/80">100 <span className="text-5xl">SOL</span></p>
+              <p className="mt-4 text-2xl text-white/60">Value Secured</p>
+            </div>
+            <div>
+              <p className="text-7xl font-semibold text-white/80">10 +</p>
+              <p className="mt-4 text-2xl text-white/60">Beneficiaries</p>
             </div>
           </div>
-        </div>
-      </section>
-
-      <div className="glow-line" />
-
-      {/* Partners */}
-      <section ref={partnersSectionRef} className="partners-section relative py-24 sm:py-32">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="font-display text-center text-3xl font-bold uppercase tracking-tight text-Heres-white sm:text-4xl lg:text-5xl">
-            The Possibilities Are Limitless
-          </h2>
-          <p className="mx-auto mt-1 text-center font-display text-lg uppercase tracking-wide text-Heres-accent/60">
-            All On Solana
+          <Link href={getAppHref('/create')} className="mt-16 inline-flex min-w-[390px] max-w-full items-center justify-center rounded-[22px] bg-[#30b6d1] px-10 py-5 text-[22px] font-semibold uppercase tracking-[-0.03em] text-white shadow-[0_0_30px_rgba(34,211,238,0.4)] transition hover:opacity-90">
+            Create Capsules
+          </Link>
+          <p className="mt-14 text-[clamp(1.6rem,3vw,2.3rem)] font-semibold uppercase tracking-[-0.05em] text-white/45">
+            Your comprehensive digital inheritance vault built on <span className="text-cyan-400">Solana.</span>
           </p>
-          <p className="mx-auto mt-5 max-w-2xl text-center text-Heres-muted">
-            Heres uses Solana for persistence, Magicblock PER (TEE) for private execution, Helius for RPC, Phantom and Backpack for wallets, and Solana Mobile Seeker for the APK.
-          </p>
-        </div>
-        <div className="partners-content relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="partners-orbit relative flex min-h-[420px] sm:min-h-[520px] items-center justify-center overflow-hidden">
-            {/* Orbit paths */}
-            <div className="partners-orbit-rings absolute inset-0 flex items-center justify-center" aria-hidden>
-              <div className="absolute h-[320px] w-[480px] rounded-full border border-white/[0.04]" />
-              <div className="absolute h-[440px] w-[660px] rounded-full border border-white/[0.04]" />
-              <div className="absolute h-[560px] w-[840px] rounded-full border border-white/[0.04]" />
-            </div>
-            {/* Orbiting logos */}
-            {[
-              { radiusX: 240, radiusY: 160, count: 4, duration: 22, reverse: false },
-              { radiusX: 330, radiusY: 220, count: 8, duration: 28, reverse: true },
-              { radiusX: 420, radiusY: 280, count: 12, duration: 35, reverse: false },
-            ].map((ring, ringIdx) => (
-              <div
-                key={ringIdx}
-                className="partners-orbit-ring absolute left-1/2 top-1/2 h-0 w-0 origin-center"
-                style={{
-                  animation: `orbitSpin ${ring.duration}s linear infinite`,
-                  animationDirection: ring.reverse ? 'reverse' : 'normal',
-                } as React.CSSProperties}
-              >
-                {(() => {
-                  const partners = [
-                    { name: 'Solana', href: 'https://solana.com', color: '#9945FF', logo: '/logos/solana.svg' },
-                    { name: 'Solana Mobile Seeker', href: 'https://seeker.solanamobile.com', color: '#ffffff', logo: '/logos/solana-mobile-seeker.png' },
-                    { name: 'Phantom', href: 'https://phantom.app', color: '#ab9ff2', logo: '/logos/phantom.svg' },
-                    { name: 'Helius', href: 'https://helius.dev', color: '#f97316', logo: '/logos/helius.svg' },
-                    { name: 'Backpack', href: 'https://backpack.app', color: '#E33E3F', logo: '/logos/backpack.png' },
-                    { name: 'Magicblock', href: 'https://www.magicblock.xyz', color: '#22d3ee', logo: '/logos/magicblock.svg' },
-                  ]
-                  const items = Array.from({ length: ring.count }, (_, i) => partners[i % partners.length])
-                  return items.map((p, i) => {
-                    const angleDeg = (360 / ring.count) * i
-                    const angleRad = (angleDeg * Math.PI) / 180
-                    const x = Math.round(ring.radiusX * Math.sin(angleRad))
-                    const y = Math.round(-ring.radiusY * Math.cos(angleRad))
-                    return (
-                      <a
-                        key={`${ringIdx}-${i}`}
-                        href={p.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="partners-orbit-item absolute left-0 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-xl border bg-Heres-surface/60 backdrop-blur-sm transition-all duration-300 hover:scale-110 hover:border-Heres-accent/30"
-                        style={{
-                          transform: `translate(${x}px, ${y}px) rotate(${-angleDeg}deg)`,
-                          borderColor: `${p.color}30`,
-                        }}
-                      >
-                        <Image
-                          src={p.logo}
-                          alt={p.name}
-                          width={36}
-                          height={36}
-                          className="h-full w-full object-contain p-0.5"
-                          unoptimized
-                        />
-                      </a>
-                    )
-                  })
-                })()}
-              </div>
-            ))}
-            {/* Central content */}
-            <div className="relative z-10 max-w-lg text-center">
-              <h2 className="font-display text-6xl font-bold tracking-tight text-white sm:text-7xl lg:text-8xl">
-                5+
-              </h2>
-              <h3 className="mt-2 font-display text-xl font-semibold uppercase tracking-wide text-white/60 sm:text-2xl">
-                Powered by
-              </h3>
-            </div>
-          </div>
         </div>
       </section>
     </div>

@@ -706,72 +706,45 @@ export default function CreatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-hero pt-24 pb-16">
-      {/* Mobile: Heres nav as horizontal strip */}
-      <div className="lg:hidden border-b border-Heres-border/50 bg-Heres-card/50 mb-6 -mt-2">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-Heres-muted mr-2">Heres</span>
-          <Link href="/create" className="rounded-lg px-3 py-1.5 text-sm font-medium bg-Heres-accent/20 text-Heres-accent border border-Heres-accent/40">
-            Create Capsule
-          </Link>
-          <Link href="/capsules" className="rounded-lg px-3 py-1.5 text-sm font-medium text-Heres-muted hover:text-Heres-white hover:bg-Heres-surface/80">
-            My Capsules
-          </Link>
-          <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm font-medium text-Heres-muted hover:text-Heres-white hover:bg-Heres-surface/80">
-            Dashboard
-          </Link>
-        </div>
-      </div>
-
-      {/* Left sidebar + main content */}
-      <div className="flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Left sidebar */}
-        <aside className="hidden lg:block w-56 shrink-0 pt-2">
-          <nav className="sticky top-24 space-y-1 rounded-2xl border border-Heres-border bg-Heres-card/80 backdrop-blur-xl p-3">
-            <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-Heres-muted">Heres</p>
-            <Link
-              href="/create"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-Heres-accent bg-Heres-accent/10 border border-Heres-accent/30"
-            >
-              <Shield className="w-4 h-4 shrink-0" />
-              Create Capsule
-            </Link>
-            <Link
-              href="/capsules"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-Heres-muted hover:text-Heres-white hover:bg-Heres-surface/80 transition-colors"
-            >
-              <User className="w-4 h-4 shrink-0" />
-              My Capsules
-            </Link>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-Heres-muted hover:text-Heres-white hover:bg-Heres-surface/80 transition-colors"
-            >
-              <Database className="w-4 h-4 shrink-0" />
-              Dashboard
-            </Link>
-            <div className="border-t border-Heres-border my-2" />
-            <Link
-              href="/"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-Heres-muted hover:text-Heres-white hover:bg-Heres-surface/80 transition-colors"
-            >
-              ??Back to Home
-            </Link>
-          </nav>
-        </aside>
-
-        {/* Main content - right of sidebar */}
-        <div className="flex-1 min-w-0 lg:pl-8">
-          <header className="mb-8">
-            <h1 className="text-3xl font-bold text-Heres-white sm:text-4xl">
-              Create Capsule
-            </h1>
-            <p className="mt-2 max-w-2xl text-Heres-muted">
-              Define your intent, set beneficiaries and conditions. Your capsule lives on Solana; delegate to Magicblock ER or PER (TEE) for private monitoring.
-            </p>
-            <p className="mt-1 text-xs text-Heres-muted/80">
-              Delegation defaults to TEE (Private Ephemeral Rollup) for confidential conditions.
-            </p>
+    <div className="min-h-screen bg-hero pb-16 pt-28">
+      <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
+        <div className="min-w-0">
+          <header className="proto-panel relative mb-8 overflow-hidden p-6 sm:p-8">
+            <div className="proto-hero-blob right-[-18%] top-[-40%] opacity-65" aria-hidden />
+            <div className="relative">
+              <Link
+                href="/capsules"
+                className="mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/8 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-400/14"
+              >
+                My Capsules
+              </Link>
+              <p className="proto-label">Capsule Creation</p>
+              <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-Heres-white sm:text-6xl">
+                Create Capsule
+              </h1>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300">
+                Define your intent, asset route, beneficiaries, and trigger conditions. The capsule lives on Solana and defaults to private PER (TEE) monitoring.
+              </p>
+              <div className="mt-6">
+                <div className="h-2 overflow-hidden rounded-full border border-cyan-400/20 bg-[#0c1430]">
+                  <div className="h-full w-[72%] rounded-full bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-500" />
+                </div>
+                <div className="mt-3 grid gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-400 sm:grid-cols-4">
+                  <span>Asset</span>
+                  <span>Network</span>
+                  <span>Beneficiaries</span>
+                  <span>Intent</span>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-3 sm:grid-cols-4">
+                {['Select Asset Type', 'Select Network', 'Beneficiary Information', 'Declare Your Intent'].map((step, index) => (
+                  <div key={step} className="proto-grid-card px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300/80">Step {index + 1}</p>
+                    <p className="mt-2 text-sm text-white">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </header>
 
           {!connected ? (
@@ -804,7 +777,7 @@ export default function CreatePage() {
                 </div>
               )}
 
-              <div className="card-Heres p-6 sm:p-8">
+              <div className="rounded-[6px] bg-[#050816] px-5 py-5 sm:px-10 sm:py-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-border flex items-center justify-center">
                     <Shield className="w-5 h-5 text-Heres-accent" />
@@ -826,18 +799,30 @@ export default function CreatePage() {
               </div>
 
               {/* Getting Started style: choose Token or NFT */}
-              <div className="card-Heres p-6 sm:p-8">
+              <div className="rounded-[6px] bg-[#050816] px-5 py-5 sm:px-10 sm:py-8">
                 <h2 className="text-xl font-bold text-Heres-white mb-2">Choose asset type</h2>
                 <p className="text-sm text-Heres-muted mb-6">
                   Follow these steps to create your capsule successfully. Select whether to transfer tokens or NFTs.
                 </p>
+                <div className="mb-6 grid gap-3 sm:grid-cols-2">
+                  <div className="proto-grid-card p-4">
+                    <p className="proto-label">Selected Network</p>
+                    <p className="mt-2 text-lg font-semibold text-white">Solana Devnet</p>
+                    <p className="mt-1 text-sm text-slate-300">Private monitoring routes through PER (TEE) after creation.</p>
+                  </div>
+                  <div className="proto-grid-card p-4">
+                    <p className="proto-label">Execution Model</p>
+                    <p className="mt-2 text-lg font-semibold text-cyan-300">Automatic Release</p>
+                    <p className="mt-1 text-sm text-slate-300">Beneficiary delivery happens after inactivity plus delay window.</p>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-4">
                   <button
                     type="button"
                     onClick={() => setCapsuleType('token')}
                     className={`inline-flex items-center gap-3 rounded-xl border px-6 py-4 text-sm font-medium transition-colors ${capsuleType === 'token'
-                      ? 'border-Heres-accent bg-Heres-accent/10 text-Heres-accent'
-                      : 'border-Heres-border bg-Heres-card/80 text-Heres-white hover:border-Heres-accent/40 hover:bg-Heres-surface/80'
+                      ? 'border-cyan-400 bg-cyan-400/10 text-cyan-300'
+                      : 'border-cyan-400/20 bg-[#091022] text-Heres-white hover:border-cyan-400/40'
                       }`}
                   >
                     <Coins className="h-5 w-5 shrink-0" />
@@ -847,8 +832,8 @@ export default function CreatePage() {
                     type="button"
                     onClick={() => setCapsuleType('nft')}
                     className={`inline-flex items-center gap-3 rounded-xl border px-6 py-4 text-sm font-medium transition-colors ${capsuleType === 'nft'
-                      ? 'border-Heres-accent bg-Heres-accent/10 text-Heres-accent'
-                      : 'border-Heres-border bg-Heres-card/80 text-Heres-white hover:border-Heres-accent/40 hover:bg-Heres-surface/80'
+                      ? 'border-cyan-400 bg-cyan-400/10 text-cyan-300'
+                      : 'border-cyan-400/20 bg-[#091022] text-Heres-white hover:border-cyan-400/40'
                       }`}
                   >
                     <ImageIcon className="h-5 w-5 shrink-0" />
@@ -860,7 +845,7 @@ export default function CreatePage() {
 
               {/* Token path: Step 2 Total Amount */}
               {capsuleType === 'token' && (
-                <div className="card-Heres p-6 sm:p-8">
+                <div className="rounded-[6px] bg-[#050816] px-5 py-5 sm:px-10 sm:py-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-border flex items-center justify-center">
                       <User className="w-5 h-5 text-Heres-accent" />
@@ -931,7 +916,7 @@ export default function CreatePage() {
 
               {/* Token path: Step 3 Beneficiaries */}
               {capsuleType === 'token' && (
-                <div className="card-Heres p-6 sm:p-8">
+                <div className="rounded-[6px] bg-[#050816] px-5 py-5 sm:px-10 sm:py-8">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-border flex items-center justify-center">
@@ -1092,7 +1077,7 @@ export default function CreatePage() {
 
               {/* NFT path: Step 2 Select NFTs */}
               {capsuleType === 'nft' && (
-                <div className="card-Heres p-6 sm:p-8">
+                <div className="rounded-[6px] bg-[#050816] px-5 py-5 sm:px-10 sm:py-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-border flex items-center justify-center">
                       <ImageIcon className="w-5 h-5 text-Heres-accent" />
@@ -1136,7 +1121,7 @@ export default function CreatePage() {
 
               {/* NFT path: Step 3 Recipients & assignment */}
               {capsuleType === 'nft' && (
-                <div className="card-Heres p-6 sm:p-8">
+                <div className="rounded-[6px] bg-[#050816] px-5 py-5 sm:px-10 sm:py-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-border flex items-center justify-center">
                       <User className="w-5 h-5 text-Heres-accent" />
@@ -1210,7 +1195,7 @@ export default function CreatePage() {
 
               {/* Step 4 Trigger Conditions (shared) */}
               {capsuleType !== null && (
-                <div className="card-Heres p-6 sm:p-8">
+                <div className="rounded-[6px] bg-[#050816] px-5 py-5 sm:px-10 sm:py-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-border flex items-center justify-center">
                       <Clock className="w-5 h-5 text-Heres-accent" />
@@ -1334,7 +1319,7 @@ export default function CreatePage() {
               )}
 
               {capsuleType !== null && (
-                <div className="card-Heres p-6 sm:p-8">
+                <div className="rounded-[6px] bg-[#050816] px-5 py-5 sm:px-10 sm:py-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-Heres-accent/10 border border-Heres-border flex items-center justify-center">
                       <Shield className="w-5 h-5 text-Heres-accent" />
@@ -1432,6 +1417,30 @@ export default function CreatePage() {
                     </div>
                   </div>
                 </>
+              )}
+
+              {capsuleType !== null && (
+                <section className="proto-outline-panel p-6 sm:p-8">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="proto-label">FAQ</p>
+                      <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">Before You Create</h2>
+                    </div>
+                  </div>
+                  <div className="mt-6 space-y-3">
+                    {[
+                      ['Can I edit my capsule later?', 'You can recreate or modify while under the wallet modification cap. Active capsules must be executed or cancelled before creating a new one.'],
+                      ['Which network is used?', 'This flow is currently configured for Solana Devnet with private monitoring delegated through PER (TEE).'],
+                      ['How are beneficiaries paid?', 'Token allocations use the percentages or fixed amounts you define. NFT capsules send each selected mint to its assigned recipient wallet.'],
+                      ['What is sent through CRE?', 'Only the encrypted intent statement package goes off-chain for delivery. Do not place seed phrases or private keys in the message.'],
+                    ].map(([question, answer]) => (
+                      <div key={question} className="proto-grid-card p-4">
+                        <p className="text-sm font-semibold text-white">{question}</p>
+                        <p className="mt-2 text-sm leading-7 text-slate-300">{answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               )}
 
               {error && (

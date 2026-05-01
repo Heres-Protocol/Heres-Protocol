@@ -594,22 +594,23 @@ export default function CapsuleDetailPage() {
 
   return (
     <div className="min-h-screen bg-hero text-Heres-white">
-      <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+      <main className="px-4 pb-16 pt-28 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <Link
             href="/capsules"
-            className="inline-flex items-center gap-2 text-sm text-Heres-muted hover:text-Heres-accent mb-6"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/8 px-4 py-2 text-sm text-cyan-200 transition hover:bg-cyan-400/14"
           >
             <ArrowLeft className="h-4 w-4" />
             My Capsules
           </Link>
 
-          {/* Graph Explorer style: header card */}
-          <section className="card-Heres p-6 sm:p-8 mb-6">
+          <section className="proto-panel relative mb-6 overflow-hidden p-6 sm:p-8">
+            <div className="proto-hero-blob right-[-18%] top-[-42%] opacity-60" aria-hidden />
+            <div className="relative">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-baseline gap-3">
-                <h1 className="text-2xl font-bold text-Heres-white sm:text-3xl">
-                  Capsule
+                <h1 className="text-3xl font-semibold tracking-[-0.05em] text-Heres-white sm:text-5xl">
+                  {isToken ? `${assetConfig.symbol} Family Capsule` : 'Capsule Detail'}
                 </h1>
                 <span className="font-mono text-sm text-Heres-muted" title={capsule.capsuleAddress}>
                   {maskAddress(capsule.capsuleAddress)}
@@ -639,67 +640,45 @@ export default function CapsuleDetailPage() {
                 Updated {timeAgo(lastUpdatedMs)}
               </p>
             </div>
-            <p className="mt-3 text-sm text-Heres-muted max-w-xl">
-              {isNft ? 'NFT capsule' : `Token (${assetConfig.symbol}) capsule`} · Inactivity period:{' '}
-              {formatDuration(capsule.inactivityPeriod)}
+            <p className="mt-3 max-w-xl text-sm text-Heres-muted">
+              {isNft ? 'NFT capsule' : `Token (${assetConfig.symbol}) capsule`} · Inactivity period {formatDuration(capsule.inactivityPeriod)}
             </p>
+            </div>
           </section>
 
-          {/* Metadata grid (Graph Explorer style) */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Network</p>
-              <p className="text-sm font-medium text-Heres-white">
-                Solana {SOLANA_CONFIG.NETWORK || 'devnet'}
-              </p>
-            </div>
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Capsule ID</p>
-              <div className="flex items-center gap-1">
-                <a
-                  href={`https://explorer.solana.com/address/${capsule.capsuleAddress}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-mono text-Heres-accent truncate min-w-0 hover:underline"
-                  title={capsule.capsuleAddress}
-                >
-                  {maskAddress(capsule.capsuleAddress)}
-                </a>
-                <CopyButton value={capsule.capsuleAddress} />
-              </div>
-            </div>
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Owner</p>
-              <div className="flex items-center gap-1">
-                <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={capsule.owner.toBase58()}>
-                  {maskAddress(capsule.owner.toBase58())}
+          <section className="proto-outline-panel mb-6 p-6">
+            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.7fr]">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Capsule Value</p>
+                <p className="mt-3 text-4xl font-semibold text-white">
+                  {isToken && intentParsed && 'totalAmount' in intentParsed && intentParsed.totalAmount ? `${intentParsed.totalAmount} ${assetConfig.symbol}` : assetConfig.symbol}
                 </p>
-                <CopyButton value={capsule.owner.toBase58()} />
-              </div>
-            </div>
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Program ID</p>
-              <div className="flex items-center gap-1">
-                <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={getProgramId().toBase58()}>
-                  {maskAddress(getProgramId().toBase58())}
-                </p>
-                <CopyButton value={getProgramId().toBase58()} />
-              </div>
-            </div>
-            {capsule.mint && (
-              <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Token Mint</p>
-                <div className="flex items-center gap-1">
-                  <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={capsule.mint.toBase58()}>
-                    {maskAddress(capsule.mint.toBase58())}
-                  </p>
-                  <CopyButton value={capsule.mint.toBase58()} />
+                <div className="mt-5 space-y-2 text-sm text-slate-300">
+                  <div className="flex gap-3">
+                    <span className="w-24 text-slate-500">Owner</span>
+                    <span className="font-mono text-white">{maskAddress(capsule.owner.toBase58())}</span>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="w-24 text-slate-500">Capsule ID</span>
+                    <span className="font-mono text-white">{maskAddress(capsule.capsuleAddress)}</span>
+                  </div>
                 </div>
               </div>
-            )}
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Retries</p>
-              <p className="text-sm font-mono text-Heres-white">{(capsule as any).retryCount?.toString() || '0'}</p>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Status</p>
+                <div className="mt-4 inline-flex rounded-full bg-green-500/20 px-5 py-2 text-sm font-medium text-green-400">
+                  {status}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Network</p>
+                <p className="mt-4 text-2xl font-semibold text-white">Solana</p>
+                <p className="mt-1 text-sm text-slate-400">{SOLANA_CONFIG.NETWORK || 'devnet'}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Token</p>
+                <p className="mt-4 text-2xl font-semibold text-white">{assetConfig.symbol}</p>
+              </div>
             </div>
           </section>
 
@@ -758,13 +737,15 @@ export default function CapsuleDetailPage() {
           </section>
 
           {/* Intent / Type summary */}
-          <section className="card-Heres p-6 mb-6">
+          <section className="proto-outline-panel p-6 mb-6">
             <h2 className="text-lg font-semibold text-Heres-white mb-3">Intent</h2>
-            <p className="text-sm text-Heres-muted mb-4">
-              {intentParsed?.intent || 'No intent decoded'}
-            </p>
+            <div className="rounded-[22px] border border-cyan-400/40 bg-[#06101f] px-8 py-7">
+              <p className="text-xl font-medium uppercase leading-[1.55] tracking-[-0.03em] text-cyan-300">
+                {intentParsed?.intent || 'No intent decoded'}
+              </p>
+            </div>
             {isToken && intentParsed && 'totalAmount' in intentParsed && intentParsed.totalAmount && (
-              <p className="text-sm text-Heres-accent">
+              <p className="mt-5 text-sm text-Heres-accent">
                 Total amount: {intentParsed.totalAmount} {assetConfig.symbol}
               </p>
             )}
@@ -773,6 +754,72 @@ export default function CapsuleDetailPage() {
                 NFTs: {intentParsed.nftMints.length} item(s)
               </p>
             )}
+          </section>
+
+          {isToken && intentParsed && 'beneficiaries' in intentParsed && Array.isArray(intentParsed.beneficiaries) && (
+            <section className="proto-outline-panel p-6 mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-Heres-white">Beneficiary Information</h2>
+                  <p className="mt-1 text-sm text-Heres-muted">Addresses and allocation rules encoded in the capsule intent.</p>
+                </div>
+                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/8 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-cyan-300">
+                  {intentParsed.beneficiaries.length} recipients
+                </span>
+              </div>
+              <div className="mt-5 space-y-3">
+                {intentParsed.beneficiaries.map((beneficiary: any, index: number) => (
+                  <div key={`${beneficiary.address}-${index}`} className="proto-grid-card grid gap-3 p-4 md:grid-cols-[1.15fr_0.7fr_0.55fr] md:items-center">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Wallet</p>
+                      <p className="mt-2 font-mono text-sm text-white">{beneficiary.address}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Allocation</p>
+                      <p className="mt-2 text-sm font-medium text-cyan-300">
+                        {beneficiary.amount} {beneficiary.amountType === 'percentage' ? '%' : assetConfig.symbol}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Chain</p>
+                      <p className="mt-2 text-sm text-white">{(beneficiary.chain || 'solana').toUpperCase()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="proto-outline-panel p-6 mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-Heres-white">Trigger Conditions</h2>
+                <p className="mt-1 text-sm text-Heres-muted">Execution only becomes available after the inactivity period has elapsed.</p>
+              </div>
+              <span className="rounded-full border border-cyan-400/20 bg-cyan-400/8 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-cyan-300">
+                {status}
+              </span>
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="proto-grid-card p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Inactivity Window</p>
+                <p className="mt-2 text-xl font-semibold text-white">{formatDuration(capsule.inactivityPeriod)}</p>
+              </div>
+              <div className="proto-grid-card p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Last Activity</p>
+                <p className="mt-2 text-xl font-semibold text-white">{timeAgo(lastUpdatedMs)}</p>
+              </div>
+              <div className="proto-grid-card p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Execution Route</p>
+                <p className="mt-2 text-xl font-semibold text-cyan-300">{isDelegated ? 'PER (TEE)' : 'Base Layer'}</p>
+              </div>
+            </div>
+            <div className="mt-6">
+              <p className="mb-3 text-sm font-medium text-slate-300">Trigger progress</p>
+              <div className="h-4 rounded-full bg-[#103342] p-1">
+                <div className="h-full w-1/2 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-300" />
+              </div>
+            </div>
           </section>
 
           {isCreEnabled && (

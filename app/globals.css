@@ -32,6 +32,32 @@ body {
   width: 100%;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(0, 224, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 82% 18%, rgba(0, 164, 255, 0.12), transparent 18%),
+    radial-gradient(circle at 52% 72%, rgba(9, 91, 184, 0.12), transparent 28%);
+  z-index: -2;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, black 42%, transparent 100%);
+  opacity: 0.26;
+  z-index: -1;
+}
+
 /* Grain texture overlay */
 .grain-overlay::before {
   content: '';
@@ -209,16 +235,127 @@ a {
 /* Navbar glass - refined */
 .nav-glass {
   @apply fixed left-0 right-0 top-0 z-50;
-  background: rgba(5, 8, 22, 0.7);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(5, 8, 22, 0.92) 0%, rgba(5, 8, 22, 0.58) 85%, rgba(5, 8, 22, 0) 100%);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
   padding-top: env(safe-area-inset-top);
-  height: calc(4rem + env(safe-area-inset-top));
+  height: calc(5.5rem + env(safe-area-inset-top));
 }
 
 .nav-glass>div {
   height: 100%;
+}
+
+.proto-nav-shell {
+  border: 1px solid rgba(95, 229, 255, 0.28);
+  background: rgba(8, 14, 34, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(95, 229, 255, 0.08),
+    0 28px 80px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.proto-panel {
+  border-radius: 28px;
+  border: 1px solid rgba(95, 229, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(18, 28, 63, 0.92) 0%, rgba(8, 13, 30, 0.94) 100%);
+  box-shadow:
+    0 0 0 1px rgba(95, 229, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 32px 90px rgba(0, 0, 0, 0.32);
+}
+
+.proto-outline-panel {
+  border-radius: 28px;
+  border: 1px solid rgba(95, 229, 255, 0.3);
+  background: rgba(7, 11, 29, 0.78);
+  box-shadow: 0 0 0 1px rgba(95, 229, 255, 0.05);
+}
+
+.proto-label {
+  color: #8be8ff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.proto-heading {
+  font-size: clamp(2.6rem, 5vw, 5.4rem);
+  line-height: 0.95;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+
+.proto-subheading {
+  font-size: 1rem;
+  color: rgba(222, 232, 255, 0.72);
+  line-height: 1.8;
+}
+
+.proto-grid-card {
+  border-radius: 24px;
+  border: 1px solid rgba(95, 229, 255, 0.2);
+  background: rgba(12, 18, 42, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.proto-hero-blob {
+  position: absolute;
+  inset: auto;
+  width: min(62vw, 760px);
+  height: min(62vw, 760px);
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(74, 222, 255, 0.82) 0%, rgba(24, 119, 255, 0.46) 34%, rgba(8, 23, 64, 0) 74%);
+  filter: blur(48px);
+  opacity: 0.84;
+  pointer-events: none;
+}
+
+.proto-input {
+  border-radius: 9999px;
+  border: 1px solid rgba(95, 229, 255, 0.2);
+  background: rgba(14, 22, 48, 0.8);
+  color: #f4f7ff;
+}
+
+.proto-input::placeholder {
+  color: rgba(173, 188, 220, 0.5);
+}
+
+.proto-feedback-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.proto-footer-wordmark {
+  font-size: clamp(4rem, 14vw, 11rem);
+  font-weight: 700;
+  letter-spacing: -0.08em;
+  line-height: 0.9;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(95, 229, 255, 0.28);
+}
+
+.proto-stat-chart::after {
+  content: '';
+  display: block;
+  height: 44px;
+  width: 100%;
+  margin-top: 18px;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(95, 229, 255, 0.2), rgba(95, 229, 255, 0)),
+    linear-gradient(90deg,
+      rgba(95, 229, 255, 0.2) 0%,
+      rgba(95, 229, 255, 0.68) 22%,
+      rgba(95, 229, 255, 0.32) 54%,
+      rgba(95, 229, 255, 0.76) 78%,
+      rgba(95, 229, 255, 0.18) 100%);
+  clip-path: polygon(0 74%, 10% 68%, 22% 78%, 36% 34%, 52% 48%, 68% 20%, 82% 34%, 100% 10%, 100% 100%, 0 100%);
+  opacity: 0.9;
 }
 
 /* Section divider - subtle gradient line */

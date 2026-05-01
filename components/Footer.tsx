@@ -2,32 +2,33 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LifeBuoy, Mail } from 'lucide-react'
-import { getAppHref } from '@/lib/app-url'
 
 const navLinks = [
   { href: '/', label: 'Home' },
-  { href: getAppHref('/dashboard'), label: 'Dashboard' },
-  { href: getAppHref('/create'), label: 'Create' },
+  { href: '#', label: 'Team' },
+  { href: '#', label: 'Careers' },
+  { href: '#', label: 'Whitepaaper' },
+  { href: '#', label: 'Learn' },
 ]
 
 const socialLinks = [
+  { href: 'https://t.me', label: 'Telegram', icon: 'telegram' },
+  { href: 'https://youtube.com', label: 'YouTube', icon: 'youtube' },
   { href: 'https://x.com/Heres_app', label: 'X (Twitter)', icon: 'x' },
+  { href: 'https://github.com/Heres-Protocol/Heres-Protocol', label: 'GitHub', icon: 'github' },
+  { href: 'https://discord.gg', label: 'Discord', icon: 'discord' },
 ]
 
 const contactLinks = [
-  {
-    href: 'mailto:hello@heresprotocol.com',
-    label: 'General',
-    value: 'hello@heresprotocol.com',
-    icon: Mail,
-  },
-  {
-    href: 'mailto:support@heresprotocol.com',
-    label: 'Support',
-    value: 'support@heresprotocol.com',
-    icon: LifeBuoy,
-  },
+  { href: '#', label: 'Legal' },
+  { href: '#', label: 'Privacy Policy' },
+]
+
+const joinLinks = [
+  { href: 'https://discord.gg', label: 'Discord' },
+  { href: 'https://x.com/Heres_app', label: 'Twitter' },
+  { href: 'https://youtube.com', label: 'Youtube' },
+  { href: 'https://t.me', label: 'Telegram' },
 ]
 
 function XIcon({ className }: { className?: string }) {
@@ -38,103 +39,140 @@ function XIcon({ className }: { className?: string }) {
   )
 }
 
+function TelegramIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M21.9 4.6 18.7 20c-.2 1-.8 1.2-1.7.8l-4.8-3.5-2.3 2.2c-.2.2-.4.4-.9.4l.3-4.8 8.8-8c.4-.4-.1-.6-.5-.3l-10.8 6.8-4.7-1.5c-1-.3-1.1-1 .2-1.5L20 3.8c.9-.3 1.7.2 1.4.8Z" />
+    </svg>
+  )
+}
+
+function YoutubeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M21.8 8s-.2-1.4-.8-2c-.8-.8-1.7-.8-2.1-.9C15.9 4.8 12 4.8 12 4.8h0s-3.9 0-6 .3c-.4.1-1.3.1-2.1.9C3.3 6.6 3.1 8 3.1 8S2.8 9.6 2.8 11.1v1.7c0 1.5.3 3.1.3 3.1s.2 1.4.8 2c.8.8 1.9.8 2.4.9 1.7.2 5.7.3 5.7.3s3.9 0 6-.3c.4-.1 1.3-.1 2.1-.9.6-.6.8-2 .8-2s.3-1.6.3-3.1v-1.7c0-1.5-.3-3.1-.3-3.1ZM9.9 14.3V8.9l5.2 2.7-5.2 2.7Z" />
+    </svg>
+  )
+}
+
+function GithubIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 .5C5.6.5.5 5.7.5 12.1c0 5.1 3.3 9.5 7.8 11 .6.1.8-.3.8-.6v-2.3c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.3 1.8 1.3 1 .1 1.6 2.7 4.3 1.9.1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.9 0-1.3.5-2.3 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.9 1.2 1.9 1.2 3.2 0 4.6-2.7 5.6-5.3 5.9.4.3.8 1 .8 2v3c0 .3.2.7.8.6 4.6-1.5 7.8-5.9 7.8-11C23.5 5.7 18.4.5 12 .5Z" />
+    </svg>
+  )
+}
+
+function DiscordIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M19.5 5.6A15.9 15.9 0 0 0 15.7 4l-.2.4c1.5.4 2.2 1 2.8 1.4-1.2-.6-2.5-1-3.8-1.2-.8-.1-1.6-.2-2.5-.2-.8 0-1.7.1-2.5.2-1.3.2-2.6.6-3.8 1.2.6-.4 1.3-1 2.8-1.4L8.3 4a15.8 15.8 0 0 0-3.8 1.6C2.1 9.2 1.5 12.8 1.7 16.4c1.5 1.1 3 1.8 4.5 2.3l1.1-1.8c-.6-.2-1.2-.5-1.8-.9l.4-.3c3.4 1.6 7 1.6 10.4 0l.4.3c-.6.4-1.2.7-1.8.9l1.1 1.8c1.5-.5 3-1.2 4.5-2.3.3-4.1-.5-7.7-2.7-10.8ZM8.8 14.1c-.8 0-1.5-.8-1.5-1.7 0-.9.6-1.7 1.5-1.7.8 0 1.5.8 1.5 1.7 0 1-.7 1.7-1.5 1.7Zm6.4 0c-.8 0-1.5-.8-1.5-1.7 0-.9.6-1.7 1.5-1.7.8 0 1.5.8 1.5 1.7 0 1-.7 1.7-1.5 1.7Z" />
+    </svg>
+  )
+}
+
 export function Footer() {
   return (
-    <footer className="border-t border-Heres-border/50 bg-Heres-bg text-Heres-white">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        {/* Top section: brand + social | nav links */}
-        <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <Image src="/logo-white.png?v=3" alt="Heres" width={44} height={44} className="h-11 w-auto" unoptimized />
-              <span className="text-xl font-bold text-Heres-white">Heres</span>
+    <footer className="bg-Heres-bg text-Heres-white">
+      <div className="mx-auto max-w-[1320px] px-4 pb-10 pt-10 sm:px-6 lg:px-8">
+        <section className="grid gap-8 lg:grid-cols-[1fr_470px] lg:items-end">
+          <div>
+            <p className="max-w-sm text-4xl font-semibold uppercase leading-[1.2] tracking-[-0.04em] text-white/45">
+              Help us shape the future of Heres we value your input.
+            </p>
+          </div>
+          <div className="rounded-[6px] bg-[#222632] p-4">
+            <p className="mb-4 text-[18px] font-semibold text-white">Send Us Your Feedback</p>
+            <div className="space-y-3">
+              <input className="w-full rounded-[2px] bg-white px-4 py-2.5 text-sm text-black outline-none" placeholder="*Your Name" />
+              <input className="w-full rounded-[2px] bg-white px-4 py-2.5 text-sm text-black outline-none" placeholder="*Your Email" />
+              <textarea className="min-h-[86px] w-full rounded-[2px] bg-white px-4 py-2.5 text-sm text-black outline-none" placeholder="*Your feedback..." />
+              <a href="mailto:hello@heresprotocol.com?subject=Heres%20Feedback" className="flex w-full items-center justify-center bg-[#3786c8] py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                SEND
+              </a>
             </div>
-            <div className="flex gap-2">
+          </div>
+        </section>
+
+        <div className="my-8 border-t border-Heres-border/50" />
+
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr]">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-[10px] bg-[#060b16] px-4 py-3">
+              <Image src="/logo-white.png?v=3" alt="Heres" width={44} height={44} className="h-11 w-auto" unoptimized />
+              <span className="text-xl font-semibold tracking-[-0.04em] text-Heres-white">HERES</span>
+            </div>
+            <div className="mt-4 flex gap-4 text-white">
               {socialLinks.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-Heres-border bg-Heres-card/80 text-Heres-white transition-colors hover:border-Heres-accent/40 hover:text-Heres-accent"
-                  aria-label={item.label}
-                >
-                  {item.icon === 'x' && <XIcon className="h-4 w-4" />}
+                <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer" aria-label={item.label} className="transition hover:text-cyan-300">
+                  {item.icon === 'telegram' && <TelegramIcon className="h-6 w-6" />}
+                  {item.icon === 'youtube' && <YoutubeIcon className="h-6 w-6" />}
+                  {item.icon === 'x' && <XIcon className="h-6 w-6" />}
+                  {item.icon === 'github' && <GithubIcon className="h-6 w-6" />}
+                  {item.icon === 'discord' && <DiscordIcon className="h-6 w-6" />}
                 </a>
               ))}
             </div>
-            <div className="mt-2 max-w-md rounded-2xl border border-Heres-border/70 bg-gradient-to-br from-Heres-card/95 via-Heres-card/85 to-Heres-surface/70 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.18)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-Heres-accent/80">Contact</p>
-                  <p className="mt-2 text-sm leading-relaxed text-Heres-muted">
-                    Reach us for product questions, partnerships, or user support.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-Heres-accent/20 bg-Heres-accent/10 p-2 text-Heres-accent">
-                  <Mail className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex flex-col gap-2.5">
-                {contactLinks.map((item) => (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    className="group flex items-center justify-between gap-3 rounded-xl border border-Heres-border/70 bg-black/10 px-3 py-3 transition-all hover:border-Heres-accent/30 hover:bg-Heres-accent/5"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="rounded-lg border border-Heres-border/70 bg-Heres-surface/80 p-2 text-Heres-accent transition-colors group-hover:border-Heres-accent/30 group-hover:bg-Heres-accent/10">
-                        <item.icon className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-Heres-muted">
-                          {item.label}
-                        </p>
-                        <p className="truncate text-sm text-Heres-white transition-colors group-hover:text-Heres-accent">
-                          {item.value}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-Heres-muted transition-colors group-hover:text-Heres-accent">
-                      Email
-                    </span>
-                  </a>
-                ))}
-              </div>
+            <p className="mt-8 text-[19px] font-semibold text-white">Be The First To Know</p>
+            <div className="mt-4 max-w-[330px]">
+              <input className="w-full rounded-full bg-white px-4 py-3 text-sm text-black outline-none" placeholder="Email" />
+              <label className="mt-4 flex items-start gap-3 text-sm text-white">
+                <span className="mt-0.5 h-7 w-7 border border-white/80 bg-transparent" />
+                <span className="leading-5 text-white">
+                  I agree to receive emails from Heres.
+                  <br />
+                  Unsubscribe anytime. <span className="text-blue-400">Privacy Policy</span>
+                </span>
+              </label>
+              <button className="mt-3 rounded-[12px] border border-cyan-500 px-5 py-2 text-[28px]/none text-cyan-400 transition hover:bg-cyan-500/10">
+                <span className="text-lg font-medium">Submit</span>
+              </button>
             </div>
           </div>
-          <nav className="flex flex-col items-end gap-2 sm:items-end">
-            {navLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="py-1 text-sm text-Heres-white/90 transition-colors hover:text-Heres-accent"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+
+          <div>
+            <p className="text-[20px] font-semibold uppercase text-white">Heres</p>
+            <div className="mt-6 space-y-5">
+              {navLinks.map((item) => (
+                <Link key={item.label} href={item.href} className="block text-[18px] text-white/95 transition hover:text-cyan-300">
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[20px] font-semibold uppercase text-white">Contact Us</p>
+            <div className="mt-6 space-y-5">
+              {contactLinks.map((item) => (
+                <a key={item.label} href={item.href} className="block text-[18px] text-white/95 transition hover:text-cyan-300">
+                  {item.label}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[20px] font-semibold uppercase text-white">Join Us</p>
+            <div className="mt-6 space-y-5">
+              {joinLinks.map((item) => (
+                <a key={item.label} href={item.href} target="_blank" rel="noopener noreferrer" className="block text-[18px] text-white/95 transition hover:text-cyan-300">
+                  {item.label}
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Divider */}
-        <div className="my-8 border-t border-Heres-border/50" />
-
-        {/* Bottom section: copyright | powered by (no Privacy / Terms) */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-Heres-muted">
-            © {new Date().getFullYear()} Heres. All rights reserved.
+        <div className="mt-8 border-t border-Heres-border/50 pt-5">
+          <p className="text-[18px] text-white">
+            Copyright 2026 <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/70 text-sm">C</span> HERES Protocol
           </p>
-          <div className="flex items-center gap-4">
-            <a
-              href="https://solana.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-card/80 px-4 py-2 text-sm text-Heres-white transition-colors hover:border-Heres-accent/40"
-            >
-              <Image src="/logos/solana.svg" alt="Solana" width={20} height={20} className="h-5 w-auto shrink-0" />
-              <span className="font-medium">Powered by Solana</span>
-            </a>
-          </div>
+          <p className="mt-4 text-sm font-semibold underline underline-offset-4">All Rights Reserved</p>
+        </div>
+
+        <div className="mt-8 overflow-hidden">
+          <p className="proto-footer-wordmark">HERES</p>
         </div>
       </div>
     </footer>

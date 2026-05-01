@@ -346,6 +346,16 @@ export default function CapsulesEntryPage() {
     }
   }, [capsuleStatus, rows])
 
+  const recentActivity = useMemo(() => {
+    if (rows.length === 0) return []
+    const releaseDate = rows[0]?.releaseDate && rows[0].releaseDate !== '--' ? rows[0].releaseDate : null
+    return [
+      `${assetUnit} capsule ${capsuleStatus ? capsuleStatus.toLowerCase() : 'created'}`,
+      releaseDate ? `Release window ${releaseDate}` : 'Waiting for trigger window',
+      `${totals.beneficiaries} beneficiary${totals.beneficiaries === 1 ? '' : 'ies'} configured`,
+    ]
+  }, [assetUnit, capsuleStatus, rows, totals.beneficiaries])
+
   if (!connected) {
     return (
       <div className="min-h-screen bg-[#070b1d] pt-24 pb-16 px-4 text-Heres-white">
@@ -378,12 +388,12 @@ export default function CapsulesEntryPage() {
 
   return (
     <div className="min-h-screen bg-[#070b1d] text-white">
-      <main className="px-4 pb-16 pt-24 sm:px-6 lg:px-10">
+      <main className="px-4 pb-16 pt-28 sm:px-6 lg:px-10">
         <div className="mx-auto max-w-[1240px]">
           <div className="mb-5 flex flex-wrap items-center gap-3">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-4 py-2 text-sm font-medium text-cyan-300 transition hover:bg-cyan-400/10"
+              className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/5 px-4 py-2 text-sm font-medium text-cyan-300 transition hover:bg-cyan-400/10"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Dashboard
@@ -396,30 +406,76 @@ export default function CapsulesEntryPage() {
             </div>
           )}
 
+          <section className="proto-panel relative mb-5 overflow-hidden p-6 sm:p-8">
+            <div className="proto-hero-blob left-[-18%] top-[-38%] opacity-65" aria-hidden />
+            <div className="relative grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+              <div>
+                <p className="proto-label">My Capsules</p>
+                <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white sm:text-6xl">
+                  My Capsule
+                  <br />
+                  Dashboard
+                </h1>
+                <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300">
+                  Monitor release clocks, beneficiary routing, and active allocations from the capsule tied to this wallet.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="proto-grid-card p-5 sm:col-span-2">
+                  <p className="proto-label">Recent Activity</p>
+                  {recentActivity.length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                      {recentActivity.map((item, index) => (
+                        <div key={item} className="flex items-center justify-between border-b border-white/8 pb-3 text-sm text-slate-300 last:border-b-0 last:pb-0">
+                          <span className="flex items-center gap-3">
+                            <span className={`h-2.5 w-2.5 rounded-full ${index === 2 ? 'bg-red-500' : 'bg-green-500'}`} />
+                            {item}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-slate-300">Create a capsule to begin tracking beneficiary events.</p>
+                  )}
+                </div>
+                <div className="proto-grid-card p-5">
+                  <p className="proto-label">Beneficiaries</p>
+                  <p className="mt-3 text-3xl font-semibold text-white">{totals.beneficiaries}</p>
+                </div>
+                <div className="proto-grid-card p-5">
+                  <p className="proto-label">Asset Unit</p>
+                  <p className="mt-3 text-3xl font-semibold text-cyan-300">{assetUnit}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section className="mb-3 grid gap-3 lg:grid-cols-3">
-            <div className="rounded-[16px] border border-cyan-400/45 bg-[#10162f] px-5 py-3.5 shadow-[0_0_0_1px_rgba(34,211,238,0.08)]">
+            <div className="proto-grid-card px-5 py-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">Total Assets Allocated</p>
                   <p className="mt-2 text-[34px] font-semibold leading-none text-white">
                     {rows.length ? `${formatNumber(totals.totalAllocated)} ${assetUnit}` : `0 ${assetUnit}`}
                   </p>
+                  <p className="mt-2 text-sm text-slate-400">Estimated amount currently routed to beneficiaries.</p>
                 </div>
                 <span className="pt-1 text-cyan-300">+</span>
               </div>
             </div>
 
-            <div className="rounded-[16px] border border-cyan-400/45 bg-[#10162f] px-5 py-3.5 shadow-[0_0_0_1px_rgba(34,211,238,0.08)]">
+            <div className="proto-grid-card px-5 py-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">Capsules</p>
                   <p className="mt-2 text-[34px] font-semibold leading-none text-white">{totals.activeCapsules}</p>
+                  <p className="mt-2 text-sm text-slate-400">Active capsule count for the connected wallet.</p>
                 </div>
                 <span className="pt-1 text-cyan-300">+</span>
               </div>
             </div>
 
-            <div className="rounded-[16px] border border-cyan-400/45 bg-[#10162f] px-5 py-3.5 shadow-[0_0_0_1px_rgba(34,211,238,0.08)]">
+            <div className="proto-grid-card px-5 py-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="w-full">
                   <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">Trigger Time</p>
@@ -433,16 +489,23 @@ export default function CapsulesEntryPage() {
                   <div className="mt-3 h-[6px] rounded-full border border-cyan-400/35 bg-transparent p-[1px]">
                     <div className="h-full rounded-full bg-cyan-300" style={{ width: `${triggerProgress}%` }} />
                   </div>
+                  <p className="mt-3 text-sm text-slate-400">Assets release automatically after the inactivity clock completes.</p>
                 </div>
                 <span className="pt-1 text-cyan-300">+</span>
               </div>
             </div>
           </section>
 
-          <section className="rounded-[18px] bg-[#10162f] px-3 pb-3 pt-2 shadow-[0_0_0_1px_rgba(17,24,50,0.65)]">
+          <section className="proto-outline-panel rounded-[18px] px-3 pb-3 pt-2 shadow-[0_0_0_1px_rgba(17,24,50,0.65)]">
             <div className="mb-2 flex flex-col gap-3 px-2 pt-1 md:flex-row md:items-center md:justify-between">
               <h2 className="text-[34px] font-medium tracking-[-0.02em] text-white">My Beneficiaries</h2>
               <div className="flex flex-col gap-2 sm:flex-row">
+                <Link
+                  href="/create"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-5 py-2.5 text-sm font-medium text-cyan-200 transition hover:bg-cyan-400/16"
+                >
+                  Create Capsule
+                </Link>
                 <div className="inline-flex items-center gap-2 rounded-full border border-[#233154] bg-[#0f1730] px-5 py-2.5 text-sm text-slate-400">
                   <Search className="h-4 w-4" />
                   <input
