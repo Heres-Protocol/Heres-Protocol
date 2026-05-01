@@ -14,6 +14,7 @@ import { getCapsulePDA, getCapsuleVaultPDA, getFeeConfigPDA } from './program'
 import { SOLANA_CONFIG, MAGICBLOCK_ER } from '@/constants'
 import { buildCcipAccountsForVaultSend } from '@/lib/ccip'
 import { getRegisteredOwners, unregisterCapsuleOwner } from '@/lib/capsule-registry'
+import { toAtomicAmount } from '@/lib/assets'
 
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
@@ -47,6 +48,26 @@ function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey
     [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
     SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID
   )[0]
+}
+
+function buildCreateAssociatedTokenAccountInstruction(
+  payer: PublicKey,
+  ata: PublicKey,
+  owner: PublicKey,
+  mint: PublicKey
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: ata, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.alloc(0),
+  })
 }
 
 export async function getEligibleCapsules(connection: Connection, crankKeypair: Keypair): Promise<DecodedCapsule[]> {
@@ -205,10 +226,9 @@ function parseBeneficiaries(
 function parseTotalAmountLamports(intentData: Buffer | Uint8Array): number {
   try {
     const json = new TextDecoder().decode(intentData)
-    const payload = JSON.parse(json) as { totalAmount?: string }
-    const total = Number.parseFloat(payload.totalAmount || '0')
-    if (!Number.isFinite(total) || total <= 0) return 0
-    return Math.floor(total * 1_000_000_000)
+    const payload = JSON.parse(json) as { totalAmount?: string; assetSymbol?: string; assetMint?: string | null }
+    if (!payload.totalAmount) return 0
+    return Number(toAtomicAmount(payload.totalAmount, payload))
   } catch {
     return 0
   }
@@ -216,16 +236,19 @@ function parseTotalAmountLamports(intentData: Buffer | Uint8Array): number {
 
 function computeBeneficiaryAmountLamports(
   beneficiary: { amount: string; amountType: string },
-  totalAmountLamports: number
+  totalAmountLamports: number,
+  assetInput?: { assetSymbol?: string; assetMint?: string | null }
 ): number {
   if (beneficiary.amountType === 'percentage') {
     const pct = Number.parseFloat(beneficiary.amount || '0')
     if (!Number.isFinite(pct) || pct <= 0) return 0
     return Math.floor((totalAmountLamports * pct) / 100)
   }
-  const fixed = Number.parseFloat(beneficiary.amount || '0')
-  if (!Number.isFinite(fixed) || fixed <= 0) return 0
-  return Math.floor(fixed * 1_000_000_000)
+  try {
+    return Number(toAtomicAmount(beneficiary.amount || '0', assetInput))
+  } catch {
+    return 0
+  }
 }
 
 export async function executeCapsuleIntent(
@@ -413,6 +436,24 @@ export async function distributeCapsuleAssets(
     feeRecipient = new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT || 'Covn3moA8qstPgXPgueRGMSmi94yXvuDCWTjQVBxHpzb')
   }
 
+  const preInstructions: TransactionInstruction[] = []
+  const feeRecipientAccount = isSpl
+    ? getAssociatedTokenAddress(mint, feeRecipient)
+    : feeRecipient
+  if (isSpl) {
+    const feeRecipientAtaInfo = await connection.getAccountInfo(feeRecipientAccount)
+    if (!feeRecipientAtaInfo) {
+      preInstructions.push(
+        buildCreateAssociatedTokenAccountInstruction(
+          crankKeypair.publicKey,
+          feeRecipientAccount,
+          feeRecipient,
+          mint
+        )
+      )
+    }
+  }
+
   const remainingAccounts = beneficiaries
     .filter((b) => b.chain === 'solana')
     .map((b) => {
@@ -431,7 +472,7 @@ export async function distributeCapsuleAssets(
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     { pubkey: feeConfigPDA, isSigner: false, isWritable: false },
-    { pubkey: feeRecipient, isSigner: false, isWritable: true },
+    { pubkey: feeRecipientAccount, isSigner: false, isWritable: true },
     // optional: mint (sentinel for None)
     { pubkey: isSpl ? mint : programId, isSigner: false, isWritable: false },
     // optional: vault_token_account (sentinel for None)
@@ -442,6 +483,7 @@ export async function distributeCapsuleAssets(
   const ix = new TransactionInstruction({ keys, programId, data: discriminator })
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
   const tx = new Transaction({ feePayer: crankKeypair.publicKey, blockhash, lastValidBlockHeight })
+  preInstructions.forEach((instruction) => tx.add(instruction))
   tx.add(ix)
   tx.sign(crankKeypair)
 
@@ -512,11 +554,20 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
 
       // Distribute assets on base layer (separate instruction for actual SOL/SPL transfers)
       // Pre-check: verify vault has enough balance to cover totalAmount + fees
+      const mint = capsule.account.mint
+      const isSpl = mint && !mint.equals(PublicKey.default) && !mint.equals(SystemProgram.programId)
       try {
         const totalAmountLamportsCheck = parseTotalAmountLamports(capsule.account.intentData)
-        const vaultBalanceCheck = await connection.getBalance(vaultPDA)
-        // Need totalAmount + small margin for tx fees (rent stays in vault)
-        const minRequired = totalAmountLamportsCheck + 50_000
+        let vaultBalanceCheck: number
+        let minRequired = totalAmountLamportsCheck
+        if (isSpl) {
+          const vaultAta = getAssociatedTokenAddress(mint, vaultPDA)
+          const tokenBalance = await connection.getTokenAccountBalance(vaultAta)
+          vaultBalanceCheck = Number(tokenBalance.value.amount || '0')
+        } else {
+          vaultBalanceCheck = await connection.getBalance(vaultPDA)
+          minRequired += 50_000
+        }
         if (vaultBalanceCheck < minRequired) {
           console.log(`[crank] Skipping distribute for ${capsule.publicKey.toBase58()}: vault=${vaultBalanceCheck} < required=${minRequired}`)
           continue
@@ -530,10 +581,18 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
         distributedCount += 1
         console.log(`[crank] Distributed ${capsule.publicKey.toBase58()}: ${distTx}`)
 
-        const mint = capsule.account.mint
-        const isSpl = mint && !mint.equals(PublicKey.default) && !mint.equals(SystemProgram.programId)
         const beneficiaries = parseBeneficiaries(capsule.account.intentData)
         const totalAmountLamports = parseTotalAmountLamports(capsule.account.intentData)
+        let assetInput: { assetSymbol?: string; assetMint?: string | null } | undefined
+        try {
+          const payload = JSON.parse(new TextDecoder().decode(capsule.account.intentData)) as {
+            assetSymbol?: string
+            assetMint?: string | null
+          }
+          assetInput = payload
+        } catch {
+          assetInput = undefined
+        }
 
         const ccipSentSet = new Set<number>() // track sent indexes to prevent double-send
         for (const [beneficiaryIndex, beneficiary] of beneficiaries.entries()) {
@@ -546,7 +605,7 @@ export async function runCrank(crankKeypair: Keypair): Promise<CrankResult> {
           ccipSentSet.add(beneficiaryIndex)
 
           const selector = beneficiary.destinationChainSelector || '16015286601757825753'
-          const tokenAmount = computeBeneficiaryAmountLamports(beneficiary, totalAmountLamports)
+          const tokenAmount = computeBeneficiaryAmountLamports(beneficiary, totalAmountLamports, assetInput)
           if (tokenAmount <= 0) continue
 
           try {

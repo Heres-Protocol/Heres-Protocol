@@ -6,6 +6,7 @@ import { SOLANA_CONFIG } from '@/constants'
 import { getCapsulePDA, getCapsuleVaultPDA, getFeeConfigPDA } from '@/lib/program'
 import { encodeIntentData, daysToSeconds } from '@/utils/intent'
 import type { Beneficiary } from '@/types'
+import { getAssetConfig, isAssetConfigured, SupportedAssetSymbol } from '@/lib/assets'
 
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
@@ -40,13 +41,21 @@ function txToBase64(tx: Transaction): string {
   return Buffer.from(bytes).toString('base64')
 }
 
+function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+    SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID
+  )[0]
+}
+
 export type CreateCapsuleTxInput = {
   owner: string
-  totalSol: string
+  totalAmount: string
   inactivityDays: number
   beneficiaryAddress: string
-  beneficiaryAmountSol: string
+  beneficiaryAmount: string
   intent?: string
+  assetSymbol?: SupportedAssetSymbol
 }
 
 export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput): Promise<{
@@ -56,16 +65,21 @@ export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput):
 }> {
   const owner = new PublicKey(input.owner)
   const beneficiaryAddress = new PublicKey(input.beneficiaryAddress)
+  const assetSymbol = input.assetSymbol ?? 'SOL'
+  if (!isAssetConfigured(assetSymbol)) {
+    throw new Error(`${assetSymbol} devnet mint is not configured`)
+  }
+  const asset = getAssetConfig(assetSymbol)
 
-  const totalSolNum = Number.parseFloat(input.totalSol)
-  const beneficiaryAmountNum = Number.parseFloat(input.beneficiaryAmountSol)
+  const totalAmountNum = Number.parseFloat(input.totalAmount)
+  const beneficiaryAmountNum = Number.parseFloat(input.beneficiaryAmount)
   const inactivitySeconds = daysToSeconds(input.inactivityDays)
 
-  if (!Number.isFinite(totalSolNum) || totalSolNum <= 0) {
-    throw new Error('Invalid totalSol')
+  if (!Number.isFinite(totalAmountNum) || totalAmountNum <= 0) {
+    throw new Error('Invalid totalAmount')
   }
   if (!Number.isFinite(beneficiaryAmountNum) || beneficiaryAmountNum <= 0) {
-    throw new Error('Invalid beneficiaryAmountSol')
+    throw new Error('Invalid beneficiaryAmount')
   }
   if (!Number.isFinite(inactivitySeconds) || inactivitySeconds <= 0) {
     throw new Error('Invalid inactivityDays')
@@ -83,7 +97,9 @@ export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput):
   const intentData = encodeIntentData({
     intent: input.intent || 'Mobile capsule',
     beneficiaries,
-    totalAmount: String(totalSolNum),
+    totalAmount: String(totalAmountNum),
+    assetSymbol,
+    assetMint: asset.mint,
     inactivityDays: input.inactivityDays,
     delayDays: 0,
   })
@@ -97,6 +113,7 @@ export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput):
   const platformFeeRecipient = SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT
     ? new PublicKey(SOLANA_CONFIG.PLATFORM_FEE_RECIPIENT)
     : owner
+  const mint = asset.mint ? new PublicKey(asset.mint) : null
 
   const ix = await program.methods
     .createCapsule(new BN(inactivitySeconds), Buffer.from(intentData))
@@ -109,9 +126,9 @@ export async function buildCreateCapsuleUnsignedTx(input: CreateCapsuleTxInput):
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
       // Anchor optional-account sentinel for "None".
-      mint: programId,
-      sourceTokenAccount: programId,
-      vaultTokenAccount: programId,
+      mint: mint ?? programId,
+      sourceTokenAccount: mint ? getAssociatedTokenAddress(mint, owner) : programId,
+      vaultTokenAccount: mint ? getAssociatedTokenAddress(mint, vaultPDA) : programId,
       associatedTokenProgram: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
     } as any)
     .instruction()

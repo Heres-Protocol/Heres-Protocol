@@ -4,7 +4,7 @@
 
 // Solana Configuration
 export const SOLANA_CONFIG = {
-  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || '26pDfWXnq9nm1Y5J6siwQsVfHXKxKo5vKvRMVCpqXms6',
+  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW',
   NETWORK: process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet',
   HELIUS_API_KEY: process.env.NEXT_PUBLIC_HELIUS_API_KEY || '',
   RPC_URL: process.env.SOLANA_RPC_URL || '',
@@ -46,7 +46,10 @@ export const PLATFORM_FEE = {
 export const MAGICBLOCK_ER = {
   DELEGATION_PROGRAM_ID: 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh',
   MAGIC_PROGRAM_ID: process.env.NEXT_PUBLIC_MAGIC_PROGRAM_ID || 'Magic11111111111111111111111111111111111111',
-  BUFFER_SEED_PROGRAM_ID: '26pDfWXnq9nm1Y5J6siwQsVfHXKxKo5vKvRMVCpqXms6',
+  BUFFER_SEED_PROGRAM_ID:
+    process.env.NEXT_PUBLIC_BUFFER_SEED_PROGRAM_ID ||
+    process.env.NEXT_PUBLIC_PROGRAM_ID ||
+    'AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW',
   MAGIC_CONTEXT: process.env.NEXT_PUBLIC_MAGIC_CONTEXT || 'MagicContext1111111111111111111111111111111',
   ER_RPC_URL: process.env.NEXT_PUBLIC_ER_RPC_URL || 'https://devnet-as.magicblock.app',
   ER_WS_URL: process.env.NEXT_PUBLIC_ER_WS_URL || 'wss://devnet-as.magicblock.app',

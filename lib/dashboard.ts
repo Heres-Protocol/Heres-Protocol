@@ -2,7 +2,7 @@ import { Connection, PublicKey } from '@solana/web3.js'
 import { Redis } from '@upstash/redis'
 import { getProgramId, getSolanaConnection, getSolanaFallbackConnection } from '@/config/solana'
 import { HELIUS_CONFIG, MAGICBLOCK_ER } from '@/constants'
-import { getRegisteredOwners, registerCapsuleOwner } from '@/lib/capsule-registry'
+import { getRegisteredOwners, registerCapsuleOwner, unregisterCapsuleOwner } from '@/lib/capsule-registry'
 import { debugLog, debugWarn } from '@/lib/log'
 import { loadDurableSnapshot, saveDurableSnapshot, persistDashboardIndex, loadSyncCheckpoint, saveSyncCheckpoint } from '@/lib/dashboard-store'
 import { getCapsule } from '@/lib/solana'
@@ -683,7 +683,11 @@ async function fetchCapsulesFromRegistry() {
     try {
       const ownerKey = new PublicKey(owner)
       const capsule = await getCapsule(ownerKey)
-      if (!capsule) return null
+      if (!capsule) {
+        await unregisterCapsuleOwner(owner)
+        debugLog(`[dashboard] pruned stale registry owner ${owner}`)
+        return null
+      }
       const accountOwner = (capsule as any).accountOwner as PublicKey | undefined
 
       const [capsulePda] = getCapsulePDA(ownerKey)
@@ -1419,7 +1423,6 @@ export function ensureDashboardPrewarmScheduler(): void {
 export async function triggerDashboardPrewarm(forceRefresh = true): Promise<void> {
   await prewarmDashboardResponses(forceRefresh)
 }
-
 
 
 

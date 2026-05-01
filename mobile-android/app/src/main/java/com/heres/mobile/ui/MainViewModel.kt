@@ -16,11 +16,12 @@ import kotlinx.coroutines.launch
 
 data class BeneficiaryDraft(
     val address: String = "22qQrq3A4fVN5D8PZDAzUjyrByTYnqTTNKFKXrFWh99J",
-    val amountSol: String = ""
+    val amount: String = ""
 )
 
 data class CreateCapsuleForm(
-    val totalSol: String = "1.0",
+    val totalAmount: String = "1.0",
+    val assetSymbol: String = "SOL",
     val inactivityDays: String = "30",
     val intent: String = "Mobile capsule",
     val beneficiary: BeneficiaryDraft = BeneficiaryDraft(),
@@ -84,7 +85,13 @@ class MainViewModel(
 
     fun updateCreateTotalSol(value: String) {
         _state.value = _state.value.copy(
-            createForm = _state.value.createForm.copy(totalSol = value, validationError = null, submitMessage = null)
+            createForm = _state.value.createForm.copy(totalAmount = value, validationError = null, submitMessage = null)
+        )
+    }
+
+    fun updateCreateAssetSymbol(value: String) {
+        _state.value = _state.value.copy(
+            createForm = _state.value.createForm.copy(assetSymbol = value, validationError = null, submitMessage = null)
         )
     }
 
@@ -108,7 +115,7 @@ class MainViewModel(
     }
 
     fun updateCreateBeneficiaryAmount(value: String) {
-        val beneficiary = _state.value.createForm.beneficiary.copy(amountSol = value)
+        val beneficiary = _state.value.createForm.beneficiary.copy(amount = value)
         _state.value = _state.value.copy(
             createForm = _state.value.createForm.copy(beneficiary = beneficiary, validationError = null, submitMessage = null)
         )
@@ -123,12 +130,13 @@ class MainViewModel(
             return
         }
 
-        val totalSol = form.totalSol.toDoubleOrNull()
+        val totalAmount = form.totalAmount.toDoubleOrNull()
         val inactivityDays = form.inactivityDays.toIntOrNull()
-        val beneficiaryAmount = form.beneficiary.amountSol.toDoubleOrNull()
+        val beneficiaryAmount = form.beneficiary.amount.toDoubleOrNull()
+        val assetLabel = form.assetSymbol.ifBlank { "asset" }
 
-        if (totalSol == null || totalSol <= 0.0) {
-            _state.value = _state.value.copy(createForm = form.copy(validationError = "Total SOL must be > 0"))
+        if (totalAmount == null || totalAmount <= 0.0) {
+            _state.value = _state.value.copy(createForm = form.copy(validationError = "Total $assetLabel must be > 0"))
             return
         }
         if (inactivityDays == null || inactivityDays <= 0) {
@@ -140,7 +148,7 @@ class MainViewModel(
             return
         }
         if (beneficiaryAmount == null || beneficiaryAmount <= 0.0) {
-            _state.value = _state.value.copy(createForm = form.copy(validationError = "Beneficiary amount must be > 0"))
+            _state.value = _state.value.copy(createForm = form.copy(validationError = "Beneficiary $assetLabel amount must be > 0"))
             return
         }
 
@@ -150,11 +158,12 @@ class MainViewModel(
             runCatching {
                 repository.buildCreateCapsuleUnsignedTx(
                     owner = wallet,
-                    totalSol = form.totalSol,
+                    totalAmount = form.totalAmount,
                     inactivityDays = inactivityDays,
                     beneficiaryAddress = form.beneficiary.address,
-                    beneficiaryAmountSol = form.beneficiary.amountSol,
-                    intent = form.intent
+                    beneficiaryAmount = form.beneficiary.amount,
+                    intent = form.intent,
+                    assetSymbol = form.assetSymbol
                 )
             }.onSuccess { unsigned ->
                 _state.value = _state.value.copy(
@@ -218,6 +227,10 @@ class MainViewModel(
                 _state.value = _state.value.copy(loading = false, error = error.message)
             }
         }
+    }
+
+    fun clearSelectedCapsule() {
+        _state.value = _state.value.copy(selectedCapsule = null)
     }
 
     fun fakeExtendAction() {

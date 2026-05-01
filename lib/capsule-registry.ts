@@ -7,10 +7,17 @@
  * Falls back to file-based storage in local dev if env vars are missing.
  */
 import { Redis } from '@upstash/redis'
+import { getProgramId } from '@/config/solana'
 import { debugLog } from '@/lib/log'
 import { isPostgresConfigured, pgQuery } from '@/lib/postgres'
 
-const REDIS_KEY = 'capsule-owners'
+function getRegistryScope(): string {
+  return getProgramId().toBase58()
+}
+
+function getRedisKey(): string {
+  return `capsule-owners:${getRegistryScope()}`
+}
 
 function getRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL
@@ -26,7 +33,7 @@ function loadLocal(): string[] {
   try {
     const fs = require('fs')
     const path = require('path')
-    const p = path.join(process.cwd(), '.data', 'capsule-registry.json')
+    const p = path.join(process.cwd(), '.data', `capsule-registry-${getRegistryScope()}.json`)
     if (!fs.existsSync(p)) return []
     return JSON.parse(fs.readFileSync(p, 'utf8'))
   } catch {
@@ -40,7 +47,7 @@ function saveLocal(owners: string[]) {
     const path = require('path')
     const dir = path.join(process.cwd(), '.data')
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-    const p = path.join(dir, 'capsule-registry.json')
+    const p = path.join(dir, `capsule-registry-${getRegistryScope()}.json`)
     const tmp = `${p}.tmp`
     fs.writeFileSync(tmp, JSON.stringify(owners))
     fs.renameSync(tmp, p)
@@ -61,7 +68,7 @@ function shouldUseLocalFallback(): boolean {
 export async function registerCapsuleOwner(ownerPubkey: string): Promise<void> {
   const redis = getRedis()
   if (redis) {
-    const added = await redis.sadd(REDIS_KEY, ownerPubkey)
+    const added = await redis.sadd(getRedisKey(), ownerPubkey)
     if (added) debugLog(`[capsule-registry] Registered owner: ${ownerPubkey}`)
     return
   }
@@ -91,7 +98,7 @@ export async function registerCapsuleOwner(ownerPubkey: string): Promise<void> {
 /** Get all registered capsule owners */
 export async function getRegisteredOwners(): Promise<string[]> {
   const redis = getRedis()
-  if (redis) return await redis.smembers(REDIS_KEY)
+  if (redis) return await redis.smembers(getRedisKey())
 
   if (isPostgresConfigured()) {
     const result = await pgQuery<{ owner_address: string }>(
@@ -99,7 +106,7 @@ export async function getRegisteredOwners(): Promise<string[]> {
        FROM capsule_owner_registry
        ORDER BY registered_at DESC`
     )
-    return result.rows.map((row) => row.owner_address)
+    return result.rows.map((row: { owner_address: string }) => row.owner_address)
   }
 
   return loadLocal()
@@ -109,7 +116,7 @@ export async function getRegisteredOwners(): Promise<string[]> {
 export async function unregisterCapsuleOwner(ownerPubkey: string): Promise<void> {
   const redis = getRedis()
   if (redis) {
-    await redis.srem(REDIS_KEY, ownerPubkey)
+    await redis.srem(getRedisKey(), ownerPubkey)
     return
   }
 

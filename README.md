@@ -177,16 +177,31 @@ Heres-Protocol/
    ```env
    NEXT_PUBLIC_SOLANA_NETWORK=devnet
    NEXT_PUBLIC_HELIUS_API_KEY=your_helius_api_key
-   NEXT_PUBLIC_PROGRAM_ID=BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms
+   NEXT_PUBLIC_PROGRAM_ID=AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW
+   NEXT_PUBLIC_BUFFER_SEED_PROGRAM_ID=AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW
+   NEXT_PUBLIC_BTC_DEVNET_MINT=<valid_devnet_btc_mint>
+   NEXT_PUBLIC_ETH_DEVNET_MINT=<valid_devnet_eth_mint>
    
    # Chainlink CRE Webhook settings
    CHAINLINK_CRE_WEBHOOK_URL=<deployed_cre_http_endpoint>
    ```
 
+   `BTC` and `ETH` capsule flows require valid devnet SPL token mints. Validate them with:
+   ```bash
+   npm run validate:assets
+   ```
+   Use a separate dev program ID in `.env.local` so local development does not point at the production-facing deployment.
+
 3. **Run**
    ```bash
    npm run dev
    ```
+
+4. **Local validator with separate dev contract**
+   ```bash
+   npm run validator:local
+   ```
+   This starts a local validator with the development program loaded at `AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW`, so local work does not point at the production-facing deployment.
 
 ### Intent Statement Delivery (CRE Local Testing)
 

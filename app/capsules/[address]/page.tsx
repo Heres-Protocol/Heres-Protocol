@@ -19,6 +19,7 @@ import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { parseIntentPayload, formatDuration } from '@/utils/intent'
 import { buildCreSignedMessage } from '@/utils/creAuth'
 import { bytesToBase64 } from '@/utils/creCrypto'
+import { inferAssetConfig } from '@/lib/assets'
 import {
   XAxis,
   YAxis,
@@ -28,9 +29,6 @@ import {
   Area,
   AreaChart,
 } from 'recharts'
-
-const COINGECKO_SOL_BASE = 'https://api.coingecko.com/api/v3/coins/solana/market_chart?vs_currency=usd&days='
-const COINGECKO_SOL_PRICE = 'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd'
 
 const CHART_RANGES = [
   { key: '6h', label: '6h', days: 1, hoursFilter: 6 },
@@ -56,6 +54,8 @@ type IntentParsed =
     type: 'token'
     intent?: string
     totalAmount?: string
+    assetSymbol?: string
+    assetMint?: string | null
     beneficiaries?: any[]
     inactivityDays?: number
     delayDays?: number
@@ -82,6 +82,8 @@ type IntentParsed =
     intent?: string
     nftMints?: string[]
     nftRecipients?: string[]
+    assetSymbol?: string
+    assetMint?: string | null
     inactivityDays?: number
     delayDays?: number
     cre?: {
@@ -125,6 +127,17 @@ function CopyButton({ value }: { value: string }) {
       <Copy className="h-4 w-4" />
     </button>
   )
+}
+
+function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [
+      owner.toBuffer(),
+      new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA').toBuffer(),
+      mint.toBuffer(),
+    ],
+    new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+  )[0]
 }
 
 function timeAgo(ms: number | null) {
@@ -291,6 +304,9 @@ export default function CapsuleDetailPage() {
 
   const isNft = intentParsed?.type === 'nft'
   const isToken = intentParsed?.type === 'token'
+  const assetConfig = inferAssetConfig(intentParsed ?? undefined, capsule?.mint)
+  const priceChartBaseUrl = `https://api.coingecko.com/api/v3/coins/${assetConfig.coingeckoId}/market_chart?vs_currency=usd&days=`
+  const priceLookupUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${assetConfig.coingeckoId}&vs_currencies=usd`
   const creConfig = intentParsed?.cre ?? intentParsed?.premium
   const isCreEnabled = Boolean(
     creConfig?.enabled &&
@@ -335,9 +351,7 @@ export default function CapsuleDetailPage() {
     }
 
     const isDelegated = capsule.accountOwner?.equals?.(new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)) ?? false
-    const isNativeSol = !capsule.mint || capsule.mint.equals(PublicKey.default)
-
-    if (isDelegated || !isNativeSol) {
+    if (isDelegated) {
       setDistributionComplete(false)
       return
     }
@@ -348,13 +362,23 @@ export default function CapsuleDetailPage() {
       try {
         const connection = getSolanaConnection()
         const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
-        const [vaultInfo, rentExemptLamports] = await Promise.all([
-          connection.getAccountInfo(vaultPDA),
-          connection.getMinimumBalanceForRentExemption(9),
-        ])
-        const spendableLamports = Math.max(0, (vaultInfo?.lamports || 0) - rentExemptLamports)
+        const isNativeSol = !capsule.mint || capsule.mint.equals(PublicKey.default)
+        let distributed = false
+        if (isNativeSol) {
+          const [vaultInfo, rentExemptLamports] = await Promise.all([
+            connection.getAccountInfo(vaultPDA),
+            connection.getMinimumBalanceForRentExemption(9),
+          ])
+          const spendableLamports = Math.max(0, (vaultInfo?.lamports || 0) - rentExemptLamports)
+          distributed = spendableLamports === 0
+        } else {
+          const mint = capsule.mint as PublicKey
+          const vaultAta = getAssociatedTokenAddress(mint, vaultPDA)
+          const ataInfo = await connection.getTokenAccountBalance(vaultAta).catch(() => null)
+          distributed = !ataInfo || Number(ataInfo.value.amount || '0') === 0
+        }
         if (!cancelled) {
-          setDistributionComplete(spendableLamports === 0)
+          setDistributionComplete(distributed)
         }
       } catch {
         if (!cancelled) {
@@ -457,7 +481,7 @@ export default function CapsuleDetailPage() {
     return () => { cancelled = true }
   }, [capsule?.capsuleAddress, isCreEnabled, wallet.connected, wallet.publicKey, wallet.signMessage, isOwner])
 
-  // Token: SOL price chart from CoinGecko (with range filter)
+  // Token price chart from CoinGecko (with range filter)
   const rangeConfig = useMemo(() => CHART_RANGES.find((r) => r.key === chartRange) ?? CHART_RANGES[2], [chartRange])
   useEffect(() => {
     if (!isToken && !isNft) {
@@ -465,7 +489,7 @@ export default function CapsuleDetailPage() {
       return
     }
     setChartLoading(true)
-    const url = `${COINGECKO_SOL_BASE}${rangeConfig.days}`
+    const url = `${priceChartBaseUrl}${rangeConfig.days}`
     fetch(url)
       .then((res) => res.json())
       .then((data: { prices?: [number, number][] }) => {
@@ -483,16 +507,16 @@ export default function CapsuleDetailPage() {
       })
       .catch(() => setChartData([]))
       .finally(() => setChartLoading(false))
-  }, [isToken, isNft, chartRange, rangeConfig.days, rangeConfig.hoursFilter, rangeConfig.key])
+  }, [isToken, isNft, priceChartBaseUrl, chartRange, rangeConfig.days, rangeConfig.hoursFilter, rangeConfig.key])
 
-  // Current SOL price (live) and polling
+  // Current asset price (live) and polling
   useEffect(() => {
     if (!isToken && !isNft) return
     const fetchPrice = () => {
-      fetch(COINGECKO_SOL_PRICE)
+      fetch(priceLookupUrl)
         .then((res) => res.json())
-        .then((data: { solana?: { usd?: number } }) => {
-          const usd = data?.solana?.usd
+        .then((data: Record<string, { usd?: number }>) => {
+          const usd = data?.[assetConfig.coingeckoId]?.usd
           if (typeof usd === 'number' && usd > 0) setCurrentSolPrice(usd)
         })
         .catch(() => { })
@@ -500,7 +524,7 @@ export default function CapsuleDetailPage() {
     fetchPrice()
     const interval = setInterval(fetchPrice, 120_000)
     return () => clearInterval(interval)
-  }, [isToken, isNft])
+  }, [assetConfig.coingeckoId, isToken, isNft, priceLookupUrl])
 
   // Keep ref in sync for animation start value
   displayedPriceRef.current = displayedSolPrice
@@ -616,7 +640,7 @@ export default function CapsuleDetailPage() {
               </p>
             </div>
             <p className="mt-3 text-sm text-Heres-muted max-w-xl">
-              {isNft ? 'NFT capsule' : 'Token (SOL) capsule'} · Inactivity period:{' '}
+              {isNft ? 'NFT capsule' : `Token (${assetConfig.symbol}) capsule`} · Inactivity period:{' '}
               {formatDuration(capsule.inactivityPeriod)}
             </p>
           </section>
@@ -741,7 +765,7 @@ export default function CapsuleDetailPage() {
             </p>
             {isToken && intentParsed && 'totalAmount' in intentParsed && intentParsed.totalAmount && (
               <p className="text-sm text-Heres-accent">
-                Total amount: {intentParsed.totalAmount} SOL
+                Total amount: {intentParsed.totalAmount} {assetConfig.symbol}
               </p>
             )}
             {isNft && intentParsed && 'nftMints' in intentParsed && intentParsed.nftMints && (
@@ -811,7 +835,7 @@ export default function CapsuleDetailPage() {
 
             const steps = [
               { num: 1, label: 'Execute Intent', desc: 'Deactivate capsule when inactivity condition met' },
-              { num: 2, label: 'Distribute Assets', desc: 'Transfer SOL/tokens to beneficiaries' },
+              { num: 2, label: 'Distribute Assets', desc: `Transfer ${assetConfig.symbol}/tokens to beneficiaries` },
               ...(isCreEnabled ? [{ num: 3, label: 'Deliver Intent Statement', desc: 'Dispatch encrypted intent via CRE' }] : []),
             ]
             const allDone = Boolean(isExecuted && isDistributed && (!isCreEnabled || isCreDelivered))
@@ -917,7 +941,7 @@ export default function CapsuleDetailPage() {
                         ? isDelegated
                           ? 'Undelegate from ER first'
                           : 'Execute intent first'
-                        : 'Distribute SOL/tokens to beneficiaries'
+                        : `Distribute ${assetConfig.symbol}/tokens to beneficiaries`
                     }
                     className="rounded-lg border border-Heres-purple px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-Heres-purple/10 text-Heres-purple hover:bg-Heres-purple/20"
                   >
@@ -982,18 +1006,18 @@ export default function CapsuleDetailPage() {
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-lg font-semibold text-Heres-white">
-                  {isToken ? 'SOL Price (USD)' : 'NFT Value (SOL / USD proxy)'}
+                  {isToken ? `${assetConfig.symbol} Price (USD)` : `NFT Value (${assetConfig.symbol} / USD proxy)`}
                 </h2>
                 <p className="text-sm text-Heres-muted mt-1">
                   {isToken
-                    ? 'Real-time SOL price (CoinGecko).'
-                    : 'Representative value trend (SOL/USD) for reference.'}
+                    ? `Real-time ${assetConfig.symbol} price (CoinGecko).`
+                    : `Representative value trend (${assetConfig.symbol}/USD) for reference.`}
                 </p>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 {isToken && (
                   <div className="rounded-lg border border-Heres-border/80 bg-Heres-card/80 px-2.5 py-1.5 flex items-center gap-2">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">1 SOL</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">1 {assetConfig.symbol}</span>
                     <span className="text-sm font-semibold tabular-nums text-Heres-accent">${displayedSolPrice.toFixed(2)}</span>
                     <span className="text-[10px] text-Heres-muted">USD</span>
                   </div>
@@ -1031,7 +1055,7 @@ export default function CapsuleDetailPage() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.3)" />
-                    <YAxis domain={[90, 'auto']} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.3)" tickFormatter={(v) => `$${v}`} />
+                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.3)" tickFormatter={(v) => `$${v}`} />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'var(--Heres-card)', border: '1px solid var(--Heres-border)' }}
                       labelStyle={{ color: 'var(--Heres-white)' }}

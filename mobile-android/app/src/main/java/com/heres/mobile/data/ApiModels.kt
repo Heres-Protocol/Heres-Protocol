@@ -76,11 +76,12 @@ data class ExtendPreviewResponse(
 @Serializable
 data class CreateCapsuleUnsignedRequest(
     val owner: String,
-    val totalSol: String,
+    val totalAmount: String,
     val inactivityDays: Int,
     val beneficiaryAddress: String,
-    val beneficiaryAmountSol: String,
-    val intent: String = "Mobile capsule"
+    val beneficiaryAmount: String,
+    val intent: String = "Mobile capsule",
+    val assetSymbol: String = "SOL"
 )
 
 @Serializable

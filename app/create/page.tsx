@@ -17,6 +17,7 @@ import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
 import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, MAX_CAPSULE_MODIFICATIONS } from '@/constants'
 import { encodeIntentData, daysToSeconds } from '@/utils/intent'
+import { getAssetConfig, getAssetMintPublicKey, isAssetConfigured, SUPPORTED_TOKEN_ASSETS, SupportedAssetSymbol } from '@/lib/assets'
 import { buildCreSignedMessage } from '@/utils/creAuth'
 import { bytesToBase64, encryptPrivateMessage, sha256Hex } from '@/utils/creCrypto'
 import {
@@ -42,6 +43,7 @@ export default function CreatePage() {
   const [showWalletMenu, setShowWalletMenu] = useState(false)
   const [intent, setIntent] = useState('')
   const [capsuleType, setCapsuleType] = useState<CapsuleAssetType>(null)
+  const [selectedTokenAsset, setSelectedTokenAsset] = useState<SupportedAssetSymbol>('SOL')
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([
     { chain: 'solana', address: '', amount: '', amountType: 'fixed', destinationChainSelector: '' }
   ])
@@ -179,6 +181,9 @@ export default function CreatePage() {
   }
 
   const supportsMinuteMode = SOLANA_CONFIG.NETWORK === 'devnet'
+  const tokenAssetConfig = getAssetConfig(selectedTokenAsset)
+  const tokenAssetUnit = tokenAssetConfig.symbol
+  const tokenAssetReady = isAssetConfigured(selectedTokenAsset)
 
   const formatInactivityLabel = (value: string | number, unit: InactivityUnit) => {
     const numeric = typeof value === 'number' ? value : parseInt(value, 10)
@@ -283,6 +288,11 @@ export default function CreatePage() {
   }
 
   const validateBeneficiaries = (): boolean => {
+    if (!tokenAssetReady) {
+      alert(`${selectedTokenAsset} devnet mint is not configured. Set NEXT_PUBLIC_${selectedTokenAsset}_DEVNET_MINT first.`)
+      return false
+    }
+
     if (!validateBeneficiaryAddresses(beneficiaries)) {
       alert('Please enter valid beneficiary addresses (Solana: base58, EVM: 0x...).')
       return false
@@ -370,6 +380,7 @@ export default function CreatePage() {
     try {
 
       const inactivityValueNum = parseInt(inactivityDays, 10)
+      const selectedMint = capsuleType === 'token' ? getAssetMintPublicKey(selectedTokenAsset) : undefined
       let intentData: Uint8Array
       let creMeta: {
         enabled: true
@@ -434,6 +445,8 @@ export default function CreatePage() {
           inactivityValue: inactivityValueNum,
           inactivityUnit,
           delayDays: parseInt(delayDays),
+          assetSymbol: selectedTokenAsset,
+          assetMint: tokenAssetConfig.mint,
           cre: creMeta,
         }
         intentData = new TextEncoder().encode(JSON.stringify(payload))
@@ -442,6 +455,8 @@ export default function CreatePage() {
           intent,
           beneficiaries,
           totalAmount,
+          assetSymbol: selectedTokenAsset,
+          assetMint: tokenAssetConfig.mint,
           inactivityDays: inactivityUnit === 'days' ? inactivityValueNum : 0,
           inactivityValue: inactivityValueNum,
           inactivityUnit,
@@ -465,7 +480,8 @@ export default function CreatePage() {
           hash = await recreateCapsule(
             wallet as any,
             inactivityPeriodSeconds,
-            intentData
+            intentData,
+            selectedMint
           )
         } else if (existingCapsule && existingCapsule.isActive) {
           // Active capsule exists — cannot create new one (on-chain constraint)
@@ -474,14 +490,16 @@ export default function CreatePage() {
           hash = await createCapsule(
             wallet as any,
             inactivityPeriodSeconds,
-            intentData
+            intentData,
+            selectedMint
           )
         }
       } else {
         hash = await createCapsule(
           wallet as any,
           inactivityPeriodSeconds,
-          intentData
+          intentData,
+          selectedMint
         )
       }
 
@@ -511,6 +529,30 @@ export default function CreatePage() {
         localStorage.setItem(txKeyWithSig, hash)
         const txKey = STORAGE_KEYS.CAPSULE_CREATION_TX(publicKey.toString())
         localStorage.setItem(txKey, hash)
+      }
+
+      if (publicKey) {
+        const [capsulePDA] = getCapsulePDA(publicKey)
+        try {
+          await fetch('/api/intent-reminder/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              capsuleAddress: capsulePDA.toBase58(),
+              owner: publicKey.toBase58(),
+              recipientEmail: normalizedEmail,
+              assetSymbol: tokenAssetConfig.symbol,
+              assetLabel: tokenAssetConfig.label,
+              totalAmount: capsuleType === 'token' ? totalAmount : undefined,
+              beneficiaryCount: capsuleType === 'token' ? beneficiaries.filter((b) => b.address.trim()).length : nftRecipients.filter((r) => r.address.trim()).length,
+              inactivityLabel: formatInactivityLabel(inactivityDays, inactivityUnit) || 'Not configured',
+              delayDays: parseInt(delayDays, 10) || 0,
+              createdAt: Date.now(),
+            }),
+          })
+        } catch (reminderErr) {
+          console.warn('[Reminder] Failed to register recurring reminder:', reminderErr)
+        }
       }
 
       if (ownerBase58) {
@@ -787,7 +829,7 @@ export default function CreatePage() {
               <div className="card-Heres p-6 sm:p-8">
                 <h2 className="text-xl font-bold text-Heres-white mb-2">Choose asset type</h2>
                 <p className="text-sm text-Heres-muted mb-6">
-                  Follow these steps to create your capsule successfully. Select whether to transfer tokens (SOL) or NFTs.
+                  Follow these steps to create your capsule successfully. Select whether to transfer tokens or NFTs.
                 </p>
                 <div className="flex flex-wrap gap-4">
                   <button
@@ -828,7 +870,37 @@ export default function CreatePage() {
                       <h2 className="text-xl font-bold text-Heres-white">Total Token Amount</h2>
                     </div>
                   </div>
-                  <label className="block text-sm text-Heres-muted mb-2">Total Amount (SOL)</label>
+                  <label className="block text-sm text-Heres-muted mb-2">Asset</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                    {SUPPORTED_TOKEN_ASSETS.map((asset) => {
+                      const configured = isAssetConfigured(asset.symbol)
+                      return (
+                        <button
+                          key={asset.symbol}
+                          type="button"
+                          onClick={() => configured && setSelectedTokenAsset(asset.symbol)}
+                          disabled={!configured}
+                          className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                            selectedTokenAsset === asset.symbol
+                              ? 'border-Heres-accent bg-Heres-accent/10 text-Heres-accent'
+                              : configured
+                                ? 'border-Heres-border bg-Heres-card/80 text-Heres-white hover:border-Heres-accent/40'
+                                : 'border-Heres-border/60 bg-Heres-card/40 text-Heres-muted opacity-60 cursor-not-allowed'
+                          }`}
+                        >
+                          <p className="text-sm font-semibold">{asset.symbol}</p>
+                          <p className="text-xs text-Heres-muted">{asset.label}</p>
+                          {!configured && <p className="mt-1 text-[10px] uppercase tracking-wide text-amber-300">Env required</p>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {!tokenAssetReady && (
+                    <p className="mb-4 text-xs text-amber-300">
+                      {selectedTokenAsset} requires <code className="font-mono">{`NEXT_PUBLIC_${selectedTokenAsset}_DEVNET_MINT`}</code> to be set to a valid devnet token mint.
+                    </p>
+                  )}
+                  <label className="block text-sm text-Heres-muted mb-2">Total Amount ({tokenAssetUnit})</label>
                   <input
                     type="number"
                     value={totalAmount}
@@ -853,7 +925,7 @@ export default function CreatePage() {
                     step="0.001"
                     className="w-full rounded-xl border border-Heres-border bg-Heres-surface/80 p-4 text-Heres-white placeholder-Heres-muted focus:outline-none focus:border-Heres-accent/50 transition-colors"
                   />
-                  <p className="text-sm text-Heres-muted mt-3">Amount to be distributed. Percentages are calculated automatically.</p>
+                  <p className="text-sm text-Heres-muted mt-3">Amount to be distributed in {tokenAssetUnit}. Percentages are calculated automatically.</p>
                 </div>
               )}
 
@@ -882,7 +954,7 @@ export default function CreatePage() {
                                 onClick={() => updateBeneficiary(index, 'chain', 'solana')}
                                 className={`px-3 text-xs font-semibold transition-colors h-full ${beneficiary.chain !== 'evm' ? 'bg-Heres-accent text-Heres-bg' : 'text-Heres-muted hover:text-Heres-white'}`}
                               >
-                                SOL
+                                {tokenAssetUnit}
                               </button>
                               <button
                                 type="button"
@@ -925,7 +997,7 @@ export default function CreatePage() {
                                 className={`px-3 text-xs font-semibold transition-colors h-full ${beneficiary.amountType === 'fixed' ? 'bg-Heres-accent text-Heres-bg' : 'text-Heres-muted hover:text-Heres-white'
                                   }`}
                               >
-                                SOL
+                                {tokenAssetUnit}
                               </button>
                               <button
                                 type="button"
@@ -967,9 +1039,9 @@ export default function CreatePage() {
                               }
                               return (
                                 <p className="text-sm text-Heres-muted">
-                                  <span className="text-Heres-accent font-semibold">{actualAmount.toFixed(6)} SOL</span>
+                                  <span className="text-Heres-accent font-semibold">{actualAmount.toFixed(6)} {tokenAssetUnit}</span>
                                   {' '}(<span className="text-Heres-accent font-semibold">{percentage.toFixed(2)}%</span>)
-                                  {' '}of <span className="text-Heres-white font-semibold">{total} SOL</span>
+                                  {' '}of <span className="text-Heres-white font-semibold">{total} {tokenAssetUnit}</span>
                                 </p>
                               )
                             })()}
@@ -995,11 +1067,11 @@ export default function CreatePage() {
                               <div className="flex justify-between text-sm">
                                 <span className="text-Heres-muted">Total to distribute</span>
                                 <span className={isExceeded ? 'text-red-400 font-semibold' : 'text-Heres-accent font-semibold'}>
-                                  {totalDistributed.toFixed(6)} / {total} SOL
+                                  {totalDistributed.toFixed(6)} / {total} {tokenAssetUnit}
                                 </span>
                               </div>
-                              {isExceeded && <p className="text-sm text-red-400">Distribution exceeds total by {Math.abs(remaining).toFixed(6)} SOL</p>}
-                              {!isExceeded && remaining > 0 && <p className="text-sm text-Heres-muted">Remaining: {remaining.toFixed(6)} SOL</p>}
+                              {isExceeded && <p className="text-sm text-red-400">Distribution exceeds total by {Math.abs(remaining).toFixed(6)} {tokenAssetUnit}</p>}
+                              {!isExceeded && remaining > 0 && <p className="text-sm text-Heres-muted">Remaining: {remaining.toFixed(6)} {tokenAssetUnit}</p>}
                               {!isExceeded && remaining === 0 && <p className="text-sm text-Heres-accent">All tokens distributed</p>}
                             </>
                           )
@@ -1396,7 +1468,7 @@ export default function CreatePage() {
                                 <p className="font-mono text-sm text-Heres-white truncate max-w-[200px]">
                                   [{(b.chain ?? 'solana').toUpperCase()}] {b.address || 'Not set'}
                                 </p>
-                                <p className="text-Heres-accent font-semibold text-sm">{b.amount} {b.amountType === 'percentage' ? '%' : 'SOL'}</p>
+                                <p className="text-Heres-accent font-semibold text-sm">{b.amount} {b.amountType === 'percentage' ? '%' : tokenAssetUnit}</p>
                               </div>
                             ))}
                           </div>
@@ -1461,4 +1533,3 @@ export default function CreatePage() {
     </div>
   )
 }
-

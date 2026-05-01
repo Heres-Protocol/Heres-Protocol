@@ -61,20 +61,22 @@ class HeresRepository {
 
     suspend fun buildCreateCapsuleUnsignedTx(
         owner: String,
-        totalSol: String,
+        totalAmount: String,
         inactivityDays: Int,
         beneficiaryAddress: String,
-        beneficiaryAmountSol: String,
-        intent: String
+        beneficiaryAmount: String,
+        intent: String,
+        assetSymbol: String
     ): UnsignedTxResponse = callApi {
         api.buildCreateCapsuleUnsignedTx(
             CreateCapsuleUnsignedRequest(
                 owner = owner,
-                totalSol = totalSol,
+                totalAmount = totalAmount,
                 inactivityDays = inactivityDays,
                 beneficiaryAddress = beneficiaryAddress,
-                beneficiaryAmountSol = beneficiaryAmountSol,
-                intent = intent
+                beneficiaryAmount = beneficiaryAmount,
+                intent = intent,
+                assetSymbol = assetSymbol
             )
         )
     }

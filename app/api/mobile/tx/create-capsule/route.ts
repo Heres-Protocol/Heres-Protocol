@@ -6,19 +6,34 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     const owner = typeof body?.owner === 'string' ? body.owner : ''
-    const totalSol = typeof body?.totalSol === 'string' ? body.totalSol : ''
+    const totalAmount =
+      typeof body?.totalAmount === 'string'
+        ? body.totalAmount
+        : typeof body?.totalSol === 'string'
+          ? body.totalSol
+          : ''
     const inactivityDays = Number(body?.inactivityDays)
     const beneficiaryAddress = typeof body?.beneficiaryAddress === 'string' ? body.beneficiaryAddress : ''
-    const beneficiaryAmountSol = typeof body?.beneficiaryAmountSol === 'string' ? body.beneficiaryAmountSol : ''
+    const beneficiaryAmount =
+      typeof body?.beneficiaryAmount === 'string'
+        ? body.beneficiaryAmount
+        : typeof body?.beneficiaryAmountSol === 'string'
+          ? body.beneficiaryAmountSol
+          : ''
     const intent = typeof body?.intent === 'string' ? body.intent : undefined
+    const assetSymbol =
+      body?.assetSymbol === 'BTC' || body?.assetSymbol === 'ETH' || body?.assetSymbol === 'SOL'
+        ? body.assetSymbol
+        : 'SOL'
 
     const unsigned = await buildCreateCapsuleUnsignedTx({
       owner,
-      totalSol,
+      totalAmount,
       inactivityDays,
       beneficiaryAddress,
-      beneficiaryAmountSol,
+      beneficiaryAmount,
       intent,
+      assetSymbol,
     })
 
     return NextResponse.json({

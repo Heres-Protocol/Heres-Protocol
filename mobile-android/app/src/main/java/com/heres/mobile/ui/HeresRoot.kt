@@ -28,6 +28,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
@@ -48,6 +49,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -57,6 +59,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import com.heres.mobile.R
 import com.heres.mobile.data.CapsuleDetailResponse
 import com.heres.mobile.data.CapsuleListItem
@@ -141,6 +147,13 @@ fun HeresRoot(
 
             if (showSplash) {
                 SplashOverlay()
+            }
+
+            state.selectedCapsule?.let { detail ->
+                CapsuleDetailDialog(
+                    detail = detail,
+                    onDismiss = vm::clearSelectedCapsule
+                )
             }
         }
     }
@@ -281,15 +294,7 @@ private fun DashboardContent(
     val scope = rememberCoroutineScope()
     var connectResult by remember { mutableStateOf<String?>(null) }
     val wallet = state.wallet.trim()
-    val filteredCapsules = remember(state.dashboardCapsules, state.capsuleSearch, wallet) {
-        val query = state.capsuleSearch.trim().lowercase(Locale.getDefault())
-        state.dashboardCapsules.filter { capsule ->
-            if (query.isBlank()) return@filter true
-            capsule.capsuleAddress.lowercase(Locale.getDefault()).contains(query) ||
-                capsule.owner.lowercase(Locale.getDefault()).contains(query) ||
-                capsule.status.lowercase(Locale.getDefault()).contains(query)
-        }
-    }
+    val visibleCapsules = state.dashboardCapsules
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -300,7 +305,7 @@ private fun DashboardContent(
             SectionTitle(
                 eyebrow = "Default Home",
                 title = "Live Capsule Dashboard",
-                subtitle = "Browse every capsule first. If a wallet is already connected, your capsule stays highlighted automatically."
+                subtitle = "Browse every capsule first. Tap any card to open a full detail view."
             )
         }
 
@@ -364,35 +369,22 @@ private fun DashboardContent(
         }
 
         item {
-            GlassPanel {
-                Text("Search", fontWeight = FontWeight.SemiBold, color = Color.White)
-                OutlinedTextField(
-                    value = state.capsuleSearch,
-                    onValueChange = vm::setCapsuleSearch,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Capsule address, owner, status") },
-                    singleLine = true
-                )
-                Text("${filteredCapsules.size} capsules visible", color = Color.White.copy(alpha = 0.72f))
-            }
+            Text(
+                "${visibleCapsules.size} capsules live",
+                color = Color.White.copy(alpha = 0.58f)
+            )
         }
 
-        if (state.selectedCapsule != null) {
-            item {
-                CapsuleDetailPanel(title = "Selected Capsule", detail = state.selectedCapsule)
-            }
-        }
-
-        if (filteredCapsules.isEmpty()) {
+        if (visibleCapsules.isEmpty()) {
             item {
                 GlassPanel {
                     Text("No capsules found", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    Text("No capsules have been indexed yet, or your search returned no matches.", color = Color.White.copy(alpha = 0.72f))
+                    Text("No capsules have been indexed yet.", color = Color.White.copy(alpha = 0.72f))
                 }
             }
         }
 
-        items(filteredCapsules, key = { it.capsuleAddress }) { capsule ->
+        items(visibleCapsules, key = { it.capsuleAddress }) { capsule ->
             DashboardCapsuleCard(
                 capsule = capsule,
                 isMine = wallet.isNotBlank() && capsule.owner == wallet,
@@ -506,12 +498,6 @@ private fun CapsuleContent(
             }
         }
 
-        if (state.selectedCapsule != null) {
-            item {
-                CapsuleDetailPanel(title = "Capsule Detail", detail = state.selectedCapsule)
-            }
-        }
-
         if (state.extendPreview?.canExtend == true) {
             item {
                 GlassPanel {
@@ -566,6 +552,7 @@ private fun CreateContent(
 ) {
     val scope = rememberCoroutineScope()
     var connectResult by remember { mutableStateOf<String?>(null) }
+    val hasExistingCapsule = state.capsules.isNotEmpty()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -576,85 +563,127 @@ private fun CreateContent(
             SectionTitle(
                 eyebrow = "Native Flow",
                 title = "Create Capsule",
-                subtitle = "Build a capsule with the same sign-and-send flow, without overloading the screen."
+                subtitle = if (hasExistingCapsule) {
+                    "Creation is locked because this wallet already has a capsule."
+                } else {
+                    "Build a capsule with the same sign-and-send flow, without overloading the screen."
+                }
             )
         }
 
         item {
-            GlassPanel {
-                OutlinedTextField(
-                    value = state.wallet,
-                    onValueChange = vm::setWallet,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Owner Wallet") },
-                    singleLine = true
-                )
-                Button(
-                    onClick = {
-                        scope.launch {
-                            val result = onConnectWallet()
-                            connectResult = result.fold(
-                                onSuccess = {
-                                    vm.setWallet(it)
-                                    onWalletConnected(it)
-                                    "Connected: ${maskAddress(it)}"
-                                },
-                                onFailure = { "Connect failed: ${shortUiError(it.message, "Wallet connection failed")}" }
+            Box {
+                GlassPanel(
+                    modifier = Modifier.alpha(if (hasExistingCapsule) 0.42f else 1f)
+                ) {
+                    OutlinedTextField(
+                        value = state.wallet,
+                        onValueChange = vm::setWallet,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Owner Wallet") },
+                        singleLine = true,
+                        enabled = !hasExistingCapsule
+                    )
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                val result = onConnectWallet()
+                                connectResult = result.fold(
+                                    onSuccess = {
+                                        vm.setWallet(it)
+                                        onWalletConnected(it)
+                                        "Connected: ${maskAddress(it)}"
+                                    },
+                                    onFailure = { "Connect failed: ${shortUiError(it.message, "Wallet connection failed")}" }
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !hasExistingCapsule,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9))
+                    ) { Text("Select Wallet") }
+                    connectResult?.let { Text(it, color = Mint) }
+
+                    OutlinedTextField(
+                        value = state.createForm.intent,
+                        onValueChange = vm::updateCreateIntent,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Intent") },
+                        singleLine = true,
+                        enabled = !hasExistingCapsule
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = state.createForm.assetSymbol,
+                            onValueChange = vm::updateCreateAssetSymbol,
+                            modifier = Modifier.weight(0.8f),
+                            label = { Text("Asset") },
+                            singleLine = true,
+                            enabled = !hasExistingCapsule
+                        )
+                        OutlinedTextField(
+                            value = state.createForm.totalAmount,
+                            onValueChange = vm::updateCreateTotalSol,
+                            modifier = Modifier.weight(1f),
+                            label = { Text("Total ${state.createForm.assetSymbol}") },
+                            singleLine = true,
+                            enabled = !hasExistingCapsule
+                        )
+                        OutlinedTextField(
+                            value = state.createForm.inactivityDays,
+                            onValueChange = vm::updateCreateInactivityDays,
+                            modifier = Modifier.weight(1f),
+                            label = { Text("Days") },
+                            singleLine = true,
+                            enabled = !hasExistingCapsule
+                        )
+                    }
+                    OutlinedTextField(
+                        value = state.createForm.beneficiary.address,
+                        onValueChange = vm::updateCreateBeneficiaryAddress,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Beneficiary Address") },
+                        singleLine = true,
+                        enabled = !hasExistingCapsule
+                    )
+                    OutlinedTextField(
+                        value = state.createForm.beneficiary.amount,
+                        onValueChange = vm::updateCreateBeneficiaryAmount,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Beneficiary ${state.createForm.assetSymbol}") },
+                        singleLine = true,
+                        enabled = !hasExistingCapsule
+                    )
+                    Button(
+                        onClick = vm::submitCreateCapsuleDraft,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !state.loading && !hasExistingCapsule,
+                        colors = ButtonDefaults.buttonColors(containerColor = Mint)
+                    ) {
+                        Text(if (state.loading) "Preparing..." else "Build Unsigned Create Tx")
+                    }
+                    state.createForm.validationError?.let { Text(it, color = Coral) }
+                    state.createForm.submitMessage?.let { Text(it, color = Mint) }
+                }
+
+                if (hasExistingCapsule) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(Color(0xAA040811))
+                            .padding(20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        GlassPanel {
+                            Text("Creation disabled", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(
+                                "This wallet already has a capsule. Open My Capsule to manage it instead of creating a second one.",
+                                color = Color.White.copy(alpha = 0.74f)
                             )
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9))
-                ) { Text("Select Wallet") }
-                connectResult?.let { Text(it, color = Mint) }
-
-                OutlinedTextField(
-                    value = state.createForm.intent,
-                    onValueChange = vm::updateCreateIntent,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Intent") },
-                    singleLine = true
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = state.createForm.totalSol,
-                        onValueChange = vm::updateCreateTotalSol,
-                        modifier = Modifier.weight(1f),
-                        label = { Text("Total SOL") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = state.createForm.inactivityDays,
-                        onValueChange = vm::updateCreateInactivityDays,
-                        modifier = Modifier.weight(1f),
-                        label = { Text("Days") },
-                        singleLine = true
-                    )
+                    }
                 }
-                OutlinedTextField(
-                    value = state.createForm.beneficiary.address,
-                    onValueChange = vm::updateCreateBeneficiaryAddress,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Beneficiary Address") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = state.createForm.beneficiary.amountSol,
-                    onValueChange = vm::updateCreateBeneficiaryAmount,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Beneficiary SOL") },
-                    singleLine = true
-                )
-                Button(
-                    onClick = vm::submitCreateCapsuleDraft,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.loading,
-                    colors = ButtonDefaults.buttonColors(containerColor = Mint)
-                ) {
-                    Text(if (state.loading) "Preparing..." else "Build Unsigned Create Tx")
-                }
-                state.createForm.validationError?.let { Text(it, color = Coral) }
-                state.createForm.submitMessage?.let { Text(it, color = Mint) }
             }
         }
 
@@ -728,7 +757,7 @@ private fun DashboardCapsuleCard(
                 Text(maskAddress(capsule.capsuleAddress), color = Color.White, fontWeight = FontWeight.SemiBold)
                 Text(maskAddress(capsule.owner), color = Color.White.copy(alpha = 0.72f))
             }
-            Text("Open", color = Mint, fontWeight = FontWeight.SemiBold)
+            Text("View", color = Mint, fontWeight = FontWeight.SemiBold)
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             CapsuleMeta("Last Activity", formatTimestamp(capsule.lastActivityAt))
@@ -738,21 +767,70 @@ private fun DashboardCapsuleCard(
 }
 
 @Composable
-private fun CapsuleDetailPanel(title: String, detail: CapsuleDetailResponse) {
-    GlassPanel {
-        Text(title, color = Color.White, fontWeight = FontWeight.SemiBold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            StatusPill(detail.status)
-            if (detail.isActive) {
-                MinePill(label = "Active")
+private fun CapsuleDetailDialog(
+    detail: CapsuleDetailResponse,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xD9040811))
+                .padding(horizontal = 18.dp, vertical = 28.dp)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(28.dp),
+                color = Color(0xF20E1C31),
+                tonalElevation = 0.dp
+            ) {
+                LazyColumn(
+                    contentPadding = PaddingValues(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("Capsule Detail", color = Mint, fontWeight = FontWeight.Bold)
+                                Text("Full capsule snapshot", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(onClick = onDismiss) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Close")
+                            }
+                        }
+                    }
+
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            StatusPill(detail.status)
+                        }
+                    }
+
+                    item {
+                        GlassPanel {
+                            CapsuleMeta("Capsule", detail.capsuleAddress)
+                            CapsuleMeta("Owner", detail.owner)
+                        }
+                    }
+
+                    item {
+                        GlassPanel {
+                            CapsuleMeta("Last Activity", formatTimestamp(detail.lastActivityAt))
+                            CapsuleMeta("Executed At", formatTimestamp(detail.executedAt))
+                            CapsuleMeta("Next Deadline", formatTimestamp(detail.nextInactivityDeadline))
+                            CapsuleMeta("Inactivity", "${detail.inactivitySeconds} sec")
+                        }
+                    }
+                }
             }
         }
-        CapsuleMeta("Capsule", detail.capsuleAddress)
-        CapsuleMeta("Owner", detail.owner)
-        CapsuleMeta("Last Activity", formatTimestamp(detail.lastActivityAt))
-        CapsuleMeta("Executed At", formatTimestamp(detail.executedAt))
-        CapsuleMeta("Next Deadline", formatTimestamp(detail.nextInactivityDeadline))
-        CapsuleMeta("Inactivity", "${detail.inactivitySeconds} sec")
     }
 }
 
