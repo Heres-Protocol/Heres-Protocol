@@ -15,6 +15,10 @@ export function validateBeneficiaryAddresses(beneficiaries: Beneficiary[]): bool
   )
 }
 
+export function isValidBeneficiaryAddress(beneficiary: Beneficiary): boolean {
+  return Boolean(beneficiary.address && isValidSolanaAddress(beneficiary.address))
+}
+
 /**
  * Validate beneficiary amounts
  */

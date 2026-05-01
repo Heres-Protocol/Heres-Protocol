@@ -2,13 +2,15 @@
 
 > **People disappear. Intent should not.**
 
-Heres is a **privacy-preserving capsule protocol on Solana Devnet**, where assets remain delegated, conditions stay private inside **Magicblock Ephemeral Rollup (ER)** or **Private Ephemeral Rollup (PER / TEE)**, and execution happens automatically when silence becomes truth.
+Heres is a **privacy-preserving capsule protocol on Solana Devnet**, where assets remain delegated, conditions stay private inside **Magicblock Ephemeral Rollup (ER)** or **Private Ephemeral Rollup (PER / TEE)**, and execution happens automatically when silence becomes truth. Beyond on-chain assets, Heres introduces a **"Confidential Bridge" via Chainlink CRE (Chainlink Runtime Environment)** to securely and autonomously deliver encrypted off-chain *Intent Statements* such as passwords or recovery codes directly to your beneficiaries without any middlemen..
 
 ---
 
 ## Background
 
-As digital asset ownership grows, a critical gap has emerged: **what happens to your crypto and your intentions when you can no longer manage them?** Traditional estate planning rarely covers bearer assets controlled by private keys. Wills and executors often lack both the technical means and legal clarity to access wallets, and leaving keys in a safe or with a lawyer creates security and privacy risks. At the same time, **confidential computing** (keeping data private during computation) has become a major focus in crypto infrastructure, enabling sensitive logic to run without exposing conditions or beneficiaries on a public ledger. Heres sits at the intersection: it uses **time-locked intent capsules** on Solana with **private execution** via Magicblock’s Ephemeral Rollups (ER) and Private Ephemeral Rollups (PER / TEE), so your “if I go silent” instructions are enforced automatically and privately.
+As digital asset ownership grows, a critical gap has emerged: **what happens to your crypto and your intentions when you can no longer manage them?** Traditional estate planning rarely covers bearer assets controlled by private keys. Wills and executors often lack both the technical means and legal clarity to access wallets, and leaving keys in a safe or with a lawyer creates security and privacy risks. At the same time, **confidential computing** (keeping data private during computation) has become a major focus in crypto infrastructure, enabling sensitive logic to run without exposing conditions or beneficiaries on a public ledger. 
+
+Heres sits at the intersection: it uses **time-locked intent capsules** on Solana with **private execution** via Magicblock’s Ephemeral Rollups (ER) and Private Ephemeral Rollups (PER / TEE), so your “if I go silent” instructions are enforced automatically and privately. Furthermore, it integrates **Chainlink CRE** to extend this trustless inheritance to off-chain secrets, creating a comprehensive digital succession layer.
 
 ---
 
@@ -18,52 +20,54 @@ Our design and positioning are informed by published research and ecosystem repo
 
 ### Digital asset inheritance & estate planning
 
-- **Scale of the problem:** Nearly 20% of all bitcoin is estimated to be lost or stranded, often due to lost keys or owners dying without succession plans. With digital asset market cap exceeding $3T and 14–17% of U.S. adults holding crypto, unplanned wealth transfer is a growing issue ([CoinDesk](https://www.coindesk.com/opinion/2024/12/18/crypto-s-estate-planning-problem-a-wake-up-call), [CNBC/Wealth Management](https://www.wealthmanagement.com/estate-planning/bitcoin-after-death-2025-estate-guide)).
-- **Planning gaps:** Only about 24% of Americans have wills, and most wills do not address digital assets or authorize executors to access them. Cryptocurrencies are bearer assets: without proper documentation and access design, heirs cannot recover holdings ([Fidelity](https://www.fidelity.com/learning-center/wealth-management-insights/crypto-and-estate-planning), [BDO](https://www.bdo.com/insights/tax/dont-let-volatile-digital-assets-blow-up-a-clients-estate-plan)).
+- **Scale of the problem:** Nearly 20% of all bitcoin is estimated to be lost or stranded, often due to lost keys or owners dying without succession plans. With digital asset market cap exceeding $3T and 14–17% of U.S. adults holding crypto, unplanned wealth transfer is a growing issue.
+- **Planning gaps:** Only about 24% of Americans have wills, and most wills do not address digital assets or authorize executors to access them. Cryptocurrencies are bearer assets: without proper documentation and access design, heirs cannot recover holdings.
 - **Implication for Heres:** We focus on **programmatic intent**: define conditions (e.g. inactivity period, beneficiaries) once; execution is automatic when conditions are met, without relying on heirs to discover keys or courts to interpret documents.
 
 ### Decentralized confidential computing (DeCC) & TEEs
 
-- **Investment and momentum:** Over **$1 billion** has been invested into Decentralized Confidential Computing (DeCC) projects. The space is converging around ZKPs, MPC, FHE, and **Trusted Execution Environments (TEEs)** as core primitives for private computation on public chains ([Messari – The Privacy Layer: DeCC](https://messari.io/report/the-privacy-layer-understanding-the-inner-workings-of-decentralized-confidential-computing)).
-- **TEE role:** TEEs provide hardware-enforced isolation so that conditions and data can be evaluated **in use** without exposing them on-chain. Messari and others describe TEEs as a practical way to achieve confidential execution with low overhead, and note projects like Secret Network, Phala, and TEN using TEEs for private smart contracts and rollups ([Cointelegraph – TEE explained](https://cointelegraph.com/news/trusted-execution-environments-tee-explained-the-future-of-secure-blockchain-applications)).
-- **Implication for Heres:** We use Magicblock’s **PER (TEE)** so that inactivity checks and beneficiary logic run inside a trusted environment; only execution outcomes are committed to Solana. No ZK proofs are required for this flow.
+- **Investment and momentum:** Over **$1 billion** has been invested into Decentralized Confidential Computing (DeCC) projects. The space is converging around ZKPs, MPC, FHE, and **Trusted Execution Environments (TEEs)** as core primitives for private computation on public chains.
+- **TEE role:** TEEs provide hardware-enforced isolation so that conditions and data can be evaluated **in use** without exposing them on-chain.
+- **Implication for Heres:** We use Magicblock’s **PER (TEE)** so that inactivity checks and beneficiary logic run inside a trusted environment; only execution outcomes are committed to Solana.
 
 ### Solana ecosystem
 
-- **Adoption and infra:** Solana has seen strong developer growth, high DEX share, and institutional interest (e.g. CME futures, tokenized funds). Chain GDP and stablecoin usage on Solana have grown sharply ([Messari State of Solana](https://messari.io/report/state-of-solana-q1-2025), [Helius Ecosystem Report](https://helius.dev/blog/solana-ecosystem-report-h1-2025)).
+- **Adoption and infra:** Solana has seen strong developer growth, high DEX share, and institutional interest.
 - **Implication for Heres:** We build on Solana for speed, low fees, and a clear program model; we integrate Helius for RPC and Magicblock for private execution so capsules are both persistent on-chain and privately monitored off-chain.
 
 ---
 
 ## Overview
 
-**Heres** is a protocol that lets you create **Intent Capsules** on Solana: you lock SOL (or define NFT intents), set an **inactivity period** and **beneficiaries**, and delegate the capsule to Magicblock ER or PER (TEE). Your **conditions stay private** inside the rollup; when you have been inactive long enough, **execution is automatic** (e.g. SOL sent to beneficiaries). No third-party executor holds your keys; the program and the private runtime enforce your intent.
+**Heres** is a protocol that lets you create **Intent Capsules** on Solana: you lock SOL (or define NFT intents), set an **inactivity period**, assign **beneficiaries**, and securely attach encrypted **Intent Statements** (like a master password or final letter). You delegate the capsule to Magicblock ER or PER (TEE). Your **conditions stay private** inside the rollup; when you have been inactive long enough, **execution is automatic**. The assets are distributed seamlessly, and your off-chain secrets are pushed securely via Chainlink CRE to the designated recipients. No third-party executor holds your keys; the program and the private runtime enforce your intent.
 
-| Layer | Role |
-|-------|------|
-| **Solana Devnet** | Persistent capsule state (owner, vault, inactivity, delegation). |
-| **Magicblock ER / PER (TEE)** | Private monitoring of conditions; triggers Magic Actions when conditions are met. |
-| **User** | Create capsule, delegate to PER/ER, (optionally) heartbeat; execution is permissionless once conditions are satisfied. |
+| Layer | Technology | Role |
+|-------|------------|------|
+| **Settlement** | **Solana Devnet** | Persistent capsule state (owner, vault, inactivity, delegation), intent data on-chain. |
+| **Private Sentinel** | **Magicblock ER / PER (TEE)** | Private monitoring of conditions; triggers execution when conditions are met. |
+| **Confidential Bridge** | **Chainlink CRE** | Secure off-chain delivery of encrypted Intent Statements to beneficiaries exactly where they need to go. |
 
 ---
 
 ## Problem
 
-1. **Digital asset succession:** Crypto is bearer-asset: whoever holds the keys controls the funds. If you disappear or become incapacitated, heirs often cannot access assets, and keys in wills or with lawyers are a security and privacy risk.
-2. **Transparent conditions:** Putting “if I don’t log in for X days, send Y to Z” on a public chain exposes beneficiaries and timing to everyone.
-3. **Trust in executors:** Relying on a person or institution to execute your wishes adds counterparty risk and delay; you want **programmatic, automatic** execution when conditions are met.
+1. **Digital asset succession:** Crypto is bearer-asset. If you disappear, heirs often cannot access assets.
+2. **Transparent conditions:** Putting “if I don’t log in for X days, send Y to Z” on a public chain exposes beneficiaries and timing to surveillance and front-running risks.
+3. **The Web2 Gap:** Digital estates encompass sensitive Web2 credentials (passwords, access codes) that cannot be safely stored on public networks.
+4. **Trust in executors:** Relying on a person or institution introduces counterparty risk and delay.
 
 ---
 
 ## Solution
 
-Heres combines:
+Heres is a triple-layer orchestration framework combining:
 
-1. **Persistent capsules on Solana** – Capsule account holds owner, vault (locked SOL), inactivity period, and intent data; delegation state is on-chain.
-2. **Private execution logic** – Conditions (inactivity, beneficiaries) are evaluated inside Magicblock **ER** or **PER (TEE)**; only the fact that conditions were satisfied and execution occurred is visible on-chain.
-3. **Automatic execution** – When the inactivity period is satisfied, **anyone** can call `execute_intent`; no owner signature is required. A crank/bot can watch and submit the transaction; execution fees are taken from the transferred amount.
+1. **Persistent capsules on Solana** – Capsule account locks SOL in a PDA vault and holds intent data.
+2. **Private execution logic** – Inactivity and beneficiary check runs inside Magicblock **PER (TEE)**, keeping conditions private off-chain until executed.
+3. **Confidential delivery** – An encrypted off-chain *Intent Statement* is attached at creation. When the capsule activates, Chainlink CRE retrieves and delivers the decrypted statement directly to the beneficiary's email.
+4. **Automatic execution** – When the inactivity period is met, the Magicblock Crank (or anyone) can call `execute_intent`. 
 
-Result: **Intent remains private, execution is deterministic and automatic.**
+Result: **Intent remains private, execution is deterministic and automatic, and no third party ever holds your keys or plain text secrets.**
 
 ---
 
@@ -71,20 +75,21 @@ Result: **Intent remains private, execution is deterministic and automatic.**
 
 - **Zero trust executor** – No third party holds your keys; the capsule program and vault enforce transfers when conditions are met.
 - **Compliant privacy** – Conditions and beneficiaries stay inside PER (TEE) / ER; only execution results are committed to Devnet.
-- **Permissionless execution** – After the inactivity period, any crank or user can trigger `execute_intent`; the program handles distribution and platform revenue.
+- **Off-chain Confidential Bridge** – Utilize Chainlink's isolated CRE to deliver encrypted secrets to Web2 emails securely.
+- **Permissionless execution** – After the inactivity period, any crank or user can trigger `execute_intent`.
 - **PER (TEE) by default** – Delegation defaults to the TEE validator so monitoring is confidential.
-- **Business model** – One-time creation fee and a percentage of the amount transferred at execution.
-- **Token & NFT intents** – Support for SOL splits to multiple beneficiaries and for NFT assignment intents (with SOL/USD trend as reference where applicable).
 
 ---
 
 ## How It Works
 
-1. **Create** – You define intent (e.g. total SOL, beneficiaries, inactivity period in days). SOL is locked in the capsule vault; creation fee is paid to the platform.
-2. **Delegate** – You delegate the capsule PDA to Magicblock ER or PER (TEE). Private runtime starts monitoring (e.g. last activity vs inactivity threshold).
+1. **Create** – You define intent (e.g. total SOL, beneficiaries, inactivity period). Optional: Write an *Intent Statement* which is client-side encrypted (AES-256-GCM) and its reference stored on-chain. SOL is locked in the capsule vault.
+2. **Delegate** – You delegate the capsule PDA to Magicblock ER or PER (TEE). Private runtime starts monitoring.
 3. **Heartbeat (optional)** – You can call `update_activity` to refresh “last activity” and postpone execution.
-4. **Execution** – When `last_activity + inactivity_period` has passed, **the crank runs automatically** (or anyone can submit `execute_intent`). The program checks time condition on-chain, deducts execution fee, and distributes SOL from the vault to beneficiaries. For NFT intents, logic can be extended similarly.
-5. **Post-execution** – Capsule can be deactivated or recreated via `recreate_capsule` for a new intent.
+4. **Execution & Delivery** 
+   - When `last_activity + inactivity_period` has passed, **the crank runs automatically** (or anyone submits `execute_intent`).
+   - The program deducts the execution fee and distributes SOL from the vault.
+   - For attached *Intent Statements*, a reconciliation cron triggers Chainlink CRE via a signed webhook. CRE securely retrieves the decryption key inside its TEE vault, decrypts the statement, pushes it to the recipient, and callbacks delivery status to Heres.
 
 ### Automatic execution (no one needs to visit)
 
@@ -92,115 +97,68 @@ When conditions are met, execution and distribution happen **without the creator
 
 #### 1. MagicBlock Crank (recommended — on-chain, no external cron)
 
-When you **delegate** the capsule to PER (TEE) from the capsule detail page, the system performs **two separate transactions**:
-
-**Step 1: Delegation** – The capsule PDA is delegated to the Ephemeral Rollup (ER) delegation program on Solana Devnet. This transaction is sent to Solana Devnet and transfers ownership of the capsule account to the MagicBlock delegation program.
-
-**Step 2: Crank Scheduling** – After successful delegation, a **separate transaction is sent to the ER** (via TEE RPC) to schedule automatic execution using MagicBlock's [ScheduleTask](https://docs.magicblock.app/pages/tools/crank/introduction). The crank runs `execute_intent` at intervals (e.g. every 15 min) **on the Ephemeral Rollup**. When `last_activity + inactivity_period` is satisfied, execution happens automatically — **no off-chain cron or user visit required**.
-
-- **Flow:** Create capsule → **[Step 1]** Delegate to PER (TEE) on Devnet → **[Step 2]** Schedule crank on ER via TEE RPC → MagicBlock runs the crank on the rollup.
-- **Docs:** [MagicBlock Crank — Introduction](https://docs.magicblock.app/pages/tools/crank/introduction), [Implementation](https://docs.magicblock.app/pages/tools/crank/implementation), [crank-counter example](https://github.com/magicblock-labs/magicblock-engine-examples/tree/main/crank-counter).
-- **Code:** `lib/solana.ts` (`scheduleExecuteIntentViaTee`), `lib/tee.ts` (`getTeeConnection`), `app/capsules/[address]/page.tsx` (after delegate, schedule crank).
+When you **delegate** the capsule to PER (TEE), the system performs **two separate transactions**:
+- **Step 1: Delegation** – The capsule PDA is delegated to the Ephemeral Rollup (ER) delegation program on Solana Devnet.
+- **Step 2: Crank Scheduling** – A **separate transaction is sent to the ER** (via TEE RPC) to schedule automatic execution using MagicBlock's `ScheduleTask`. The crank runs `execute_intent` at intervals **on the Ephemeral Rollup**.
 
 #### 2. Off-chain cron (fallback)
 
-For capsules that were **not** delegated, or as a fallback, you can use the API so a cron job calls `execute_intent` for eligible capsules on the Solana base layer.
+For capsules that were **not** delegated, a cron job calls `execute_intent` for eligible capsules on the Solana base layer.
+- **Endpoint:** `GET` or `POST` `/api/cron/execute-intent`. 
 
-- **Endpoint:** `GET` or `POST` `/api/cron/execute-intent`. Optional: send `Authorization: Bearer <CRON_SECRET>` if `CRON_SECRET` is set.
-- **No Vercel Cron required (Vercel Cron is a paid feature).** Use a **free external cron** to hit your deployed API every 15 minutes, for example:
-  - [cron-job.org](https://cron-job.org): create a job, URL `https://heres.vercel.app/api/cron/execute-intent`, method GET or POST, schedule `*/15 * * * *` (every 15 min). If you set `CRON_SECRET`, add header `Authorization: Bearer <your-secret>`.
-  - [Uptime Robot](https://uptimerobot.com): monitor or HTTP check to the same URL every 15 minutes.
-- **Env:** Set `CRANK_WALLET_PRIVATE_KEY` to the crank wallet’s secret key (`23TuotDVJK58UWQWr6coiiYmbJmCJtTqP4qMSaZ1G78ZWyqaByNnPd5oPMtJDHuRfzstqFmqeYaDgBTUnqrmvkkY`). This wallet pays the transaction fee for each `execute_intent`. Optionally set `CRON_SECRET` to protect the endpoint.
+---
 
-Code: `lib/crank.ts` (eligible capsules, execute), `app/api/cron/execute-intent/route.ts` (HTTP handler).
+## How we use Solana, Magicblock, Chainlink, and Helius
 
-### How we use Solana, Magicblock, and Helius
-
-| Partner | How we use it | Code & links |
+| Provider | How we use it | Integration Details |
 |--------|----------------|---------------|
-| **Solana** | We run the **Heres program** on Solana Devnet: capsule accounts (owner, vault, inactivity period, intent data), PDAs for vault and fee config, and all instructions (`create_capsule`, `execute_intent`, `delegate_capsule`, etc.) are executed on-chain. The frontend uses the Solana connection (via Helius RPC) and Anchor to build and sign transactions. | **Contract:** [heres_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/heres_program/programs/heres_program/src/lib.rs) · **Program on Devnet:** [Explorer](https://explorer.solana.com/address/BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms?cluster=devnet) · **App:** [config/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/config/solana.ts), [lib/program.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/program.ts), [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) |
-| **Magicblock** | We use **Ephemeral Rollups (ER)** and **Private Ephemeral Rollup (PER / TEE)** for private condition monitoring. The capsule PDA is delegated to Magicblock via `delegate_capsule` (default validator: TEE). The private runtime checks inactivity and beneficiaries; only execution results are committed to Devnet via Magic Actions. TEE auth uses `getAuthToken` and optional `verifyTeeRpcIntegrity` from the Magicblock SDK. | **Contract (delegate):** [heres_program/src/lib.rs](https://github.com/Joseph-hackathon/Project-x/blob/main/heres_program/programs/heres_program/src/lib.rs) · **App:** [lib/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/solana.ts) (`delegateCapsule`, `undelegateCapsule`), [lib/tee.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/tee.ts) (TEE auth), [constants/index.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/constants/index.ts) (`MAGICBLOCK_ER`, `PER_TEE`) |
-| **Helius** | We use Helius for **RPC** (primary Solana connection with fallback to public RPC), **Enhanced Transactions API** for the dashboard (parsed capsule create/execute events and history), and **DAS API** for NFT listing when creating NFT capsules. | **Config:** [config/solana.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/config/solana.ts) (`getSolanaConnection`), [constants/index.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/constants/index.ts) (`HELIUS_CONFIG`) · **App:** [lib/helius.ts](https://github.com/Joseph-hackathon/Project-x/blob/main/lib/helius.ts) (`getEnhancedTransactions`, `getNftsByOwner`) |
-
-- **Contract (Devnet):** Program ID `BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms` → [View on Solana Explorer (Devnet)](https://explorer.solana.com/address/BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms?cluster=devnet).
+| **Solana** | The **Heres program** deployed on Devnet acts as the immutable registry. It handles capsule accounts, PDAs for the vault, execution instructions, and stores delegation parameters. | **Contract:** `heres_program` |
+| **Magicblock** | We use **Ephemeral Rollups (ER)** and **Private Ephemeral Rollup (PER / TEE)** for private condition monitoring. The private runtime evaluates inactivity without exposing logic on the public ledger. | **App:** `lib/solana.ts`, `lib/tee.ts` |
+| **Chainlink** | We integrate the **Chainlink Runtime Environment (CRE)** as a Confidential Bridge. It acts as an isolated TEE vault to retrieve, decrypt, and deliver our client-side encrypted *Intent Statements* to an email provider, and callbacks execution status without exposing secrets to our core backend. | **App:** `lib/cre/`, `/api/cre/dispatch` |
+| **Helius** | We use Helius for **RPC** (primary Solana connection), **Enhanced Transactions API** for the dashboard, and **DAS API** for NFT listings. | **App:** `lib/helius.ts`, `config/solana.ts` |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   Solana Devnet                          │
-│  Heres Program (Persistent)                              │
-│  · Capsule: owner, vault (locked SOL), inactivity_period │
-│  · intent_data (beneficiaries, amounts); delegation      │
-└─────────────────────────▲───────────────────────────────┘
-                          │ Magic Actions (execute_intent result)
-┌─────────────────────────┴───────────────────────────────┐
-│           Magicblock ER / PER (TEE)                      │
-│  · Private condition checks (inactivity, beneficiaries)   │
-│  · Crank / bot monitors; triggers execution on Devnet    │
-└─────────────────────────▲───────────────────────────────┘
-                          │ delegate_capsule / heartbeat
-┌─────────────────────────┴───────────────────────────────┐
-│                 User Wallet (Devnet)                     │
-│  Create capsule, delegate to PER/ER, update_activity       │
-└─────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                             Solana Devnet                                  │
+│  Heres Program (Persistent)                                                │
+│  · Capsule storage: owner, locked SOL vault, inactivity_period, intent_data│
+│  · CRE secretRef & secretHash committed on-chain                           │
+└─────▲──────────────────────────────────────────────────────────────────────┘
+      │ Magic Actions (execution result)
+┌─────┴──────────────────────────────────────────────────────────────────────┐
+│                       Magicblock ER / PER (TEE)                            │
+│  · Private condition checks (inactivity, beneficiaries)                    │
+│  · Crank monitors heartbeat & triggers execution on Devnet                 │
+└─────▲──────────────────────────────────────────────────────┬───────────────┘
+      │ delegate_capsule / update_activity                   │
+┌─────┴────────────────────────────────────────────────┐   ┌─▼───────────────┐
+│                    User Client                       │   │                 │
+│  · Create capsule, payload AES-256-GCM encryption    │   │  Chainlink CRE  │
+│  · delegate to PER/ER, sign transactions             ├───►  (TEE Vault)    │
+└──────────────────────────────────────────────────────┘   │  Delivers Email │
+                                                           └─────────────────┘
 ```
-
-- **On-chain:** Capsule state, vault; execution is a normal program call once conditions are met.
-- **Off-chain (private):** Magicblock ER/PER runs the monitoring logic; only “conditions met → execute” is reflected on-chain via Magic Actions.
-
----
-
-## User Flow
-
-```
-Landing (/)
-  → Create Capsule (/create)
-      · Connect wallet
-      · Choose Token (SOL) or NFT intent
-      · Set beneficiaries, amounts, inactivity period (and optional delay)
-      · Sign create_capsule → SOL locked in vault, creation fee paid
-  → Dashboard (/dashboard)
-      · View capsules and recent events (Helius enhanced tx)
-      · Open capsule detail
-  → Capsule Detail (/capsules/[address])
-      · View status (Active / Expired / Executed)
-      · Delegate to PER (TEE) for private monitoring
-      · SOL price chart (CoinGecko), intent summary
-      · Link to Solana Explorer (Capsule ID)
-  → When inactive long enough
-      · Anyone (e.g. crank) calls execute_intent
-      · SOL transferred to beneficiaries; execution fee to platform
-```
-
----
-
-## Tech Stack
-
-- **Frontend:** Next.js 14, React, TypeScript, Tailwind CSS, GSAP
-- **Blockchain:** Solana Devnet
-- **Smart contract:** Anchor (Rust), deployed
-- **Wallet:** Solana Wallet Adapter (Phantom, Backpack, etc.)
-- **RPC:** Helius API
-- **Private execution:** Magicblock Ephemeral Rollups (ER/PER); TEE auth via `@magicblock-labs/ephemeral-rollups-sdk` (getAuthToken, getTeeConnection)
 
 ---
 
 ## Project Structure
 
 ```
-Heres_solana/
+Heres-Protocol/
 ├── app/                 # Next.js app (landing, create, capsules, dashboard)
-├── components/          # Navbar, Footer, AsciiCapsule, CapsuleMediaBlock
-├── config/              # Solana connection (getSolanaConnection, getProgramId)
-├── constants/           # Program ID, Magicblock ER/PER, storage keys
-├── lib/                 # solana.ts, helius.ts, program.ts, tee.ts
-├── heres_program/       # Anchor program (Rust) – source only
-├── idl/                 # heres_program.json
-├── types/               # IntentCapsule, Beneficiary, WalletActivity
-└── utils/               # intent encoding, validation
+├── components/          # Reusable UI components
+├── config/              # Solana & Helius connection configurations
+├── constants/           # Program ID, Magicblock endpoints, CRE variables
+├── heres-cre/           # Chainlink CRE Delivery Workflow scripts & config
+├── heres_program/       # Anchor program (Rust) smart contract
+├── idl/                 # heres_program.json IDL
+├── lib/                 # Core utilities (solana.ts, helius.ts, crank.ts, tee.ts)
+│   └── cre/             # CRE crypto, auth, and dispatch logic
+└── scripts/             # CRE testing & local environment scripts
 ```
 
 ---
@@ -209,7 +167,8 @@ Heres_solana/
 
 1. **Clone and install**
    ```bash
-   cd Heres_solana
+   git clone <repo>
+   cd Heres-Protocol
    npm install
    ```
 
@@ -218,114 +177,44 @@ Heres_solana/
    ```env
    NEXT_PUBLIC_SOLANA_NETWORK=devnet
    NEXT_PUBLIC_HELIUS_API_KEY=your_helius_api_key
-   NEXT_PUBLIC_PROGRAM_ID=BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms
+   NEXT_PUBLIC_PROGRAM_ID=AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW
+   NEXT_PUBLIC_BUFFER_SEED_PROGRAM_ID=AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW
+   NEXT_PUBLIC_BTC_DEVNET_MINT=<valid_devnet_btc_mint>
+   NEXT_PUBLIC_ETH_DEVNET_MINT=<valid_devnet_eth_mint>
+   
+   # Chainlink CRE Webhook settings
+   CHAINLINK_CRE_WEBHOOK_URL=<deployed_cre_http_endpoint>
    ```
+
+   `BTC` and `ETH` capsule flows require valid devnet SPL token mints. Validate them with:
+   ```bash
+   npm run validate:assets
+   ```
+   Use a separate dev program ID in `.env.local` so local development does not point at the production-facing deployment.
 
 3. **Run**
    ```bash
    npm run dev
    ```
-   Open [http://localhost:3000](http://localhost:3000).
 
-### Intent Statement Delivery + CRE local testing
-
-For local end-to-end testing (without a real Chainlink CRE URL), use the built-in mock CRE endpoint:
-
-1. Copy env template:
+4. **Local validator with separate dev contract**
    ```bash
-   cp .env.example .env.local
+   npm run validator:local
    ```
-2. Ensure this is set:
-   ```env
-   CHAINLINK_CRE_WEBHOOK_URL=http://127.0.0.1:3000/api/mock/cre
-   CHAINLINK_CRE_SIGNING_SECRET=dev-cre-signing-secret
-   CHAINLINK_CRE_CALLBACK_SECRET=dev-cre-callback-secret
-   MOCK_CRE_AUTO_CALLBACK=true
-   ```
-3. Start app:
-   ```bash
-   npm run dev
-   ```
-4. Create a capsule on `/create` with **Representative Email** and **Access Code**, then open capsule detail and click **Execute Intent**.
-5. Trigger CRE reconcile (cron/manual):
-   - `GET /api/cron/reconcile-cre-delivery` with `Authorization: Bearer <CRON_SECRET>`
-6. Check delivery status:
-   - UI: `Intent Statement Delivery` card on `/capsules/[address]`
-   - API: `GET /api/intent-delivery/status?...` now requires owner-signed request headers (recommended via UI flow)
+   This starts a local validator with the development program loaded at `AmiL7vEZ2SpAuDXzdxC3sJMyjZqgacvwvvQdT3qosmsW`, so local work does not point at the production-facing deployment.
 
-### CRE auto setup commands
+### Intent Statement Delivery (CRE Local Testing)
 
-You can configure CRE-related env vars automatically:
-
-1. Mock mode (local callback loop):
-   ```bash
-   npm run cre:setup:mock
-   ```
-
-2. Real CRE webhook mode:
-   ```bash
-   npm run cre:setup:real -- --webhook-url https://<your-cre-endpoint> --api-key <optional-api-key> --callback-secret <optional-callback-hmac-secret>
-   ```
-
-This updates `.env.local` with:
-- `CHAINLINK_CRE_WEBHOOK_URL`
-- `CHAINLINK_CRE_API_KEY`
-- `CHAINLINK_CRE_SIGNING_SECRET`
-- `CHAINLINK_CRE_CALLBACK_SECRET`
-- `CRE_DISPATCH_SECRET`
-- `CRE_STORE_PATH`
-- mock flags (`MOCK_CRE_*`)
-
-Notes:
-- If `--callback-secret` is omitted in real mode, `CHAINLINK_CRE_CALLBACK_SECRET` is left empty (callback signature verification disabled in app).
-
----
-
-## Deployed Program (Devnet)
-
-| Item | Value |
-|------|--------|
-| **Cluster** | https://api.devnet.solana.com |
-| **Program Id** | `BiAB1qZpx8kDgS5dJxKFdCJDNMagCn8xfj4afNhRZWms` |
-
-Set `NEXT_PUBLIC_PROGRAM_ID` in `.env.local` to this program id.
-
----
-
-## Automatic Execution (No Owner Signature)
-
-SOL is locked in the capsule **vault PDA** at creation. Once the inactivity period is satisfied, **anyone** may call `execute_intent`; **owner signature is not required**. A crank or bot can submit the transaction; the caller pays only tx fees.
-
----
-
-## Business Model
-
-- **Creation:** A one-time fee is charged when a capsule is created.
-- **Execution:** A percentage of the amount transferred at execution is taken as platform revenue.
-
----
-
-## Solana Program (Anchor) – Instruction Reference
-
-| Instruction | Description |
-|-------------|-------------|
-| **create_capsule** | Create capsule (owner, inactivity period, intent data); pays creation fee; locks SOL in vault. |
-| **update_intent** | Update intent data (owner only). |
-| **execute_intent** | Execute when inactivity period is met; pays execution fee; distributes from vault. |
-| **update_activity** | Refresh last activity timestamp (heartbeat). |
-| **deactivate_capsule** | Deactivate capsule (owner only). |
-| **delegate_capsule** | Delegate capsule PDA to Magicblock ER/PER (default: TEE validator). |
-| **undelegate_capsule** | Commit and undelegate from ER. |
-| **schedule_execute_intent** | Schedule crank (Magicblock ScheduleTask). |
-| **recreate_capsule** | Create a new capsule after one has been executed. |
-
----
-
-## Magicblock ER / PER (Devnet)
-
-- **Delegation program:** `DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh`
-- **Router:** `https://devnet-router.magicblock.app`
-- **TEE (PER):** Validator `FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA`; TEE RPC/docs in `constants/index.ts` (`MAGICBLOCK_ER`, `PER_TEE`).
+To test the CRE workflow callback locally:
+```bash
+npm run cre:setup:mock
+npm run dev
+```
+Create a capsule on `/create`, provide an *Intent Statement* + Representative email, then manually trigger the reconciliation endpoint:
+```http
+GET /api/cron/reconcile-cre-delivery
+```
+You can view the delivery status mapped on the capsule detail page!
 
 ---
 

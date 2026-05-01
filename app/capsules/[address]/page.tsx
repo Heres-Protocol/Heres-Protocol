@@ -8,6 +8,10 @@ import { useWallet } from '@solana/wallet-adapter-react'
 import { ArrowLeft, Copy, RefreshCw, Shield } from 'lucide-react'
 import {
   getCapsuleByAddress,
+  executeIntent,
+  distributeAssets,
+  undelegateCapsule,
+  registerCapsuleOwnerForAutomation,
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
@@ -15,6 +19,7 @@ import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
 import { parseIntentPayload, formatDuration } from '@/utils/intent'
 import { buildCreSignedMessage } from '@/utils/creAuth'
 import { bytesToBase64 } from '@/utils/creCrypto'
+import { inferAssetConfig } from '@/lib/assets'
 import {
   XAxis,
   YAxis,
@@ -24,9 +29,6 @@ import {
   Area,
   AreaChart,
 } from 'recharts'
-
-const COINGECKO_SOL_BASE = 'https://api.coingecko.com/api/v3/coins/solana/market_chart?vs_currency=usd&days='
-const COINGECKO_SOL_PRICE = 'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd'
 
 const CHART_RANGES = [
   { key: '6h', label: '6h', days: 1, hoursFilter: 6 },
@@ -52,6 +54,8 @@ type IntentParsed =
     type: 'token'
     intent?: string
     totalAmount?: string
+    assetSymbol?: string
+    assetMint?: string | null
     beneficiaries?: any[]
     inactivityDays?: number
     delayDays?: number
@@ -78,6 +82,8 @@ type IntentParsed =
     intent?: string
     nftMints?: string[]
     nftRecipients?: string[]
+    assetSymbol?: string
+    assetMint?: string | null
     inactivityDays?: number
     delayDays?: number
     cre?: {
@@ -123,6 +129,17 @@ function CopyButton({ value }: { value: string }) {
   )
 }
 
+function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [
+      owner.toBuffer(),
+      new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA').toBuffer(),
+      mint.toBuffer(),
+    ],
+    new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+  )[0]
+}
+
 function timeAgo(ms: number | null) {
   if (!ms) return '—'
   const diff = Math.max(0, Date.now() - ms)
@@ -156,8 +173,129 @@ export default function CapsuleDetailPage() {
   } | null>(null)
   const [creDeliveryLoading, setCreDeliveryLoading] = useState(false)
   const [creDeliveryError, setCreDeliveryError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [creDispatchLoading, setCreDispatchLoading] = useState(false)
+  const [creDispatchResult, setCreDispatchResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [distributionComplete, setDistributionComplete] = useState(false)
 
   const isOwner = Boolean(wallet.connected && wallet.publicKey && capsule?.owner && capsule.owner.equals(wallet.publicKey))
+
+  const handleExecuteIntent = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    setActionLoading('execute')
+    setActionResult(null)
+    try {
+      const beneficiaries = intentParsed?.type === 'token' && 'beneficiaries' in intentParsed && intentParsed.beneficiaries
+        ? intentParsed.beneficiaries.filter((b: any) => b.address?.trim()).map((b: any) => ({
+            chain: b.chain ?? 'solana',
+            address: b.address,
+            amount: b.amount,
+            amountType: b.amountType,
+          }))
+        : undefined
+      const mint = capsule.mint && !capsule.mint.equals(PublicKey.default) ? capsule.mint : undefined
+      const tx = await executeIntent(wallet as any, capsule.owner, beneficiaries, mint)
+      setActionResult({ type: 'success', message: `Execute Intent TX: ${tx}` })
+    } catch (err: any) {
+      console.error('[Execute Intent] Error:', err)
+      setActionResult({ type: 'error', message: err.message || 'Execute failed' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDistributeAssets = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    setActionLoading('distribute')
+    setActionResult(null)
+    try {
+      const beneficiaries = intentParsed?.type === 'token' && 'beneficiaries' in intentParsed && intentParsed.beneficiaries
+        ? intentParsed.beneficiaries.filter((b: any) => b.address?.trim()).map((b: any) => ({
+            chain: b.chain ?? 'solana',
+            address: b.address,
+            amount: b.amount,
+            amountType: b.amountType,
+          }))
+        : undefined
+      const mint = capsule.mint && !capsule.mint.equals(PublicKey.default) ? capsule.mint : undefined
+      const tx = await distributeAssets(wallet as any, capsule.owner, beneficiaries, mint)
+      setDistributionComplete(true)
+      setActionResult({ type: 'success', message: `Distribute Assets TX: ${tx}` })
+    } catch (err: any) {
+      console.error('[Distribute Assets] Error:', err)
+      setActionResult({ type: 'error', message: err.message || 'Distribution failed' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleUndelegate = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    setActionLoading('undelegate')
+    setActionResult(null)
+    try {
+      const tx = await undelegateCapsule(wallet as any, capsule.owner)
+      const refreshed = await getCapsuleByAddress(new PublicKey(capsule.capsuleAddress))
+      setCapsule(refreshed)
+      setActionResult({ type: 'success', message: `Undelegate TX: ${tx}` })
+    } catch (err: any) {
+      console.error('[Undelegate] Error:', err)
+      setActionResult({ type: 'error', message: err.message || 'Undelegation failed' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleRefreshAutomation = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule) return
+    setActionLoading('automation')
+    setActionResult(null)
+    try {
+      await registerCapsuleOwnerForAutomation(capsule.owner.toBase58())
+      setActionResult({
+        type: 'success',
+        message: 'Automation registry refreshed. The next external cron run should be able to discover this capsule.',
+      })
+    } catch (err: any) {
+      console.error('[Automation Refresh] Error:', err)
+      setActionResult({
+        type: 'error',
+        message: err.message || 'Failed to refresh automation registry',
+      })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleCreDispatch = async () => {
+    if (!wallet.connected || !wallet.publicKey || !capsule || !wallet.signMessage) return
+    setCreDispatchLoading(true)
+    setCreDispatchResult(null)
+    try {
+      const owner = wallet.publicKey.toBase58()
+      const timestamp = Date.now()
+      const message = buildCreSignedMessage({
+        action: 'dispatch',
+        owner,
+        capsuleAddress: capsule.capsuleAddress,
+        timestamp,
+      })
+      const signature = bytesToBase64(await wallet.signMessage(new TextEncoder().encode(message)))
+      const res = await fetch('/api/intent-delivery/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-cre-signature': signature },
+        body: JSON.stringify({ capsule: capsule.capsuleAddress, owner, timestamp }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'CRE dispatch failed')
+      setCreDispatchResult({ type: 'success', message: `Intent Statement delivery dispatched (${data.status || 'queued'})` })
+    } catch (err: any) {
+      setCreDispatchResult({ type: 'error', message: err.message || 'CRE dispatch failed' })
+    } finally {
+      setCreDispatchLoading(false)
+    }
+  }
 
   const intentParsed = useMemo(() => {
     if (!capsule?.intentData) return null
@@ -166,6 +304,9 @@ export default function CapsuleDetailPage() {
 
   const isNft = intentParsed?.type === 'nft'
   const isToken = intentParsed?.type === 'token'
+  const assetConfig = inferAssetConfig(intentParsed ?? undefined, capsule?.mint)
+  const priceChartBaseUrl = `https://api.coingecko.com/api/v3/coins/${assetConfig.coingeckoId}/market_chart?vs_currency=usd&days=`
+  const priceLookupUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${assetConfig.coingeckoId}&vs_currencies=usd`
   const creConfig = intentParsed?.cre ?? intentParsed?.premium
   const isCreEnabled = Boolean(
     creConfig?.enabled &&
@@ -202,6 +343,52 @@ export default function CapsuleDetailPage() {
     }
     return () => { cancelled = true }
   }, [address])
+
+  useEffect(() => {
+    if (!capsule?.owner || !capsule.executedAt) {
+      setDistributionComplete(false)
+      return
+    }
+
+    const isDelegated = capsule.accountOwner?.equals?.(new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)) ?? false
+    if (isDelegated) {
+      setDistributionComplete(false)
+      return
+    }
+
+    let cancelled = false
+
+    ; (async () => {
+      try {
+        const connection = getSolanaConnection()
+        const [vaultPDA] = getCapsuleVaultPDA(capsule.owner)
+        const isNativeSol = !capsule.mint || capsule.mint.equals(PublicKey.default)
+        let distributed = false
+        if (isNativeSol) {
+          const [vaultInfo, rentExemptLamports] = await Promise.all([
+            connection.getAccountInfo(vaultPDA),
+            connection.getMinimumBalanceForRentExemption(9),
+          ])
+          const spendableLamports = Math.max(0, (vaultInfo?.lamports || 0) - rentExemptLamports)
+          distributed = spendableLamports === 0
+        } else {
+          const mint = capsule.mint as PublicKey
+          const vaultAta = getAssociatedTokenAddress(mint, vaultPDA)
+          const ataInfo = await connection.getTokenAccountBalance(vaultAta).catch(() => null)
+          distributed = !ataInfo || Number(ataInfo.value.amount || '0') === 0
+        }
+        if (!cancelled) {
+          setDistributionComplete(distributed)
+        }
+      } catch {
+        if (!cancelled) {
+          setDistributionComplete(false)
+        }
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [capsule?.owner, capsule?.executedAt, capsule?.mint, capsule?.accountOwner])
 
   useEffect(() => {
     if (
@@ -294,7 +481,7 @@ export default function CapsuleDetailPage() {
     return () => { cancelled = true }
   }, [capsule?.capsuleAddress, isCreEnabled, wallet.connected, wallet.publicKey, wallet.signMessage, isOwner])
 
-  // Token: SOL price chart from CoinGecko (with range filter)
+  // Token price chart from CoinGecko (with range filter)
   const rangeConfig = useMemo(() => CHART_RANGES.find((r) => r.key === chartRange) ?? CHART_RANGES[2], [chartRange])
   useEffect(() => {
     if (!isToken && !isNft) {
@@ -302,7 +489,7 @@ export default function CapsuleDetailPage() {
       return
     }
     setChartLoading(true)
-    const url = `${COINGECKO_SOL_BASE}${rangeConfig.days}`
+    const url = `${priceChartBaseUrl}${rangeConfig.days}`
     fetch(url)
       .then((res) => res.json())
       .then((data: { prices?: [number, number][] }) => {
@@ -320,16 +507,16 @@ export default function CapsuleDetailPage() {
       })
       .catch(() => setChartData([]))
       .finally(() => setChartLoading(false))
-  }, [isToken, isNft, chartRange, rangeConfig.days, rangeConfig.hoursFilter, rangeConfig.key])
+  }, [isToken, isNft, priceChartBaseUrl, chartRange, rangeConfig.days, rangeConfig.hoursFilter, rangeConfig.key])
 
-  // Current SOL price (live) and polling
+  // Current asset price (live) and polling
   useEffect(() => {
     if (!isToken && !isNft) return
     const fetchPrice = () => {
-      fetch(COINGECKO_SOL_PRICE)
+      fetch(priceLookupUrl)
         .then((res) => res.json())
-        .then((data: { solana?: { usd?: number } }) => {
-          const usd = data?.solana?.usd
+        .then((data: Record<string, { usd?: number }>) => {
+          const usd = data?.[assetConfig.coingeckoId]?.usd
           if (typeof usd === 'number' && usd > 0) setCurrentSolPrice(usd)
         })
         .catch(() => { })
@@ -337,7 +524,7 @@ export default function CapsuleDetailPage() {
     fetchPrice()
     const interval = setInterval(fetchPrice, 120_000)
     return () => clearInterval(interval)
-  }, [isToken, isNft])
+  }, [assetConfig.coingeckoId, isToken, isNft, priceLookupUrl])
 
   // Keep ref in sync for animation start value
   displayedPriceRef.current = displayedSolPrice
@@ -384,11 +571,11 @@ export default function CapsuleDetailPage() {
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-red-400 mb-6">{error || 'Capsule not found'}</p>
           <Link
-            href="/dashboard"
+            href="/capsules"
             className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-card/80 px-4 py-2 text-Heres-white hover:border-Heres-accent/40"
           >
             <ArrowLeft className="h-4 w-4" />
-            Dashboard
+            My Capsules
           </Link>
         </div>
       </div>
@@ -402,6 +589,7 @@ export default function CapsuleDetailPage() {
       : capsule.lastActivity + capsule.inactivityPeriod < Math.floor(Date.now() / 1000)
         ? 'Expired'
         : 'Active'
+  const isDelegated = capsule.accountOwner?.equals?.(new PublicKey(MAGICBLOCK_ER.DELEGATION_PROGRAM_ID)) ?? false
   const lastUpdatedMs = capsule.lastActivity ? capsule.lastActivity * 1000 : null
 
   return (
@@ -409,11 +597,11 @@ export default function CapsuleDetailPage() {
       <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <Link
-            href="/dashboard"
+            href="/capsules"
             className="inline-flex items-center gap-2 text-sm text-Heres-muted hover:text-Heres-accent mb-6"
           >
             <ArrowLeft className="h-4 w-4" />
-            Dashboard
+            My Capsules
           </Link>
 
           {/* Graph Explorer style: header card */}
@@ -441,13 +629,18 @@ export default function CapsuleDetailPage() {
                 >
                   {status}
                 </span>
+                {isDelegated && (
+                  <span className="rounded-lg px-2.5 py-1 text-xs font-medium bg-blue-500/20 text-blue-400">
+                    Delegated (PER)
+                  </span>
+                )}
               </div>
               <p className="text-sm text-Heres-muted">
                 Updated {timeAgo(lastUpdatedMs)}
               </p>
             </div>
             <p className="mt-3 text-sm text-Heres-muted max-w-xl">
-              {isNft ? 'NFT capsule' : 'Token (SOL) capsule'} · Inactivity period:{' '}
+              {isNft ? 'NFT capsule' : `Token (${assetConfig.symbol}) capsule`} · Inactivity period:{' '}
               {formatDuration(capsule.inactivityPeriod)}
             </p>
           </section>
@@ -539,10 +732,10 @@ export default function CapsuleDetailPage() {
               <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Validator address</p>
                 <div className="flex items-center gap-1">
-                  <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={MAGICBLOCK_ER.VALIDATOR_TEE}>
-                    {maskAddress(MAGICBLOCK_ER.VALIDATOR_TEE)}
+                  <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={MAGICBLOCK_ER.ACTIVE_VALIDATOR}>
+                    {maskAddress(MAGICBLOCK_ER.ACTIVE_VALIDATOR)}
                   </p>
-                  <CopyButton value={MAGICBLOCK_ER.VALIDATOR_TEE} />
+                  <CopyButton value={MAGICBLOCK_ER.ACTIVE_VALIDATOR} />
                 </div>
               </div>
               <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
@@ -572,7 +765,7 @@ export default function CapsuleDetailPage() {
             </p>
             {isToken && intentParsed && 'totalAmount' in intentParsed && intentParsed.totalAmount && (
               <p className="text-sm text-Heres-accent">
-                Total amount: {intentParsed.totalAmount} SOL
+                Total amount: {intentParsed.totalAmount} {assetConfig.symbol}
               </p>
             )}
             {isNft && intentParsed && 'nftMints' in intentParsed && intentParsed.nftMints && (
@@ -627,23 +820,204 @@ export default function CapsuleDetailPage() {
             </section>
           )}
 
+          {/* Actions — status-based flow */}
+          {isOwner && (() => {
+            const isExecuted = status === 'Executed' || (!capsule.isActive && capsule.executedAt)
+            const isExpired = status === 'Expired'
+            const isActive = status === 'Active'
+            const isCreDelivered = creDeliveryStatus?.status === 'delivered'
+            const isDistributed = Boolean(isExecuted && distributionComplete)
+            const canExecute = isExpired && !isExecuted
+            const canUndelegate = Boolean(isDelegated)
+            const canDistribute = Boolean(isExecuted && !isDelegated && !isDistributed)
+            const canDispatchCre = Boolean(isExecuted && isDistributed && isCreEnabled && !isCreDelivered)
+            const canRefreshAutomation = Boolean((isExpired || isActive) && !isExecuted)
+
+            const steps = [
+              { num: 1, label: 'Execute Intent', desc: 'Deactivate capsule when inactivity condition met' },
+              { num: 2, label: 'Distribute Assets', desc: `Transfer ${assetConfig.symbol}/tokens to beneficiaries` },
+              ...(isCreEnabled ? [{ num: 3, label: 'Deliver Intent Statement', desc: 'Dispatch encrypted intent via CRE' }] : []),
+            ]
+            const allDone = Boolean(isExecuted && isDistributed && (!isCreEnabled || isCreDelivered))
+
+            // Determine current step (1-based)
+            const currentStep = allDone ? steps.length + 1 : canDispatchCre ? 3 : isExecuted ? 2 : canExecute ? 1 : 0
+
+            return (
+              <section className="card-Heres p-6 mb-6 border-amber-500/30">
+                <h2 className="text-lg font-semibold text-Heres-white mb-2">Actions</h2>
+
+                {/* Status guidance */}
+                <div className="rounded-lg border border-Heres-border/50 bg-Heres-surface/30 p-3 mb-5">
+                  {isActive && (
+                    <p className="text-sm text-Heres-muted">
+                      Capsule is <span className="text-Heres-accent font-medium">Active</span>. The inactivity period has not elapsed yet. Actions will become available once the capsule expires.
+                    </p>
+                  )}
+                  {canExecute && (
+                    <p className="text-sm text-amber-400">
+                      Inactivity period has elapsed. You can now <strong>Execute Intent</strong> to deactivate the capsule, then distribute assets.
+                    </p>
+                  )}
+                  {isExpired && !isExecuted && (
+                    <p className="mt-2 text-sm text-blue-400">
+                      If external automation missed this capsule, use <strong>Refresh Automation</strong> to re-register it for the crank without creating a new capsule.
+                    </p>
+                  )}
+                  {isExecuted && isDelegated && (
+                    <p className="text-sm text-blue-400">
+                      Capsule executed on ER. <strong>Undelegate from ER</strong> first, then distribute assets on the base layer.
+                    </p>
+                  )}
+                  {isDistributed && isCreEnabled && !isCreDelivered && (
+                    <p className="text-sm text-Heres-accent">
+                      Assets already reached the beneficiary. Proceed to <strong>Deliver Intent Statement</strong> via CRE.
+                    </p>
+                  )}
+                  {isExecuted && !isDistributed && !allDone && !isDelegated && (
+                    <p className="text-sm text-Heres-accent">
+                      Capsule executed. Proceed to <strong>Distribute Assets</strong>{isCreEnabled ? ' and then dispatch Intent Statement delivery via CRE.' : '.'}
+                    </p>
+                  )}
+                  {allDone && (
+                    <p className="text-sm text-green-400">
+                      {isCreEnabled
+                        ? 'All steps complete. Assets distributed and intent statement delivered.'
+                        : 'All steps complete. Assets distributed to the beneficiary.'}
+                    </p>
+                  )}
+                  {status === 'Waiting' && (
+                    <p className="text-sm text-Heres-purple">
+                      Capsule is in <span className="font-medium">Waiting</span> state. No actions available.
+                    </p>
+                  )}
+                </div>
+
+                {/* Step indicator */}
+                <div className="flex items-center gap-2 mb-5 overflow-x-auto">
+                  {steps.map((step, i) => {
+                    const done = step.num < currentStep || (step.num === 3 && allDone)
+                    const active = step.num === currentStep || (step.num === 2 && currentStep === 2) || (step.num === 3 && currentStep >= 2 && !allDone)
+                    return (
+                      <div key={step.num} className="flex items-center gap-2">
+                        {i > 0 && <div className={`w-8 h-px ${done ? 'bg-green-500' : 'bg-Heres-border'}`} />}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                            done ? 'bg-green-500/20 text-green-400 border border-green-500/40' :
+                            active ? 'bg-Heres-accent/20 text-Heres-accent border border-Heres-accent/40' :
+                            'bg-Heres-surface/50 text-Heres-muted border border-Heres-border'
+                          }`}>
+                            {done ? '✓' : step.num}
+                          </div>
+                          <div>
+                            <p className={`text-xs font-medium ${done ? 'text-green-400' : active ? 'text-Heres-white' : 'text-Heres-muted'}`}>
+                              {step.label}
+                            </p>
+                            <p className="text-[10px] text-Heres-muted hidden sm:block">{step.desc}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleExecuteIntent}
+                    disabled={!canExecute || !!actionLoading}
+                    title={!canExecute ? (isActive ? 'Inactivity period not elapsed' : isExecuted ? 'Already executed' : 'Not available') : 'Execute intent on-chain'}
+                    className="rounded-lg border border-Heres-accent px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-Heres-accent/10 text-Heres-accent hover:bg-Heres-accent/20"
+                  >
+                    {actionLoading === 'execute' ? 'Executing...' : isExecuted ? 'Executed ✓' : 'Execute Intent'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDistributeAssets}
+                    disabled={!canDistribute || !!actionLoading}
+                    title={
+                      !canDistribute
+                        ? isDelegated
+                          ? 'Undelegate from ER first'
+                          : 'Execute intent first'
+                        : `Distribute ${assetConfig.symbol}/tokens to beneficiaries`
+                    }
+                    className="rounded-lg border border-Heres-purple px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-Heres-purple/10 text-Heres-purple hover:bg-Heres-purple/20"
+                  >
+                    {actionLoading === 'distribute' ? 'Distributing...' : 'Distribute Assets'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRefreshAutomation}
+                    disabled={!canRefreshAutomation || !!actionLoading}
+                    title={!canRefreshAutomation ? 'Only pending capsules can be re-registered for automation' : 'Re-register this capsule for external crank discovery'}
+                    className="rounded-lg border border-cyan-500 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
+                  >
+                    {actionLoading === 'automation' ? 'Refreshing...' : 'Refresh Automation'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUndelegate}
+                    disabled={!canUndelegate || !!actionLoading}
+                    title={!canUndelegate ? 'Capsule is already on base layer' : 'Commit ER state and undelegate back to Solana base layer'}
+                    className="rounded-lg border border-blue-500 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                  >
+                    {actionLoading === 'undelegate' ? 'Undelegating...' : 'Undelegate from ER'}
+                  </button>
+                  {isCreEnabled && (
+                    <button
+                      type="button"
+                      onClick={handleCreDispatch}
+                      disabled={!canDispatchCre || creDispatchLoading || !!actionLoading}
+                      title={!canDispatchCre ? 'Execute intent first' : 'Dispatch encrypted intent statement via CRE'}
+                      className="rounded-lg border border-blue-500 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                    >
+                      {creDispatchLoading ? 'Dispatching...' : 'Deliver Intent Statement'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Result messages */}
+                {actionResult && (
+                  <div className={`mt-4 rounded-lg border p-3 text-sm break-all ${
+                    actionResult.type === 'success'
+                      ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                      : 'border-red-500/30 bg-red-500/10 text-red-400'
+                  }`}>
+                    {actionResult.message}
+                  </div>
+                )}
+                {creDispatchResult && (
+                  <div className={`mt-3 rounded-lg border p-3 text-sm break-all ${
+                    creDispatchResult.type === 'success'
+                      ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                      : 'border-red-500/30 bg-red-500/10 text-red-400'
+                  }`}>
+                    {creDispatchResult.message}
+                  </div>
+                )}
+              </section>
+            )
+          })()}
+
           {/* Price / Value chart (Graph Explorer style) */}
           <section className="card-Heres p-6 mb-6">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-lg font-semibold text-Heres-white">
-                  {isToken ? 'SOL Price (USD)' : 'NFT Value (SOL / USD proxy)'}
+                  {isToken ? `${assetConfig.symbol} Price (USD)` : `NFT Value (${assetConfig.symbol} / USD proxy)`}
                 </h2>
                 <p className="text-sm text-Heres-muted mt-1">
                   {isToken
-                    ? 'Real-time SOL price (CoinGecko).'
-                    : 'Representative value trend (SOL/USD) for reference.'}
+                    ? `Real-time ${assetConfig.symbol} price (CoinGecko).`
+                    : `Representative value trend (${assetConfig.symbol}/USD) for reference.`}
                 </p>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 {isToken && (
                   <div className="rounded-lg border border-Heres-border/80 bg-Heres-card/80 px-2.5 py-1.5 flex items-center gap-2">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">1 SOL</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-Heres-muted">1 {assetConfig.symbol}</span>
                     <span className="text-sm font-semibold tabular-nums text-Heres-accent">${displayedSolPrice.toFixed(2)}</span>
                     <span className="text-[10px] text-Heres-muted">USD</span>
                   </div>
@@ -681,11 +1055,11 @@ export default function CapsuleDetailPage() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.3)" />
-                    <YAxis domain={[90, 'auto']} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.3)" tickFormatter={(v) => `$${v}`} />
+                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.3)" tickFormatter={(v) => `$${v}`} />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'var(--Heres-card)', border: '1px solid var(--Heres-border)' }}
                       labelStyle={{ color: 'var(--Heres-white)' }}
-                      formatter={(value: number | undefined) => [value != null ? `$${Number(value).toFixed(2)}` : '$0.00', 'USD']}
+                      formatter={(value) => [value != null && !Array.isArray(value) ? '$' + Number(value).toFixed(2) : '$0.00', 'USD']}
                     />
                     <Area
                       type="monotone"

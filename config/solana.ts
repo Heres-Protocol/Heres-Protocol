@@ -6,6 +6,7 @@ import { Connection, PublicKey } from '@solana/web3.js'
 import { SOLANA_CONFIG, HELIUS_CONFIG, PER_TEE, MAGICBLOCK_ER } from '@/constants'
 
 let cachedConnection: Connection | null = null
+let cachedFallbackConnection: Connection | null = null
 
 /**
  * Get Solana connection with Helius RPC (Base Layer).
@@ -20,6 +21,17 @@ export function getSolanaConnection(): Connection {
     wsEndpoint: HELIUS_CONFIG.RPC_URL.replace('https', 'wss'),
   })
   return cachedConnection
+}
+
+export function getSolanaFallbackConnection(): Connection {
+  if (cachedFallbackConnection) return cachedFallbackConnection
+
+  const rpcUrl = HELIUS_CONFIG.RPC_URL_ALT
+  cachedFallbackConnection = new Connection(rpcUrl, {
+    commitment: 'confirmed',
+    wsEndpoint: HELIUS_CONFIG.RPC_URL_ALT.replace('https', 'wss'),
+  })
+  return cachedFallbackConnection
 }
 
 /**
