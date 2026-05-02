@@ -11,6 +11,8 @@ declare namespace NodeJS {
     NEXT_PUBLIC_PROGRAM_ID?: string
     NEXT_PUBLIC_BUFFER_SEED_PROGRAM_ID?: string
     NEXT_PUBLIC_PLATFORM_FEE_RECIPIENT?: string
+    NEXT_PUBLIC_BTC_MINT?: string
+    NEXT_PUBLIC_ETH_MINT?: string
     NEXT_PUBLIC_BTC_DEVNET_MINT?: string
     NEXT_PUBLIC_ETH_DEVNET_MINT?: string
     APP_BASE_URL?: string

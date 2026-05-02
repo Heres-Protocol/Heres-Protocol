@@ -15,7 +15,15 @@ import Link from 'next/link'
 import { createCapsule, getCapsule, delegateCapsule, scheduleExecuteIntent, registerCapsuleOwnerForAutomation } from '@/lib/solana'
 import { getCapsulePDA, getCapsuleVaultPDA } from '@/lib/program'
 import { Beneficiary } from '@/types'
-import { DEFAULT_VALUES, STORAGE_KEYS, SOLANA_CONFIG, PLATFORM_FEE, MAGICBLOCK_ER, MAX_CAPSULE_MODIFICATIONS } from '@/constants'
+import {
+  DEFAULT_VALUES,
+  STORAGE_KEYS,
+  SOLANA_CONFIG,
+  PLATFORM_FEE,
+  MAGICBLOCK_ER,
+  MAX_CAPSULE_MODIFICATIONS,
+  getAssetMintEnvKey,
+} from '@/constants'
 import { encodeIntentData, daysToSeconds } from '@/utils/intent'
 import { getAssetConfig, getAssetMintPublicKey, isAssetConfigured, SUPPORTED_TOKEN_ASSETS, SupportedAssetSymbol } from '@/lib/assets'
 import { buildCreSignedMessage } from '@/utils/creAuth'
@@ -289,7 +297,7 @@ export default function CreatePage() {
 
   const validateBeneficiaries = (): boolean => {
     if (!tokenAssetReady) {
-      alert(`${selectedTokenAsset} devnet mint is not configured. Set NEXT_PUBLIC_${selectedTokenAsset}_DEVNET_MINT first.`)
+      alert(`${selectedTokenAsset} mint is not configured. Set ${getAssetMintEnvKey(selectedTokenAsset)} first.`)
       return false
     }
 
@@ -576,9 +584,9 @@ export default function CreatePage() {
 
       let delegatedToEr = false
 
-      // ===== Step 2: Delegate to ER (Asia devnet) =====
+      // ===== Step 2: Delegate to ER =====
       setCurrentStep('Delegating to ER...')
-      console.log('[Step 2/3] Delegating capsule to Asia ER validator...')
+      console.log('[Step 2/3] Delegating capsule to active ER validator...')
       for (let attempt = 0; attempt < 2 && !delegatedToEr; attempt++) {
         try {
           const delegateTx = await delegateCapsule(wallet as any, new PublicKey(MAGICBLOCK_ER.ACTIVE_VALIDATOR))
@@ -618,7 +626,7 @@ export default function CreatePage() {
       // ===== Step 3: Schedule Crank on ER =====
       if (delegatedToEr && erSynced && publicKey) {
         setCurrentStep('Scheduling crank...')
-        console.log('[Step 3/3] Scheduling crank on ER (Asia devnet)...')
+        console.log('[Step 3/3] Scheduling crank on ER...')
         let scheduled = false
         for (let attempt = 0; attempt < 3 && !scheduled; attempt++) {
           try {
@@ -897,7 +905,7 @@ export default function CreatePage() {
                   </div>
                   {!tokenAssetReady && (
                     <p className="mb-4 text-xs text-amber-300">
-                      {selectedTokenAsset} requires <code className="font-mono">{`NEXT_PUBLIC_${selectedTokenAsset}_DEVNET_MINT`}</code> to be set to a valid devnet token mint.
+                      {selectedTokenAsset} requires <code className="font-mono">{getAssetMintEnvKey(selectedTokenAsset)}</code> to be set to a valid token mint for the active network.
                     </p>
                   )}
                   <label className="block text-sm text-Heres-muted mb-2">Total Amount ({tokenAssetUnit})</label>

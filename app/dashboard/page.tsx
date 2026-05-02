@@ -16,7 +16,7 @@ import {
 import { Connection, PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
-import { SOLANA_CONFIG, PLATFORM_FEE, HELIUS_CONFIG } from '@/constants'
+import { SOLANA_CONFIG, PLATFORM_FEE, HELIUS_CONFIG, getExplorerUrl, getNetworkDisplayLabel } from '@/constants'
 import { getEnhancedTransactions } from '@/lib/helius'
 import { initFeeConfig } from '@/lib/solana'
 import { getFeeConfigPDA } from '@/lib/program'
@@ -498,7 +498,7 @@ export default function DashboardPage() {
           if (e?.message?.includes('403') || e?.message?.includes('Forbidden') || e?.message?.includes('Bad request')) {
             console.log('Detection of 403/Forbidden. Retrying with fallback RPC...')
             try {
-              const fallbackConnection = new Connection(HELIUS_CONFIG.RPC_URL_DEVNET, 'confirmed')
+              const fallbackConnection = new Connection(HELIUS_CONFIG.PUBLIC_RPC_URL, 'confirmed')
               accounts = await fallbackConnection.getProgramAccounts(programId, {
                 commitment: 'confirmed',
               })
@@ -816,7 +816,7 @@ export default function DashboardPage() {
   ]
 
   const programIdStr = SOLANA_CONFIG.PROGRAM_ID
-  const rpcLabel = SOLANA_CONFIG.HELIUS_API_KEY ? 'Helius Devnet' : 'Solana Devnet'
+  const rpcLabel = SOLANA_CONFIG.HELIUS_API_KEY ? `Helius ${SOLANA_CONFIG.NETWORK}` : getNetworkDisplayLabel()
 
   return (
     <div className="min-h-screen bg-hero text-Heres-white">
@@ -862,7 +862,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="mt-3 text-sm text-Heres-muted max-w-xl">
-              Track capsule status, PER (TEE) execution, and verification on Solana Devnet.
+              Track capsule status, PER (TEE) execution, and verification on the active Solana cluster.
             </p>
           </section>
 
@@ -894,7 +894,7 @@ export default function DashboardPage() {
                 <p className="mt-3 text-sm text-Heres-accent">
                   ?깃났:{' '}
                   <a
-                    href={`https://explorer.solana.com/tx/${initFeeTx}?cluster=devnet`}
+                    href={getExplorerUrl('tx', initFeeTx)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline"
@@ -914,7 +914,7 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Network</p>
               <p className="text-sm font-medium text-Heres-white truncate">
-                {SOLANA_CONFIG.NETWORK ? `Solana ${SOLANA_CONFIG.NETWORK}` : 'Solana Devnet'}
+                {getNetworkDisplayLabel()}
               </p>
             </div>
             <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">

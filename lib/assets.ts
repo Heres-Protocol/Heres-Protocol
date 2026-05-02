@@ -1,4 +1,5 @@
 import { PublicKey } from '@solana/web3.js'
+import { getAssetMintFromEnv } from '../constants/index.ts'
 
 export type SupportedAssetSymbol = 'SOL' | 'BTC' | 'ETH'
 
@@ -38,7 +39,7 @@ export const ASSET_REGISTRY: Record<SupportedAssetSymbol, AssetConfig> = {
   BTC: {
     symbol: 'BTC',
     label: 'Bitcoin',
-    mint: normalizeMint(process.env.NEXT_PUBLIC_BTC_DEVNET_MINT),
+    mint: normalizeMint(getAssetMintFromEnv('BTC')),
     decimals: 8,
     coingeckoId: 'bitcoin',
     isNative: false,
@@ -46,7 +47,7 @@ export const ASSET_REGISTRY: Record<SupportedAssetSymbol, AssetConfig> = {
   ETH: {
     symbol: 'ETH',
     label: 'Ethereum',
-    mint: normalizeMint(process.env.NEXT_PUBLIC_ETH_DEVNET_MINT),
+    mint: normalizeMint(getAssetMintFromEnv('ETH')),
     decimals: 8,
     coingeckoId: 'ethereum',
     isNative: false,

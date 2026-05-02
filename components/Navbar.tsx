@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Menu, User, X, ChevronDown } from 'lucide-react'
+import { SOLANA_CONFIG, getNetworkDisplayLabel } from '@/constants'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
 const WalletMultiButton = dynamic(
@@ -23,14 +24,16 @@ const navLinks = [
 const NETWORKS = [
   { id: 'devnet', label: 'Solana Devnet' },
   { id: 'testnet', label: 'Solana Testnet' },
-  { id: 'mainnet', label: 'Solana Mainnet' },
+  { id: 'mainnet-beta', label: 'Solana Mainnet' },
 ] as const
 
 export function Navbar() {
   const pathname = usePathname()
   const [networkOpen, setNetworkOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [selectedNetwork, setSelectedNetwork] = useState<(typeof NETWORKS)[number]>(NETWORKS[0])
+  const [selectedNetwork, setSelectedNetwork] = useState<(typeof NETWORKS)[number]>(
+    NETWORKS.find((network) => network.id === SOLANA_CONFIG.NETWORK) ?? NETWORKS[0]
+  )
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -92,7 +95,7 @@ export function Navbar() {
               aria-haspopup="listbox"
               aria-label="Select network"
             >
-              <span className="text-Heres-accent">Solana</span>
+              <span className="text-Heres-accent">{getNetworkDisplayLabel(selectedNetwork.id)}</span>
               <ChevronDown className={`h-4 w-4 text-Heres-muted transition-transform ${networkOpen ? 'rotate-180' : ''}`} />
             </button>
             {networkOpen && (

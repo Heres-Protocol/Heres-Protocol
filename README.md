@@ -163,6 +163,12 @@ Heres-Protocol/
 
 ---
 
+## Operational Readiness
+
+- Production transition checklist: [docs/production-readiness.md](docs/production-readiness.md)
+
+---
+
 ## Getting Started
 
 1. **Clone and install**

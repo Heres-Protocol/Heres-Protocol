@@ -15,7 +15,7 @@ import {
 } from '@/lib/solana'
 import { getCapsuleVaultPDA } from '@/lib/program'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
-import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE } from '@/constants'
+import { SOLANA_CONFIG, MAGICBLOCK_ER, PER_TEE, getExplorerUrl, getNetworkDisplayLabel } from '@/constants'
 import { parseIntentPayload, formatDuration } from '@/utils/intent'
 import { buildCreSignedMessage } from '@/utils/creAuth'
 import { bytesToBase64 } from '@/utils/creCrypto'
@@ -650,14 +650,14 @@ export default function CapsuleDetailPage() {
             <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Network</p>
               <p className="text-sm font-medium text-Heres-white">
-                Solana {SOLANA_CONFIG.NETWORK || 'devnet'}
+                {getNetworkDisplayLabel()}
               </p>
             </div>
             <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Capsule ID</p>
               <div className="flex items-center gap-1">
                 <a
-                  href={`https://explorer.solana.com/address/${capsule.capsuleAddress}?cluster=${SOLANA_CONFIG.NETWORK || 'devnet'}`}
+                  href={getExplorerUrl('address', capsule.capsuleAddress)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm font-mono text-Heres-accent truncate min-w-0 hover:underline"

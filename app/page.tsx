@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { useRef, useEffect, useState } from 'react'
+import { getNetworkDisplayLabel } from '@/constants'
 
 const AsciiCapsule = dynamic(() => import('@/components/AsciiCapsule').then((m) => ({ default: m.AsciiCapsule })), {
   ssr: false,
@@ -340,7 +341,7 @@ export default function HomePage() {
             <div ref={whyVisualMainRef} className="relative w-full md:min-w-0 md:flex-1 lg:max-w-[900px]">
               <div className="why-build-flow-wrap relative flex flex-col md:flex-row md:items-stretch md:gap-0 md:pl-2 md:pr-4">
                 <div className="relative mt-4 flex w-full flex-col items-center text-white md:mt-0 md:w-full md:scale-100">
-                  {/* 1. Solana Devnet */}
+                  {/* 1. Solana settlement */}
                   <div
                     className="z-10 flex w-full justify-center"
                     style={{ opacity: activeWhyIndex >= 0 ? 1 : 0.4, transform: activeWhyIndex >= 0 ? 'scale(1)' : 'scale(0.98)', transition: 'opacity 0.3s, transform 0.3s' }}
@@ -348,7 +349,7 @@ export default function HomePage() {
                     <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm p-3 text-center md:p-4 w-[164px]">
                       <div className="flex items-center justify-center gap-2 font-display text-sm md:text-base text-white whitespace-nowrap uppercase tracking-wide">
                         <Image src="/logos/solana.svg" alt="Solana" width={24} height={24} className="shrink-0" unoptimized />
-                        <span>Solana Devnet</span>
+                        <span>{getNetworkDisplayLabel()}</span>
                       </div>
                     </div>
                   </div>
@@ -482,7 +483,7 @@ export default function HomePage() {
                 <h3 className="font-display text-xl font-bold uppercase tracking-tight text-Heres-white">Create</h3>
               </div>
               <p className="text-sm text-Heres-muted leading-relaxed">
-                Create a capsule to define beneficiaries, amounts, and inactivity period on Solana Devnet.
+                Create a capsule to define beneficiaries, amounts, and inactivity period on the active Solana network.
               </p>
               <div className="mt-6 flex-1 overflow-hidden rounded-xl border border-white/[0.06] bg-black/20">
                 <div className="relative h-full min-h-[200px] w-full">
