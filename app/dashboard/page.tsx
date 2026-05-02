@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
+  ArrowUpRight,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -10,13 +11,12 @@ import {
   RefreshCw,
   Settings,
   Signal,
-  Sparkles,
   User,
 } from 'lucide-react'
 import { Connection, PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { getProgramId, getSolanaConnection } from '@/config/solana'
-import { SOLANA_CONFIG, PLATFORM_FEE, HELIUS_CONFIG, getExplorerUrl, getNetworkDisplayLabel } from '@/constants'
+import { SOLANA_CONFIG, PLATFORM_FEE, HELIUS_CONFIG, getExplorerUrl } from '@/constants'
 import { getEnhancedTransactions } from '@/lib/helius'
 import { initFeeConfig } from '@/lib/solana'
 import { getFeeConfigPDA } from '@/lib/program'
@@ -78,6 +78,8 @@ const timeAgo = (timestampMs: number | null) => {
   const days = Math.floor(hours / 24)
   return `${days}d ago`
 }
+
+const formatDelta = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
 
 const maskAddress = (address: string) =>
   address.length > 10 ? `${address.slice(0, 4)}...${address.slice(-4)}` : address
@@ -808,15 +810,52 @@ export default function DashboardPage() {
   const pageStart = (currentPage - 1) * pageSize
   const pagedCapsules = filteredCapsules.slice(pageStart, pageStart + pageSize)
 
+  const totalBase = Math.max(summary.total, 1)
+  const activeDelta = (summary.active / totalBase) * 100
+  const executedDelta = (summary.executed / totalBase) * 100
+  const proofDelta = summary.successRate
+  const totalDelta = ((summary.active + summary.proofs) / totalBase) * 100
+
   const statCards = [
-    { label: 'Total Capsules', value: formatNumber(summary.total), tone: 'text-Heres-accent' },
-    { label: 'Active Capsules', value: formatNumber(summary.active), tone: 'text-Heres-accent' },
-    { label: 'Executed Capsules', value: formatNumber(summary.executed), tone: 'text-Heres-purple' },
-    { label: 'PER (TEE) Verified', value: formatNumber(summary.proofs), tone: 'text-Heres-accent' },
+    {
+      label: 'Total Capsule Events',
+      value: formatNumber(summary.total),
+      metaLabel: 'Active + Verified',
+      metaValue: formatNumber(summary.active + summary.proofs),
+      delta: formatDelta(totalDelta),
+      accent: 'cyan' as const,
+      linePath: 'M8 80 C28 18, 54 70, 74 40 S112 28, 132 20',
+    },
+    {
+      label: 'Active Capsules',
+      value: formatNumber(summary.active),
+      metaLabel: 'Live on dashboard',
+      metaValue: `${activeDelta.toFixed(1)}%`,
+      delta: formatDelta(activeDelta),
+      accent: 'cyan' as const,
+      linePath: 'M8 78 C24 62, 40 44, 58 38 S92 34, 112 20 S126 12, 132 14',
+    },
+    {
+      label: 'Executed Capsules',
+      value: formatNumber(summary.executed),
+      metaLabel: 'Execution share',
+      metaValue: `${executedDelta.toFixed(1)}%`,
+      delta: formatDelta(executedDelta),
+      accent: 'purple' as const,
+      linePath: 'M8 84 C28 66, 42 76, 58 56 S86 32, 100 30 S120 18, 132 12',
+    },
+    {
+      label: 'PER (TEE) Verified',
+      value: formatNumber(summary.proofs),
+      metaLabel: 'Proof success rate',
+      metaValue: `${proofDelta.toFixed(1)}%`,
+      delta: formatDelta(proofDelta),
+      accent: 'cyan' as const,
+      linePath: 'M8 82 C24 70, 40 48, 58 52 S86 42, 100 26 S122 18, 132 8',
+    },
   ]
 
   const programIdStr = SOLANA_CONFIG.PROGRAM_ID
-  const rpcLabel = SOLANA_CONFIG.HELIUS_API_KEY ? `Helius ${SOLANA_CONFIG.NETWORK}` : getNetworkDisplayLabel()
 
   return (
     <div className="min-h-screen bg-hero text-Heres-white">
@@ -841,6 +880,16 @@ export default function DashboardPage() {
                 <span className="text-Heres-accent font-semibold">
                   {formatNumber(summary.total)} Capsules
                 </span>
+                <a
+                  href={getExplorerUrl('address', programIdStr)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg border border-Heres-border bg-Heres-card/80 px-3 py-1.5 text-xs font-medium text-Heres-muted transition-colors hover:border-Heres-accent/40 hover:text-Heres-accent"
+                  title={programIdStr}
+                >
+                  <span className="uppercase tracking-wider text-[10px]">Program ID</span>
+                  <span className="font-mono text-Heres-white">{maskAddress(programIdStr)}</span>
+                </a>
               </div>
               <div className="flex items-center gap-3">
                 <Link
@@ -909,46 +958,70 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {/* Explorer-style: metadata grid (Network, Program ID, Query URL) */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Network</p>
-              <p className="text-sm font-medium text-Heres-white truncate">
-                {getNetworkDisplayLabel()}
-              </p>
-            </div>
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Program ID</p>
-              <div className="flex items-center gap-1">
-                <p className="text-sm font-mono text-Heres-white truncate min-w-0" title={programIdStr}>
-                  {maskAddress(programIdStr)}
-                </p>
-                <CopyButton value={programIdStr} />
-              </div>
-            </div>
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">RPC</p>
-              <p className="text-sm font-medium text-Heres-white truncate">{rpcLabel}</p>
-            </div>
-            <div className="rounded-xl border border-Heres-border bg-Heres-card/80 p-4 sm:col-span-2 lg:col-span-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-Heres-muted mb-1">Index Status</p>
-              <p className="text-sm font-medium text-Heres-accent">Live</p>
-            </div>
-          </section>
-
           {/* Stats row (Explorer "Signal" style) */}
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
-            {statCards.map((card) => (
+            {statCards.map((card, index) => (
               <div
                 key={card.label}
-                className="card-Heres p-5 transition-all hover:border-Heres-accent/30"
+                className={`dashboard-stat-card dashboard-stat-card--${card.accent}`}
               >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium uppercase tracking-wider text-Heres-muted">{card.label}</p>
-                  <Sparkles className="w-4 h-4 text-Heres-accent" />
+                <div className="dashboard-stat-card__glow" />
+                <div className="relative z-10 flex h-full items-start justify-between gap-6">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-Heres-muted/90">
+                      {card.label}
+                    </p>
+                    <div className="mt-3 text-[2.1rem] font-semibold leading-none text-Heres-accent sm:text-[2.35rem]">
+                      {card.value}
+                    </div>
+                    <div className="mt-5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-Heres-muted/80">
+                        {card.metaLabel}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span className="text-2xl font-semibold text-white/80">
+                          {card.metaValue}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-lg font-semibold text-emerald-400">
+                          <ArrowUpRight className="h-4 w-4" />
+                          {card.delta}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-Heres-muted/80">
+                        {lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : 'Updated just now'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="dashboard-stat-card__chart">
+                    <svg viewBox="0 0 140 92" className="h-full w-full" aria-hidden="true">
+                      <defs>
+                        <filter id={`glow-${index}`}>
+                          <feGaussianBlur stdDeviation="2.5" result="blur" />
+                          <feMerge>
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="SourceGraphic" />
+                          </feMerge>
+                        </filter>
+                      </defs>
+                      <path
+                        d={card.linePath}
+                        fill="none"
+                        stroke="rgba(34, 211, 238, 0.2)"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        filter={`url(#glow-${index})`}
+                      />
+                      <path
+                        d={card.linePath}
+                        fill="none"
+                        stroke={card.accent === 'purple' ? '#a78bfa' : '#22d3ee'}
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
                 </div>
-                <div className={`mt-3 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
-                <p className="mt-1 text-xs text-Heres-muted">Protocol health</p>
               </div>
             ))}
           </section>
